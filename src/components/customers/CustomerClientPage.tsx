@@ -5,11 +5,11 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, Edit2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Trash2, Search } from "lucide-react";
+import { PlusCircle, Users, Edit2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+// import { Textarea } from "@/components/ui/textarea"; // No longer needed for address
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import type { Customer } from "@/types";
 import { CustomerSchema } from "@/types";
@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Textarea } from "../ui/textarea";
 
 const FIRESTORE_COLLECTION_NAME = "clientes";
 
@@ -43,6 +44,22 @@ interface ViaCepResponse {
   erro?: boolean;
 }
 
+const formatAddressForDisplay = (customer: Customer): string => {
+  const parts: string[] = [];
+  if (customer.street) {
+    let line = customer.street;
+    if (customer.number) line += `, ${customer.number}`;
+    parts.push(line);
+  }
+  if (customer.neighborhood) parts.push(customer.neighborhood);
+  if (customer.city && customer.state) parts.push(`${customer.city} - ${customer.state}`);
+  else if (customer.city) parts.push(customer.city);
+  else if (customer.state) parts.push(customer.state);
+  
+  return parts.join(', ').trim() || "Endereço não fornecido";
+};
+
+
 export function CustomerClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -55,10 +72,15 @@ export function CustomerClientPage() {
     resolver: zodResolver(CustomerSchema),
     defaultValues: {
       name: "",
-      address: "",
       cnpj: "",
       email: "",
       cep: "",
+      street: "",
+      number: "",
+      complement: "",
+      neighborhood: "",
+      city: "",
+      state: "",
       preferredTechnician: "",
       notes: "",
     },
@@ -118,21 +140,34 @@ export function CustomerClientPage() {
 
   const handleSearchCep = async () => {
     const cepValue = form.getValues("cep");
-    if (!cepValue || cepValue.replace(/\D/g, "").length !== 8) {
-      toast({ title: "CEP Inválido", description: "Por favor, insira um CEP com 8 dígitos.", variant: "destructive" });
+    if (!cepValue) {
+        toast({ title: "CEP Vazio", description: "Por favor, insira um CEP.", variant: "default" });
+        return;
+    }
+    const cleanedCep = cepValue.replace(/\D/g, "");
+    if (cleanedCep.length !== 8) {
+      toast({ title: "CEP Inválido", description: "CEP deve conter 8 dígitos.", variant: "destructive" });
       return;
     }
+
     setIsCepLoading(true);
     try {
-      const response = await fetch(`https://viacep.com.br/ws/${cepValue.replace(/\D/g, "")}/json/`);
+      const response = await fetch(`https://viacep.com.br/ws/${cleanedCep}/json/`);
       const data: ViaCepResponse = await response.json();
       if (data.erro) {
         toast({ title: "CEP Não Encontrado", description: "O CEP informado não foi encontrado.", variant: "destructive" });
-        form.setValue("address", ""); // Limpa o endereço se o CEP não for encontrado
+        form.setValue("street", "");
+        form.setValue("neighborhood", "");
+        form.setValue("city", "");
+        form.setValue("state", "");
+        form.setValue("complement", "");
       } else {
-        const fullAddress = `${data.logradouro || ""}${data.logradouro && data.bairro ? ", " : ""}${data.bairro || ""}${ (data.logradouro || data.bairro) && data.localidade ? " - " : ""}${data.localidade || ""}${data.localidade && data.uf ? " / " : ""}${data.uf || ""}`.trim();
-        form.setValue("address", fullAddress);
-        toast({ title: "Endereço Encontrado", description: "O endereço foi preenchido." });
+        form.setValue("street", data.logradouro || "");
+        form.setValue("neighborhood", data.bairro || "");
+        form.setValue("city", data.localidade || "");
+        form.setValue("state", data.uf || "");
+        form.setValue("complement", data.complemento || "");
+        toast({ title: "Endereço Encontrado", description: "Os campos de endereço foram preenchidos." });
       }
     } catch (error) {
       toast({ title: "Erro ao Buscar CEP", description: "Não foi possível buscar o endereço. Verifique sua conexão.", variant: "destructive" });
@@ -147,7 +182,11 @@ export function CustomerClientPage() {
       form.reset(customer);
     } else {
       setEditingCustomer(null);
-      form.reset({ name: "", address: "", cnpj: "", email: "", cep: "", preferredTechnician: "", notes: "" });
+      form.reset({
+        name: "", cnpj: "", email: "", cep: "", street: "", number: "",
+        complement: "", neighborhood: "", city: "", state: "",
+        preferredTechnician: "", notes: ""
+      });
     }
     setIsModalOpen(true);
   };
@@ -168,7 +207,9 @@ export function CustomerClientPage() {
   
   const handleModalDeleteConfirm = () => {
     if (editingCustomer && editingCustomer.id) {
-      deleteCustomerMutation.mutate(editingCustomer.id);
+       if (window.confirm(`Tem certeza que deseja excluir o cliente "${editingCustomer.name}"?`)) {
+        deleteCustomerMutation.mutate(editingCustomer.id);
+      }
     }
   };
   
@@ -228,8 +269,11 @@ export function CustomerClientPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                {customer.cep && <p className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> CEP: {customer.cep}</p>}
-                <p className="flex items-start"><MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> {customer.address}</p>
+                <p className="flex items-start">
+                  <MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> 
+                  {formatAddressForDisplay(customer)}
+                </p>
+                {customer.cep && <p className="text-xs text-muted-foreground ml-6">CEP: {customer.cep}</p>}
                 <p className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> {customer.email}</p>
                 {customer.preferredTechnician && <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> Técnico Pref.: {customer.preferredTechnician}</p>}
                 {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
@@ -266,6 +310,14 @@ export function CustomerClientPage() {
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome completo do cliente ou razão social" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+            <FormField control={form.control} name="cnpj" render={({ field }) => (
+              <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input placeholder="00.000.000/0000-00" {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+             <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="contato@exemplo.com" {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+
+            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Endereço</h3>
             
             <FormField control={form.control} name="cep" render={({ field }) => (
               <FormItem>
@@ -273,7 +325,6 @@ export function CustomerClientPage() {
                 <div className="flex items-center gap-2">
                   <FormControl>
                     <Input placeholder="00000-000" {...field} value={field.value ?? ""} onChange={(e) => {
-                      // Basic CEP masking (optional)
                       const value = e.target.value.replace(/\D/g, "");
                       if (value.length <= 5) {
                         field.onChange(value);
@@ -294,15 +345,33 @@ export function CustomerClientPage() {
               </FormItem>
             )} />
 
-            <FormField control={form.control} name="address" render={({ field }) => (
-              <FormItem><FormLabel>Endereço</FormLabel><FormControl><Textarea placeholder="Rua, Número, Bairro - Cidade / UF" {...field} /></FormControl><FormMessage /></FormItem>
+            <FormField control={form.control} name="street" render={({ field }) => (
+              <FormItem><FormLabel>Rua / Logradouro</FormLabel><FormControl><Input placeholder="Ex: Av. Paulista" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
-            <FormField control={form.control} name="cnpj" render={({ field }) => (
-              <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input placeholder="00.000.000/0000-00" {...field} /></FormControl><FormMessage /></FormItem>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField control={form.control} name="number" render={({ field }) => (
+                <FormItem className="md:col-span-1"><FormLabel>Número</FormLabel><FormControl><Input placeholder="Ex: 123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="complement" render={({ field }) => (
+                <FormItem className="md:col-span-2"><FormLabel>Complemento</FormLabel><FormControl><Input placeholder="Ex: Apto 10, Bloco B" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+
+            <FormField control={form.control} name="neighborhood" render={({ field }) => (
+              <FormItem><FormLabel>Bairro</FormLabel><FormControl><Input placeholder="Ex: Bela Vista" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
-            <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="contato@exemplo.com" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField control={form.control} name="city" render={({ field }) => (
+                <FormItem className="md:col-span-2"><FormLabel>Cidade</FormLabel><FormControl><Input placeholder="Ex: São Paulo" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="state" render={({ field }) => (
+                <FormItem className="md:col-span-1"><FormLabel>Estado (UF)</FormLabel><FormControl><Input placeholder="Ex: SP" maxLength={2} {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+            
+            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Outras Informações</h3>
             <FormField control={form.control} name="preferredTechnician" render={({ field }) => (
               <FormItem><FormLabel>Técnico Preferencial (Opcional)</FormLabel><FormControl><Input placeholder="Nome do técnico" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />

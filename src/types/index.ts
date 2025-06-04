@@ -1,11 +1,17 @@
 
+
 export interface Customer {
   id: string;
   name: string;
-  address: string;
   cnpj: string;
   email: string;
-  cep?: string; // Adicionado campo CEP
+  cep?: string | null;
+  street: string;
+  number?: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string; // UF / Estado
   preferredTechnician?: string;
   notes?: string;
 }
@@ -75,10 +81,20 @@ import { z } from 'zod';
 
 export const CustomerSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
-  address: z.string().min(1, "Endereço é obrigatório"),
-  cnpj: z.string().min(1, "CNPJ é obrigatório"), 
+  cnpj: z.string().min(1, "CNPJ é obrigatório"), // TODO: Add CNPJ validation/masking later
   email: z.string().email("Endereço de email inválido"),
-  cep: z.string().optional().nullable().transform(val => val === "" ? null : val), // CEP é opcional
+  cep: z.string()
+    .refine(val => !val || /^\d{5}-?\d{3}$/.test(val), { message: "CEP inválido. Use o formato XXXXX-XXX ou XXXXXXXX." })
+    .optional()
+    .nullable()
+    .transform(val => val ? val.replace(/\D/g, '') : null) // Remove non-digits before saving
+    .transform(val => val && val.length === 8 ? `${val.slice(0,5)}-${val.slice(5)}` : val), // Format for display/storage if 8 digits
+  street: z.string().min(1, "Rua é obrigatória"),
+  number: z.string().optional(),
+  complement: z.string().optional(),
+  neighborhood: z.string().min(1, "Bairro é obrigatório"),
+  city: z.string().min(1, "Cidade é obrigatória"),
+  state: z.string().length(2, "UF deve ter 2 caracteres").min(2, "UF é obrigatória e deve ter 2 caracteres"),
   preferredTechnician: z.string().optional(),
   notes: z.string().optional(),
 });
