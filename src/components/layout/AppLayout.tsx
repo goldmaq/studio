@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -25,9 +26,10 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Logo } from "@/components/icons/Logo";
+import { Logo } from "@/components/icons/Logo"; // Assuming you might want to use the textual logo here too
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface NavItem {
   href: string;
@@ -57,29 +59,30 @@ function MainSidebar() {
     >
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <Link href="/" className="flex items-center gap-2">
-          <Package className="w-8 h-8 text-primary" />
-          <span className="font-headline text-xl font-semibold text-foreground">
-            GoldMaq Controle
-          </span>
+          {/* Using the SVG Logo component here */}
+          <Logo className="h-8 w-auto" /> 
         </Link>
       </SidebarHeader>
       <SidebarContent>
         <ScrollArea className="h-full">
           <SidebarMenu>
-            {navItems.map((item) => (
-              <SidebarMenuItem key={item.label}>
-                <Link href={item.href} passHref legacyBehavior>
-                  <SidebarMenuButton
-                    isActive={pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))}
-                    tooltip={{ children: item.label, side: "right" }}
-                    className="justify-start"
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            ))}
+            {navItems.map((item) => {
+              const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+              return (
+                <SidebarMenuItem key={item.label}>
+                  <Link href={item.href} passHref legacyBehavior>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      tooltip={{ children: item.label, side: "right" }}
+                      className="justify-start"
+                    >
+                      <item.icon className={cn("w-5 h-5", isActive && "text-primary")} />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </Link>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </ScrollArea>
       </SidebarContent>
@@ -89,8 +92,13 @@ function MainSidebar() {
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const currentPathname = usePathname();
-  const currentNavItem = navItems.find(item => item.href === currentPathname || (item.href !== "/" && currentPathname.startsWith(item.href)));
+  // Attempt to find the current nav item for page title, fallback to a generic title if needed.
+  const currentNavItem = navItems.find(item => {
+    if (item.href === "/") return currentPathname === "/";
+    return currentPathname.startsWith(item.href);
+  });
   const pageTitle = currentNavItem?.label || "Painel";
+
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -101,8 +109,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <div className="flex items-center">
                <SidebarTrigger className="md:hidden"/>
             </div>
-            <div className="font-headline text-lg font-semibold">
-              {pageTitle}
+            <div className="font-heading text-lg font-semibold text-foreground">
+              {/* Display the dynamic page title, fallback if necessary */}
+              {currentPathname === "/" ? "Painel Principal" : pageTitle}
             </div>
             <div>{/* User menu or other actions can go here */}</div>
           </header>

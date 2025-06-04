@@ -8,25 +8,27 @@ body {
 
 @layer base {
   :root {
-    --background: 210 17% 98%;
-    --foreground: 215 28% 17%;
-    --card: 0 0% 100%;
-    --card-foreground: 215 28% 17%;
+    /* Light Theme - Main Content Area (as per screenshot) */
+    --background: 0 0% 100%; /* White */
+    --foreground: 215 28% 17%; /* Dark text */
+    --card: 0 0% 100%; /* White cards */
+    --card-foreground: 215 28% 17%; /* Dark text on cards */
     --popover: 0 0% 100%;
     --popover-foreground: 215 28% 17%;
-    --primary: 26 95% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 16% 93%;
-    --secondary-foreground: 215 28% 17%;
-    --muted: 210 16% 90%;
-    --muted-foreground: 215 15% 45%;
-    --accent: 45 95% 53%;
-    --accent-foreground: 215 28% 17%;
+    --primary: 26 95% 53%; /* Vibrant Orange */
+    --primary-foreground: 210 40% 98%; /* Light text on orange */
+    --secondary: 210 20% 94%; /* Light gray for secondary elements */
+    --secondary-foreground: 215 28% 17%; /* Dark text on secondary */
+    --muted: 210 20% 96%; /* Very light gray for muted elements */
+    --muted-foreground: 215 15% 45%; /* Medium-dark text for muted */
+    --accent: 45 95% 53%; /* Gold - can be used for other accents */
+    --accent-foreground: 215 28% 17%; /* Dark text on gold */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 210 14% 89%;
-    --input: 210 14% 89%;
-    --ring: 26 95% 53%;
+    --border: 210 10% 85%; /* Light gray border */
+    --input: 210 10% 85%; /* Light gray input border */
+    --ring: 26 95% 53%; /* Orange for focus rings */
+    
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -34,18 +36,19 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* Sidebar specific variables for light theme */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 28% 17%;
-    --sidebar-primary: 26 95% 53%; /* Use main primary for sidebar interactive elements */
-    --sidebar-primary-foreground: 210 40% 98%; /* Contrast for sidebar primary */
-    --sidebar-accent: 210 16% 93%; /* Use main secondary as sidebar accent */
-    --sidebar-accent-foreground: 215 28% 17%; /* Contrast for sidebar accent */
-    --sidebar-border: 210 14% 89%; /* Use main border for sidebar */
-    --sidebar-ring: 26 95% 53%; /* Use main ring for sidebar focus */
+    /* Sidebar specific variables for light theme (to achieve dark sidebar as per screenshot) */
+    --sidebar-background: 220 13% 18%; /* Dark gray for sidebar */
+    --sidebar-foreground: 210 40% 98%; /* Light text for sidebar */
+    --sidebar-primary: 26 95% 53%; /* Orange for active icons in sidebar */
+    --sidebar-primary-foreground: 210 40% 98%; /* Light text on primary elements in sidebar */
+    --sidebar-accent: 220 13% 25%; /* Slightly lighter dark gray for sidebar item hover/active background */
+    --sidebar-accent-foreground: 210 40% 98%; /* Light text for sidebar item hover/active text */
+    --sidebar-border: 220 13% 22%; /* Border color within sidebar */
+    --sidebar-ring: 26 95% 53%; /* Orange for focus rings in sidebar */
   }
 
   .dark {
+    /* Standard Dark Theme (remains available if a theme switcher is added) */
     --background: 215 28% 17%;
     --foreground: 210 17% 98%;
     --card: 215 25% 22%;
@@ -72,13 +75,13 @@ body {
     --chart-5: 340 75% 55%;
 
     /* Sidebar specific variables for dark theme */
-    --sidebar-background: 215 28% 12%; /* Darker than main dark background */
+    --sidebar-background: 215 28% 12%; 
     --sidebar-foreground: 210 17% 98%;
     --sidebar-primary: 26 95% 53%;
     --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 215 20% 25%; /* Use main dark secondary as sidebar accent */
+    --sidebar-accent: 215 20% 25%; 
     --sidebar-accent-foreground: 210 17% 98%;
-    --sidebar-border: 215 20% 25%; /* Use a slightly lighter border than background */
+    --sidebar-border: 215 20% 25%; 
     --sidebar-ring: 26 95% 53%;
   }
 }
