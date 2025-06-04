@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, HardHat, Edit2, Trash2, UserCircle, Wrench, Loader2 } from "lucide-react";
+import { PlusCircle, HardHat, Edit2, Trash2, UserCircle, Wrench, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,36 +18,79 @@ import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const FIRESTORE_COLLECTION_NAME = "tecnicos";
 
+async function fetchTechnicians(): Promise<Technician[]> {
+  const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
+}
+
 export function TechnicianClientPage() {
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTechnician, setEditingTechnician] = useState<Technician | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof TechnicianSchema>>({
     resolver: zodResolver(TechnicianSchema),
     defaultValues: { name: "", employeeId: "", specialization: "" },
   });
 
-  useEffect(() => {
-    const fetchTechnicians = async () => {
-      setIsLoading(true);
-      try {
-        const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
-        const techniciansData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
-        setTechnicians(techniciansData);
-      } catch (error) {
-        console.error("Erro ao buscar técnicos:", error);
-        toast({ title: "Erro ao Carregar Técnicos", description: "Não foi possível buscar os dados dos técnicos.", variant: "destructive" });
-      }
-      setIsLoading(false);
-    };
-    fetchTechnicians();
-  }, [toast]);
+  const { data: technicians = [], isLoading, isError, error } = useQuery<Technician[], Error>({
+    queryKey: [FIRESTORE_COLLECTION_NAME],
+    queryFn: fetchTechnicians,
+  });
+
+  const addTechnicianMutation = useMutation({
+    mutationFn: async (newTechnicianData: z.infer<typeof TechnicianSchema>) => {
+      return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newTechnicianData);
+    },
+    onSuccess: (docRef, variables) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Técnico Adicionado", description: `${variables.name} foi adicionado.` });
+      closeModal();
+    },
+    onError: (err: Error, variables) => {
+      console.error("Erro ao adicionar técnico:", err);
+      toast({ title: "Erro ao Adicionar", description: `Não foi possível adicionar o técnico ${variables.name}. Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+
+  const updateTechnicianMutation = useMutation({
+    mutationFn: async (technicianData: Technician) => {
+      const { id, ...dataToUpdate } = technicianData;
+      if (!id) throw new Error("ID do técnico é necessário para atualização.");
+      const techRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
+      return updateDoc(techRef, dataToUpdate);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Técnico Atualizado", description: `${variables.name} foi atualizado.` });
+      closeModal();
+    },
+    onError: (err: Error, variables) => {
+      console.error("Erro ao atualizar técnico:", err);
+      toast({ title: "Erro ao Atualizar", description: `Não foi possível atualizar o técnico ${variables.name}. Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+
+  const deleteTechnicianMutation = useMutation({
+    mutationFn: async (technicianId: string) => {
+      if (!technicianId) throw new Error("ID do técnico é necessário para exclusão.");
+      return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, technicianId));
+    },
+    onSuccess: (_, technicianId) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Técnico Excluído", description: `O técnico (ID: ${technicianId}) foi removido.` });
+    },
+    onError: (err: Error, technicianId) => {
+      console.error("Erro ao excluir técnico:", err);
+      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o técnico (ID: ${technicianId}). Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
 
   const openModal = (technician?: Technician) => {
     if (technician) {
@@ -67,35 +110,21 @@ export function TechnicianClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof TechnicianSchema>) => {
-    try {
-      if (editingTechnician) {
-        const techRef = doc(db, FIRESTORE_COLLECTION_NAME, editingTechnician.id);
-        await updateDoc(techRef, values);
-        setTechnicians(technicians.map((t) => (t.id === editingTechnician.id ? { ...t, ...values } : t)));
-        toast({ title: "Técnico Atualizado", description: `${values.name} foi atualizado.` });
-      } else {
-        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), values);
-        setTechnicians([...technicians, { id: docRef.id, ...values }]);
-        toast({ title: "Técnico Adicionado", description: `${values.name} foi adicionado.` });
-      }
-      closeModal();
-    } catch (error) {
-      console.error("Erro ao salvar técnico:", error);
-      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados do técnico.", variant: "destructive" });
+    if (editingTechnician && editingTechnician.id) {
+      updateTechnicianMutation.mutate({ ...values, id: editingTechnician.id });
+    } else {
+      addTechnicianMutation.mutate(values);
     }
   };
 
-  const handleDelete = async (technicianId: string) => {
-    try {
-      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, technicianId));
-      setTechnicians(technicians.filter(t => t.id !== technicianId));
-      toast({ title: "Técnico Excluído", description: "O técnico foi removido.", variant: "default" });
-    } catch (error) {
-      console.error("Erro ao excluir técnico:", error);
-      toast({ title: "Erro ao Excluir", description: "Não foi possível excluir o técnico.", variant: "destructive" });
+  const handleDelete = async (technician: Technician) => {
+    if (window.confirm(`Tem certeza que deseja excluir o técnico "${technician.name}"?`)) {
+      deleteTechnicianMutation.mutate(technician.id);
     }
   };
   
+  const isMutating = addTechnicianMutation.isPending || updateTechnicianMutation.isPending;
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -105,18 +134,29 @@ export function TechnicianClientPage() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-destructive">
+        <AlertTriangle className="h-12 w-12 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Técnicos</h2>
+        <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
+        <p className="text-sm mt-2">Detalhe: {error?.message}</p>
+      </div>
+    );
+  }
+
   return (
     <>
       <PageHeader 
         title="Cadastro de Técnicos"
         actions={
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || deleteTechnicianMutation.isPending}>
             <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Técnico
           </Button>
         }
       />
 
-      {technicians.length === 0 ? (
+      {technicians.length === 0 && !isLoading ? (
         <DataTablePlaceholder
           icon={HardHat}
           title="Nenhum Técnico Cadastrado"
@@ -141,11 +181,12 @@ export function TechnicianClientPage() {
                 {tech.specialization && <p className="flex items-center"><Wrench className="mr-2 h-4 w-4 text-primary" /> Especialização: {tech.specialization}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(tech)}>
+                <Button variant="outline" size="sm" onClick={() => openModal(tech)} disabled={isMutating || deleteTechnicianMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(tech.id)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                <Button variant="destructive" size="sm" onClick={() => handleDelete(tech)} disabled={deleteTechnicianMutation.isPending && deleteTechnicianMutation.variables === tech.id}>
+                  {deleteTechnicianMutation.isPending && deleteTechnicianMutation.variables === tech.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Excluir
                 </Button>
               </CardFooter>
             </Card>
@@ -159,7 +200,7 @@ export function TechnicianClientPage() {
         title={editingTechnician ? "Editar Técnico" : "Adicionar Novo Técnico"}
         description="Insira os detalhes do técnico."
         formId="technician-form"
-        isSubmitting={form.formState.isSubmitting}
+        isSubmitting={isMutating}
         editingItem={editingTechnician}
       >
         <Form {...form}>

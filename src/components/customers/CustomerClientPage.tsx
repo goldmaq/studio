@@ -54,7 +54,15 @@ export function CustomerClientPage() {
 
   const addCustomerMutation = useMutation({
     mutationFn: async (newCustomerData: z.infer<typeof CustomerSchema>) => {
-      return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newCustomerData);
+      console.log("Attempting to add customer to Firestore:", newCustomerData);
+      try {
+        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newCustomerData);
+        console.log("Customer added to Firestore with ID:", docRef.id);
+        return docRef;
+      } catch (e) {
+        console.error("Error directly in addDoc while creating customer:", e);
+        throw e; 
+      }
     },
     onSuccess: (docRef, variables) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -62,7 +70,7 @@ export function CustomerClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao criar cliente:", err);
+      console.error("Erro ao criar cliente (onError):", err);
       toast({ title: "Erro ao Criar", description: `Não foi possível criar o cliente ${variables.name}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -71,8 +79,15 @@ export function CustomerClientPage() {
     mutationFn: async (customerData: Customer) => {
       const { id, ...dataToUpdate } = customerData;
       if (!id) throw new Error("ID do cliente é necessário para atualização.");
+      console.log("Attempting to update customer in Firestore, ID:", id, dataToUpdate);
       const customerRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
-      return updateDoc(customerRef, dataToUpdate);
+      try {
+        await updateDoc(customerRef, dataToUpdate);
+        console.log("Customer updated in Firestore, ID:", id);
+      } catch (e) {
+        console.error("Error directly in updateDoc for customer:", e);
+        throw e;
+      }
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -80,7 +95,7 @@ export function CustomerClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao atualizar cliente:", err);
+      console.error("Erro ao atualizar cliente (onError):", err);
       toast({ title: "Erro ao Atualizar", description: `Não foi possível atualizar o cliente ${variables.name}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -88,15 +103,22 @@ export function CustomerClientPage() {
   const deleteCustomerMutation = useMutation({
     mutationFn: async (customerId: string) => {
       if (!customerId) throw new Error("ID do cliente é necessário para exclusão.");
-      return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, customerId));
+      console.log("Attempting to delete customer from Firestore, ID:", customerId);
+      try {
+        await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, customerId));
+        console.log("Customer deleted from Firestore, ID:", customerId);
+      } catch (e) {
+        console.error("Error directly in deleteDoc for customer:", e);
+        throw e;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (_, customerId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
-      toast({ title: "Cliente Excluído", description: "O cliente foi excluído." });
+      toast({ title: "Cliente Excluído", description: `O cliente (ID: ${customerId}) foi excluído.` });
     },
-    onError: (err: Error) => {
-      console.error("Erro ao excluir cliente:", err);
-      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o cliente. Detalhe: ${err.message}`, variant: "destructive" });
+    onError: (err: Error, customerId) => {
+      console.error("Erro ao excluir cliente (onError):", err);
+      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o cliente (ID: ${customerId}). Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
 
@@ -125,9 +147,9 @@ export function CustomerClientPage() {
     }
   };
 
-  const handleDelete = async (customerId: string) => {
-    if (window.confirm("Tem certeza que deseja excluir este cliente?")) {
-      deleteCustomerMutation.mutate(customerId);
+  const handleDelete = async (customer: Customer) => {
+    if (window.confirm(`Tem certeza que deseja excluir o cliente "${customer.name}"?`)) {
+      deleteCustomerMutation.mutate(customer.id);
     }
   };
   
@@ -158,7 +180,7 @@ export function CustomerClientPage() {
       <PageHeader 
         title="Clientes" 
         actions={
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || deleteCustomerMutation.isPending}>
             <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Cliente
           </Button>
         } 
@@ -189,10 +211,10 @@ export function CustomerClientPage() {
                 {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(customer)} disabled={deleteCustomerMutation.isPending}>
+                <Button variant="outline" size="sm" onClick={() => openModal(customer)} disabled={isMutating || deleteCustomerMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(customer.id)} disabled={deleteCustomerMutation.isPending}>
+                <Button variant="destructive" size="sm" onClick={() => handleDelete(customer)} disabled={deleteCustomerMutation.isPending && deleteCustomerMutation.variables === customer.id}>
                   {deleteCustomerMutation.isPending && deleteCustomerMutation.variables === customer.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                   Excluir
                 </Button>

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
@@ -20,6 +20,7 @@ import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
 const phaseIcons = {
@@ -30,13 +31,15 @@ const phaseIcons = {
   Cancelada: <X className="h-4 w-4 text-red-500" />,
 };
 
-// Helper para converter Timestamp do Firestore para string YYYY-MM-DD
+const FIRESTORE_COLLECTION_NAME = "ordensDeServico";
+
+// Helper para converter Timestamp do Firestore para string YYYY-MM-DD e vice-versa
 const formatDateForInput = (date: any): string => {
   if (!date) return "";
   if (date instanceof Timestamp) {
     return date.toDate().toISOString().split('T')[0];
   }
-  if (typeof date === 'string') { // Se já for string, retorna (útil para defaultValues)
+  if (typeof date === 'string') {
     try {
       return new Date(date).toISOString().split('T')[0];
     } catch (e) { return ""; }
@@ -44,47 +47,112 @@ const formatDateForInput = (date: any): string => {
   return "";
 };
 
-const FIRESTORE_COLLECTION_NAME = "ordensDeServico";
+const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
+  if (!dateString) return null;
+  const date = new Date(dateString);
+  // Check if date is valid after parsing. Add one day to counteract timezone issues if only date is provided.
+  if (isNaN(date.getTime())) return null;
+  const adjustedDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  return Timestamp.fromDate(adjustedDate);
+};
+
+async function fetchServiceOrders(): Promise<ServiceOrder[]> {
+  const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
+  return querySnapshot.docs.map(docSnap => {
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      ...data,
+      startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
+      endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
+    } as ServiceOrder;
+  });
+}
+
 
 export function ServiceOrderClientPage() {
-  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof ServiceOrderSchema>>({
     resolver: zodResolver(ServiceOrderSchema),
     defaultValues: {
       orderNumber: "", customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
       natureOfService: "", vehicleId: "", estimatedLaborCost: 0, description: "", notes: "",
-      startDate: new Date().toISOString().split('T')[0], endDate: ""
+      startDate: formatDateForInput(new Date().toISOString()), endDate: ""
     },
   });
 
-  useEffect(() => {
-    const fetchServiceOrders = async () => {
-      setIsLoading(true);
-      try {
-        const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
-        const ordersData = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return { 
-            id: doc.id, 
-            ...data,
-            startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
-            endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
-          } as ServiceOrder;
-        });
-        setServiceOrders(ordersData);
-      } catch (error) {
-        console.error("Erro ao buscar ordens de serviço:", error);
-        toast({ title: "Erro ao Carregar Ordens", description: "Não foi possível buscar os dados das ordens de serviço.", variant: "destructive" });
-      }
-      setIsLoading(false);
-    };
-    fetchServiceOrders();
-  }, [toast]);
+  const { data: serviceOrders = [], isLoading, isError, error } = useQuery<ServiceOrder[], Error>({
+    queryKey: [FIRESTORE_COLLECTION_NAME],
+    queryFn: fetchServiceOrders,
+  });
+
+  const addServiceOrderMutation = useMutation({
+    mutationFn: async (newOrderData: z.infer<typeof ServiceOrderSchema>) => {
+      const dataToSave = {
+        ...newOrderData,
+        startDate: convertToTimestamp(newOrderData.startDate),
+        endDate: convertToTimestamp(newOrderData.endDate),
+        estimatedLaborCost: Number(newOrderData.estimatedLaborCost),
+        actualLaborCost: newOrderData.actualLaborCost ? Number(newOrderData.actualLaborCost) : undefined,
+      };
+      return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), dataToSave);
+    },
+    onSuccess: (docRef, variables) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Ordem de Serviço Criada", description: `Ordem ${variables.orderNumber} criada.` });
+      closeModal();
+    },
+    onError: (err: Error, variables) => {
+      console.error("Erro ao criar ordem de serviço:", err);
+      toast({ title: "Erro ao Criar OS", description: `Não foi possível criar a OS ${variables.orderNumber}. Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+
+  const updateServiceOrderMutation = useMutation({
+    mutationFn: async (orderData: ServiceOrder) => {
+      const { id, ...dataToUpdate } = orderData;
+      if (!id) throw new Error("ID da OS é necessário para atualização.");
+      const dataToSave = {
+        ...dataToUpdate,
+        startDate: convertToTimestamp(orderData.startDate),
+        endDate: convertToTimestamp(orderData.endDate),
+        estimatedLaborCost: Number(orderData.estimatedLaborCost),
+        actualLaborCost: orderData.actualLaborCost ? Number(orderData.actualLaborCost) : undefined,
+      };
+      const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
+      return updateDoc(orderRef, dataToSave);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Ordem de Serviço Atualizada", description: `Ordem ${variables.orderNumber} atualizada.` });
+      closeModal();
+    },
+    onError: (err: Error, variables) => {
+      console.error("Erro ao atualizar ordem de serviço:", err);
+      toast({ title: "Erro ao Atualizar OS", description: `Não foi possível atualizar a OS ${variables.orderNumber}. Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+
+  const deleteServiceOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      if (!orderId) throw new Error("ID da OS é necessário para exclusão.");
+      return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderId));
+    },
+    onSuccess: (_, orderId) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Ordem de Serviço Excluída", description: `A OS (ID: ${orderId}) foi excluída.` });
+    },
+    onError: (err: Error, orderId) => {
+      console.error("Erro ao excluir ordem de serviço:", err);
+      toast({ title: "Erro ao Excluir OS", description: `Não foi possível excluir a OS (ID: ${orderId}). Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+
 
   const openModal = (order?: ServiceOrder) => {
     if (order) {
@@ -93,6 +161,8 @@ export function ServiceOrderClientPage() {
         ...order,
         startDate: formatDateForInput(order.startDate),
         endDate: formatDateForInput(order.endDate),
+        estimatedLaborCost: Number(order.estimatedLaborCost) || 0,
+        actualLaborCost: order.actualLaborCost ? Number(order.actualLaborCost) : undefined,
       });
     } else {
       setEditingOrder(null);
@@ -100,7 +170,7 @@ export function ServiceOrderClientPage() {
         orderNumber: `OS-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`, 
         customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
         natureOfService: "", vehicleId: "", estimatedLaborCost: 0, description: "", notes: "",
-        startDate: new Date().toISOString().split('T')[0], endDate: ""
+        startDate: formatDateForInput(new Date().toISOString()), endDate: ""
       });
     }
     setIsModalOpen(true);
@@ -113,40 +183,25 @@ export function ServiceOrderClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
-    try {
-      const dataToSave = {
-        ...values,
-        startDate: values.startDate ? Timestamp.fromDate(new Date(values.startDate)) : null,
-        endDate: values.endDate ? Timestamp.fromDate(new Date(values.endDate)) : null,
-      };
-
-      if (editingOrder) {
-        const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, editingOrder.id);
-        await updateDoc(orderRef, dataToSave);
-        setServiceOrders(serviceOrders.map((o) => (o.id === editingOrder.id ? { ...editingOrder, ...values } : o))); // Usa values para UI
-        toast({ title: "Ordem de Serviço Atualizada", description: `Ordem ${values.orderNumber} atualizada.` });
-      } else {
-        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), dataToSave);
-        setServiceOrders([...serviceOrders, { id: docRef.id, ...values }]); // Usa values para UI
-        toast({ title: "Ordem de Serviço Criada", description: `Ordem ${values.orderNumber} criada.` });
-      }
-      closeModal();
-    } catch (error) {
-      console.error("Erro ao salvar ordem de serviço:", error);
-      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados da ordem de serviço.", variant: "destructive" });
+    const orderData = {
+      ...values,
+      estimatedLaborCost: Number(values.estimatedLaborCost),
+      actualLaborCost: values.actualLaborCost ? Number(values.actualLaborCost) : undefined,
+    };
+    if (editingOrder && editingOrder.id) {
+      updateServiceOrderMutation.mutate({ ...orderData, id: editingOrder.id });
+    } else {
+      addServiceOrderMutation.mutate(orderData);
     }
   };
 
-  const handleDelete = async (orderId: string) => {
-    try {
-      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderId));
-      setServiceOrders(serviceOrders.filter(o => o.id !== orderId));
-      toast({ title: "Ordem de Serviço Excluída", description: "A ordem de serviço foi excluída.", variant: "default" });
-    } catch (error) {
-      console.error("Erro ao excluir ordem de serviço:", error);
-      toast({ title: "Erro ao Excluir", description: "Não foi possível excluir a ordem de serviço.", variant: "destructive" });
+  const handleDelete = async (order: ServiceOrder) => {
+    if (window.confirm(`Tem certeza que deseja excluir a Ordem de Serviço "${order.orderNumber}"?`)) {
+      deleteServiceOrderMutation.mutate(order.id);
     }
   };
+  
+  const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending;
 
   if (isLoading) {
     return (
@@ -156,19 +211,30 @@ export function ServiceOrderClientPage() {
       </div>
     );
   }
+  
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-destructive">
+        <AlertTriangle className="h-12 w-12 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Ordens de Serviço</h2>
+        <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
+        <p className="text-sm mt-2">Detalhe: {error?.message}</p>
+      </div>
+    );
+  }
 
   return (
     <>
       <PageHeader 
         title="Ordens de Serviço" 
         actions={
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || deleteServiceOrderMutation.isPending}>
             <PlusCircle className="mr-2 h-4 w-4" /> Criar Ordem de Serviço
           </Button>
         }
       />
 
-      {serviceOrders.length === 0 ? (
+      {serviceOrders.length === 0 && !isLoading ? (
         <DataTablePlaceholder
           icon={ClipboardList}
           title="Nenhuma Ordem de Serviço Ainda"
@@ -191,16 +257,17 @@ export function ServiceOrderClientPage() {
                 <p className="flex items-center"><Construction className="mr-2 h-4 w-4 text-primary" /> ID Equip.: {order.equipmentId}</p>
                 <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> ID Téc.: {order.technicianId}</p>
                 <p className="flex items-center"><Settings2 className="mr-2 h-4 w-4 text-primary" /> Serviço: {order.natureOfService}</p>
-                <p className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Custo Est.: R$ {order.estimatedLaborCost.toFixed(2)}</p>
+                <p className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Custo Est.: R$ {Number(order.estimatedLaborCost).toFixed(2)}</p>
                 {order.startDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary" /> Início: {formatDateForInput(order.startDate)}</p>}
                 <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Desc.: {order.description}</p>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(order)}>
+                <Button variant="outline" size="sm" onClick={() => openModal(order)} disabled={isMutating || deleteServiceOrderMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(order.id)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                <Button variant="destructive" size="sm" onClick={() => handleDelete(order)} disabled={deleteServiceOrderMutation.isPending && deleteServiceOrderMutation.variables === order.id}>
+                   {deleteServiceOrderMutation.isPending && deleteServiceOrderMutation.variables === order.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Excluir
                 </Button>
               </CardFooter>
             </Card>
@@ -214,7 +281,7 @@ export function ServiceOrderClientPage() {
         title={editingOrder ? "Editar Ordem de Serviço" : "Criar Nova Ordem de Serviço"}
         description="Gerencie os detalhes da ordem de serviço."
         formId="service-order-form"
-        isSubmitting={form.formState.isSubmitting}
+        isSubmitting={isMutating}
         editingItem={editingOrder}
       >
         <Form {...form}>
@@ -247,13 +314,16 @@ export function ServiceOrderClientPage() {
                 <FormItem><FormLabel>ID do Veículo (Opcional)</FormLabel><FormControl><Input placeholder="Selecione o Veículo" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="estimatedLaborCost" render={({ field }) => (
-                <FormItem><FormLabel>Custo Estimado da Mão de Obra</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Custo Estimado da Mão de Obra</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="startDate" render={({ field }) => (
                 <FormItem><FormLabel>Data de Início</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="endDate" render={({ field }) => (
                 <FormItem><FormLabel>Data de Término (Opcional)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={form.control} name="actualLaborCost" render={({ field }) => (
+                <FormItem className="md:col-span-2"><FormLabel>Custo Real da Mão de Obra (Opcional)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
             <FormField control={form.control} name="description" render={({ field }) => (
