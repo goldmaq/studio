@@ -29,6 +29,15 @@ export function CompanyConfigClientPage() {
 
   const form = useForm<z.infer<typeof CompanySchema>>({
     resolver: zodResolver(CompanySchema),
+    defaultValues: {
+      name: "",
+      cnpj: "",
+      address: "",
+      bankName: "",
+      bankAgency: "",
+      bankAccount: "",
+      bankPixKey: "",
+    },
   });
 
   const openModal = (company: Company) => {
@@ -100,28 +109,28 @@ export function CompanyConfigClientPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="company-form" className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Nome da Empresa</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Nome da Empresa</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="cnpj" render={({ field }) => (
-              <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="address" render={({ field }) => (
-              <FormItem><FormLabel>Endereço</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Endereço</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Bancárias (Opcional)</h3>
             <FormField control={form.control} name="bankName" render={({ field }) => (
-              <FormItem><FormLabel>Nome do Banco</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Nome do Banco</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="bankAgency" render={({ field }) => (
-                <FormItem><FormLabel>Agência</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Agência</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="bankAccount" render={({ field }) => (
-                <FormItem><FormLabel>Conta</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Conta</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
             <FormField control={form.control} name="bankPixKey" render={({ field }) => (
-              <FormItem><FormLabel>Chave PIX</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Chave PIX</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
         </Form>
