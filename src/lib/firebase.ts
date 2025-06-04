@@ -38,12 +38,24 @@ Please ensure these environment variables are set in your .env.local (for local 
 or in your hosting provider's settings (for deployment). 
 Firebase functionalities will not work. Application cannot start.`;
   
-  // This error will be thrown when this module is imported, making the issue very clear.
-  // It will stop the JavaScript execution.
+  console.error(errorMessage); // Log no console do servidor também, se aplicável.
+  if (typeof window !== 'undefined') {
+    // Se estiver no cliente, tornar o erro muito óbvio na tela.
+    document.body.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word; padding: 20px; background-color: #fff0f0; border: 1px solid red; color: red; font-family: monospace;">${errorMessage}</pre>`;
+  }
   throw new Error(errorMessage);
 } else {
   // All values are present, so the cast to FirebaseConfig is safe.
   const completeConfig = firebaseConfigValues as FirebaseConfig;
+
+  // Log o projectId que está sendo usado para inicialização (aparecerá no console do navegador)
+  if (typeof window !== 'undefined') {
+    console.log("Firebase Init: Attempting to initialize with projectId:", completeConfig.projectId);
+    if (completeConfig.projectId !== "gold-maq-control") {
+      console.warn("Firebase Init: WARNING - Project ID does NOT match 'gold-maq-control'. Expected: 'gold-maq-control', Got:", completeConfig.projectId);
+    }
+  }
+
   if (!getApps().length) {
     app = initializeApp(completeConfig);
   } else {
