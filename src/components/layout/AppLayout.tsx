@@ -26,7 +26,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Logo } from "@/components/icons/Logo"; // Assuming you might want to use the textual logo here too
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -59,8 +58,7 @@ function MainSidebar() {
     >
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <Link href="/" className="flex items-center gap-2">
-          {/* Using the SVG Logo component here */}
-          <Logo className="h-8 w-auto" /> 
+          {/* Logo component removed */}
         </Link>
       </SidebarHeader>
       <SidebarContent>
