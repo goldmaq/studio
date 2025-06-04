@@ -43,10 +43,11 @@ export function CustomerClientPage() {
     const fetchCustomers = async () => {
       setIsLoading(true);
       try {
-        const querySnapshot = await getDocs(collection(db, "customers"));
+        const querySnapshot = await getDocs(collection(db, "clientes"));
         const customersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
         setCustomers(customersData);
-      } catch (error) {
+      } catch (error)
+ {
         console.error("Erro ao buscar clientes:", error);
         toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível buscar os dados dos clientes.", variant: "destructive" });
       }
@@ -75,12 +76,12 @@ export function CustomerClientPage() {
   const onSubmit = async (values: z.infer<typeof CustomerSchema>) => {
     try {
       if (editingCustomer) {
-        const customerRef = doc(db, "customers", editingCustomer.id);
+        const customerRef = doc(db, "clientes", editingCustomer.id);
         await updateDoc(customerRef, values);
         setCustomers(customers.map((c) => (c.id === editingCustomer.id ? { ...c, ...values } : c)));
         toast({ title: "Cliente Atualizado", description: `${values.name} foi atualizado.` });
       } else {
-        const docRef = await addDoc(collection(db, "customers"), values);
+        const docRef = await addDoc(collection(db, "clientes"), values);
         setCustomers([...customers, { id: docRef.id, ...values }]);
         toast({ title: "Cliente Criado", description: `${values.name} foi adicionado.` });
       }
@@ -93,7 +94,7 @@ export function CustomerClientPage() {
 
   const handleDelete = async (customerId: string) => {
     try {
-      await deleteDoc(doc(db, "customers", customerId));
+      await deleteDoc(doc(db, "clientes", customerId));
       setCustomers(customers.filter(c => c.id !== customerId));
       toast({ title: "Cliente Excluído", description: "O cliente foi excluído.", variant: "default" });
     } catch (error) {
