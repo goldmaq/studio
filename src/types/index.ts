@@ -1,15 +1,17 @@
+
 export interface Customer {
   id: string;
   name: string;
   address: string;
   cnpj: string;
   email: string;
+  cep?: string; // Adicionado campo CEP
   preferredTechnician?: string;
   notes?: string;
 }
 
 export interface Equipment {
-  id: string;
+  id:string;
   brand: string;
   model: string;
   chassisNumber: string;
@@ -76,6 +78,7 @@ export const CustomerSchema = z.object({
   address: z.string().min(1, "Endereço é obrigatório"),
   cnpj: z.string().min(1, "CNPJ é obrigatório"), 
   email: z.string().email("Endereço de email inválido"),
+  cep: z.string().optional().nullable().transform(val => val === "" ? null : val), // CEP é opcional
   preferredTechnician: z.string().optional(),
   notes: z.string().optional(),
 });

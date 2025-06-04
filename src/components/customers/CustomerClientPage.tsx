@@ -5,12 +5,12 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, Edit2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Trash2 } from "lucide-react";
+import { PlusCircle, Users, Edit2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import type { Customer } from "@/types";
 import { CustomerSchema } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -29,12 +29,27 @@ async function fetchCustomers(): Promise<Customer[]> {
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
 }
 
+interface ViaCepResponse {
+  cep: string;
+  logradouro: string;
+  complemento: string;
+  bairro: string;
+  localidade: string;
+  uf: string;
+  ibge: string;
+  gia: string;
+  ddd: string;
+  siafi: string;
+  erro?: boolean;
+}
+
 export function CustomerClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isCepLoading, setIsCepLoading] = useState(false);
 
   const form = useForm<z.infer<typeof CustomerSchema>>({
     resolver: zodResolver(CustomerSchema),
@@ -43,6 +58,7 @@ export function CustomerClientPage() {
       address: "",
       cnpj: "",
       email: "",
+      cep: "",
       preferredTechnician: "",
       notes: "",
     },
@@ -90,15 +106,40 @@ export function CustomerClientPage() {
       if (!customerId) throw new Error("ID do cliente é necessário para exclusão.");
       await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, customerId));
     },
-    onSuccess: (_, customerId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Cliente Excluído", description: `O cliente foi excluído.` });
-      closeModal(); // Close modal after successful deletion
+      closeModal(); 
     },
-    onError: (err: Error, customerId) => {
+    onError: (err: Error) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o cliente. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
+
+  const handleSearchCep = async () => {
+    const cepValue = form.getValues("cep");
+    if (!cepValue || cepValue.replace(/\D/g, "").length !== 8) {
+      toast({ title: "CEP Inválido", description: "Por favor, insira um CEP com 8 dígitos.", variant: "destructive" });
+      return;
+    }
+    setIsCepLoading(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cepValue.replace(/\D/g, "")}/json/`);
+      const data: ViaCepResponse = await response.json();
+      if (data.erro) {
+        toast({ title: "CEP Não Encontrado", description: "O CEP informado não foi encontrado.", variant: "destructive" });
+        form.setValue("address", ""); // Limpa o endereço se o CEP não for encontrado
+      } else {
+        const fullAddress = `${data.logradouro || ""}${data.logradouro && data.bairro ? ", " : ""}${data.bairro || ""}${ (data.logradouro || data.bairro) && data.localidade ? " - " : ""}${data.localidade || ""}${data.localidade && data.uf ? " / " : ""}${data.uf || ""}`.trim();
+        form.setValue("address", fullAddress);
+        toast({ title: "Endereço Encontrado", description: "O endereço foi preenchido." });
+      }
+    } catch (error) {
+      toast({ title: "Erro ao Buscar CEP", description: "Não foi possível buscar o endereço. Verifique sua conexão.", variant: "destructive" });
+    } finally {
+      setIsCepLoading(false);
+    }
+  };
 
   const openModal = (customer?: Customer) => {
     if (customer) {
@@ -106,7 +147,7 @@ export function CustomerClientPage() {
       form.reset(customer);
     } else {
       setEditingCustomer(null);
-      form.reset({ name: "", address: "", cnpj: "", email: "", preferredTechnician: "", notes: "" });
+      form.reset({ name: "", address: "", cnpj: "", email: "", cep: "", preferredTechnician: "", notes: "" });
     }
     setIsModalOpen(true);
   };
@@ -127,9 +168,7 @@ export function CustomerClientPage() {
   
   const handleModalDeleteConfirm = () => {
     if (editingCustomer && editingCustomer.id) {
-      if (window.confirm(`Tem certeza que deseja excluir o cliente "${editingCustomer.name}"?`)) {
-        deleteCustomerMutation.mutate(editingCustomer.id);
-      }
+      deleteCustomerMutation.mutate(editingCustomer.id);
     }
   };
   
@@ -189,6 +228,7 @@ export function CustomerClientPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
+                {customer.cep && <p className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-primary" /> CEP: {customer.cep}</p>}
                 <p className="flex items-start"><MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> {customer.address}</p>
                 <p className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> {customer.email}</p>
                 {customer.preferredTechnician && <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> Técnico Pref.: {customer.preferredTechnician}</p>}
@@ -217,7 +257,7 @@ export function CustomerClientPage() {
         formId="customer-form"
         isSubmitting={isMutating}
         editingItem={editingCustomer}
-        onDeleteConfirm={handleModalDeleteConfirm}
+        onDeleteConfirm={editingCustomer ? handleModalDeleteConfirm : undefined}
         isDeleting={deleteCustomerMutation.isPending}
         deleteButtonLabel="Excluir Cliente"
       >
@@ -226,8 +266,36 @@ export function CustomerClientPage() {
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome completo do cliente ou razão social" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+            
+            <FormField control={form.control} name="cep" render={({ field }) => (
+              <FormItem>
+                <FormLabel>CEP</FormLabel>
+                <div className="flex items-center gap-2">
+                  <FormControl>
+                    <Input placeholder="00000-000" {...field} value={field.value ?? ""} onChange={(e) => {
+                      // Basic CEP masking (optional)
+                      const value = e.target.value.replace(/\D/g, "");
+                      if (value.length <= 5) {
+                        field.onChange(value);
+                      } else if (value.length <= 8) {
+                        field.onChange(`${value.slice(0,5)}-${value.slice(5)}`);
+                      } else {
+                        field.onChange(`${value.slice(0,5)}-${value.slice(5,8)}`);
+                      }
+                    }}/>
+                  </FormControl>
+                  <Button type="button" variant="outline" onClick={handleSearchCep} disabled={isCepLoading}>
+                    {isCepLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    <span className="ml-2 sm:inline hidden">Buscar</span>
+                  </Button>
+                </div>
+                <FormDescription>Digite o CEP para buscar o endereço automaticamente.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )} />
+
             <FormField control={form.control} name="address" render={({ field }) => (
-              <FormItem><FormLabel>Endereço</FormLabel><FormControl><Input placeholder="Endereço completo" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Endereço</FormLabel><FormControl><Textarea placeholder="Rua, Número, Bairro - Cidade / UF" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="cnpj" render={({ field }) => (
               <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input placeholder="00.000.000/0000-00" {...field} /></FormControl><FormMessage /></FormItem>
