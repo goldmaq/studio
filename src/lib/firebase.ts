@@ -49,11 +49,13 @@ Firebase functionalities will not work. Application cannot start.`;
   const completeConfig = firebaseConfigValues as FirebaseConfig;
 
   // Log o projectId que está sendo usado para inicialização (aparecerá no console do navegador)
-  if (typeof window !== 'undefined') {
+  // Apenas em ambiente de não produção
+  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
     console.log("Firebase Init: Attempting to initialize with projectId:", completeConfig.projectId);
-    if (completeConfig.projectId !== "gold-maq-control") {
-      console.warn("Firebase Init: WARNING - Project ID does NOT match 'gold-maq-control'. Expected: 'gold-maq-control', Got:", completeConfig.projectId);
-    }
+  }
+  
+  if (typeof window !== 'undefined' && completeConfig.projectId !== "gold-maq-control") {
+    console.warn("Firebase Init: WARNING - Project ID does NOT match 'gold-maq-control'. Expected: 'gold-maq-control', Got:", completeConfig.projectId);
   }
 
   if (!getApps().length) {
