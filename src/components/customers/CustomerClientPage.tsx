@@ -1,10 +1,11 @@
+
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, Edit2, Trash2, FileText, MapPin, Mail, Building, HardHat } from "lucide-react";
+import { PlusCircle, Users, Edit2, Trash2, FileText, MapPin, Mail, Building, HardHat, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,16 +17,14 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-
-const initialCustomers: Customer[] = [
-  { id: "1", name: "Cliente Alpha Ltda.", address: "Rua das Palmeiras, 123, São Paulo, SP", cnpj: "11.222.333/0001-44", email: "contato@alpha.com", preferredTechnician: "Carlos Silva", notes: "Cliente VIP, priorizar atendimentos."},
-  { id: "2", name: "Indústria Beta S.A.", address: "Av. Industrial, 456, Contagem, MG", cnpj: "44.555.666/0001-77", email: "compras@beta.ind.br", notes: "Contrato de manutenção mensal."},
-];
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 
 export function CustomerClientPage() {
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof CustomerSchema>>({
@@ -39,6 +38,22 @@ export function CustomerClientPage() {
       notes: "",
     },
   });
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      setIsLoading(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, "customers"));
+        const customersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+        setCustomers(customersData);
+      } catch (error) {
+        console.error("Erro ao buscar clientes:", error);
+        toast({ title: "Erro ao Carregar Clientes", description: "Não foi possível buscar os dados dos clientes.", variant: "destructive" });
+      }
+      setIsLoading(false);
+    };
+    fetchCustomers();
+  }, [toast]);
 
   const openModal = (customer?: Customer) => {
     if (customer) {
@@ -57,21 +72,44 @@ export function CustomerClientPage() {
     form.reset();
   };
 
-  const onSubmit = (values: z.infer<typeof CustomerSchema>) => {
-    if (editingCustomer) {
-      setCustomers(customers.map((c) => (c.id === editingCustomer.id ? { ...c, ...values } : c)));
-      toast({ title: "Cliente Atualizado", description: `${values.name} foi atualizado.` });
-    } else {
-      setCustomers([...customers, { id: String(Date.now()), ...values }]);
-      toast({ title: "Cliente Criado", description: `${values.name} foi adicionado.` });
+  const onSubmit = async (values: z.infer<typeof CustomerSchema>) => {
+    try {
+      if (editingCustomer) {
+        const customerRef = doc(db, "customers", editingCustomer.id);
+        await updateDoc(customerRef, values);
+        setCustomers(customers.map((c) => (c.id === editingCustomer.id ? { ...c, ...values } : c)));
+        toast({ title: "Cliente Atualizado", description: `${values.name} foi atualizado.` });
+      } else {
+        const docRef = await addDoc(collection(db, "customers"), values);
+        setCustomers([...customers, { id: docRef.id, ...values }]);
+        toast({ title: "Cliente Criado", description: `${values.name} foi adicionado.` });
+      }
+      closeModal();
+    } catch (error) {
+      console.error("Erro ao salvar cliente:", error);
+      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados do cliente.", variant: "destructive" });
     }
-    closeModal();
   };
 
-  const handleDelete = (customerId: string) => {
-    setCustomers(customers.filter(c => c.id !== customerId));
-    toast({ title: "Cliente Excluído", description: "O cliente foi excluído.", variant: "destructive" });
+  const handleDelete = async (customerId: string) => {
+    try {
+      await deleteDoc(doc(db, "customers", customerId));
+      setCustomers(customers.filter(c => c.id !== customerId));
+      toast({ title: "Cliente Excluído", description: "O cliente foi excluído.", variant: "default" });
+    } catch (error) {
+      console.error("Erro ao excluir cliente:", error);
+      toast({ title: "Erro ao Excluir", description: "Não foi possível excluir o cliente.", variant: "destructive" });
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Carregando clientes...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -182,7 +220,7 @@ export function CustomerClientPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Técnico Preferencial (Opcional)</FormLabel>
-                  <FormControl><Input placeholder="Nome do técnico" {...field} /></FormControl>
+                  <FormControl><Input placeholder="Nome do técnico" {...field} value={field.value ?? ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -193,7 +231,7 @@ export function CustomerClientPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Observações (Opcional)</FormLabel>
-                  <FormControl><Textarea placeholder="Quaisquer observações relevantes sobre o cliente" {...field} /></FormControl>
+                  <FormControl><Textarea placeholder="Quaisquer observações relevantes sobre o cliente" {...field} value={field.value ?? ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}

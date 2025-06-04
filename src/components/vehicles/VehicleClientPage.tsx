@@ -1,10 +1,11 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, CarFront, Edit2, Trash2, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, CircleX, WrenchIcon } from "lucide-react";
+import { PlusCircle, CarFront, Edit2, Trash2, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,11 +17,8 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-
-const initialVehicles: Vehicle[] = [
-  { id: "v1", model: "Fiat Fiorino", licensePlate: "BRA2E19", kind: "Van", currentMileage: 120500, fuelConsumption: 10.5, costPerKilometer: 0.55, status: "Disponível", registrationInfo: "Renavam: 1234567890" },
-  { id: "v2", model: "Honda CG 160", licensePlate: "XYZ1234", kind: "Motorcycle", currentMileage: 35200, fuelConsumption: 35, costPerKilometer: 0.15, status: "Em Uso" },
-];
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 
 const statusOptions: Vehicle['status'][] = ['Disponível', 'Em Uso', 'Manutenção'];
 const statusIcons = {
@@ -30,15 +28,32 @@ const statusIcons = {
 };
 
 export function VehicleClientPage() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof VehicleSchema>>({
     resolver: zodResolver(VehicleSchema),
     defaultValues: { model: "", licensePlate: "", kind: "", currentMileage: 0, fuelConsumption: 0, costPerKilometer: 0, registrationInfo: "", status: "Disponível" },
   });
+
+  useEffect(() => {
+    const fetchVehicles = async () => {
+      setIsLoading(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, "vehicles"));
+        const vehiclesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vehicle));
+        setVehicles(vehiclesData);
+      } catch (error) {
+        console.error("Erro ao buscar veículos:", error);
+        toast({ title: "Erro ao Carregar Veículos", description: "Não foi possível buscar os dados dos veículos.", variant: "destructive" });
+      }
+      setIsLoading(false);
+    };
+    fetchVehicles();
+  }, [toast]);
 
   const openModal = (vehicle?: Vehicle) => {
     if (vehicle) {
@@ -57,21 +72,44 @@ export function VehicleClientPage() {
     form.reset();
   };
 
-  const onSubmit = (values: z.infer<typeof VehicleSchema>) => {
-    if (editingVehicle) {
-      setVehicles(vehicles.map((v) => (v.id === editingVehicle.id ? { ...v, ...values } : v)));
-      toast({ title: "Veículo Atualizado", description: `${values.model} (${values.licensePlate}) atualizado.` });
-    } else {
-      setVehicles([...vehicles, { id: String(Date.now()), ...values }]);
-      toast({ title: "Veículo Adicionado", description: `${values.model} (${values.licensePlate}) adicionado.` });
+  const onSubmit = async (values: z.infer<typeof VehicleSchema>) => {
+    try {
+      if (editingVehicle) {
+        const vehicleRef = doc(db, "vehicles", editingVehicle.id);
+        await updateDoc(vehicleRef, values);
+        setVehicles(vehicles.map((v) => (v.id === editingVehicle.id ? { ...v, ...values } : v)));
+        toast({ title: "Veículo Atualizado", description: `${values.model} (${values.licensePlate}) atualizado.` });
+      } else {
+        const docRef = await addDoc(collection(db, "vehicles"), values);
+        setVehicles([...vehicles, { id: docRef.id, ...values }]);
+        toast({ title: "Veículo Adicionado", description: `${values.model} (${values.licensePlate}) adicionado.` });
+      }
+      closeModal();
+    } catch (error) {
+      console.error("Erro ao salvar veículo:", error);
+      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados do veículo.", variant: "destructive" });
     }
-    closeModal();
   };
 
-  const handleDelete = (vehicleId: string) => {
-    setVehicles(vehicles.filter(v => v.id !== vehicleId));
-    toast({ title: "Veículo Excluído", description: "O veículo foi removido.", variant: "destructive" });
+  const handleDelete = async (vehicleId: string) => {
+    try {
+      await deleteDoc(doc(db, "vehicles", vehicleId));
+      setVehicles(vehicles.filter(v => v.id !== vehicleId));
+      toast({ title: "Veículo Excluído", description: "O veículo foi removido.", variant: "default" });
+    } catch (error) {
+      console.error("Erro ao excluir veículo:", error);
+      toast({ title: "Erro ao Excluir", description: "Não foi possível excluir o veículo.", variant: "destructive" });
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Carregando veículos...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -164,7 +202,7 @@ export function VehicleClientPage() {
                 )} />
               </div>
             <FormField control={form.control} name="registrationInfo" render={({ field }) => (
-              <FormItem><FormLabel>Informações de Registro (Opcional)</FormLabel><FormControl><Input placeholder="ex: Renavam" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Informações de Registro (Opcional)</FormLabel><FormControl><Input placeholder="ex: Renavam" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
         </Form>

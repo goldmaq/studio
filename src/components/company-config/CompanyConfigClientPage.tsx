@@ -1,10 +1,11 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { Edit2, Building, Landmark, Hash, QrCode, MapPin, Contact } from "lucide-react";
+import { Edit2, Building, Landmark, Hash, QrCode, MapPin, Contact, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,17 +15,22 @@ import { CompanySchema } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
-const initialCompanyData: Record<CompanyId, Company> = {
+const initialCompanyDataFromCode: Record<CompanyId, Company> = {
   goldmaq: { id: "goldmaq", name: "Goldmaq Empilhadeiras", cnpj: "00.000.000/0001-00", address: "Rua Goldmaq, 10, São Paulo, SP", bankName: "Banco Alpha", bankAgency: "0001", bankAccount: "12345-6", bankPixKey: "cnpj@goldmaq.com.br" },
   goldcomercio: { id: "goldcomercio", name: "Gold Comércio de Peças", cnpj: "11.111.111/0001-11", address: "Av. Comércio, 20, São Paulo, SP", bankName: "Banco Beta", bankAgency: "0002", bankAccount: "65432-1" },
   goldjob: { id: "goldjob", name: "Gold Job Locações", cnpj: "22.222.222/0001-22", address: "Praça Job, 30, São Paulo, SP" },
 };
 
+const companyIds: CompanyId[] = ["goldmaq", "goldcomercio", "goldjob"];
+
 export function CompanyConfigClientPage() {
-  const [companyData, setCompanyData] = useState<Record<CompanyId, Company>>(initialCompanyData);
+  const [companyData, setCompanyData] = useState<Record<CompanyId, Company>>({} as Record<CompanyId, Company>);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof CompanySchema>>({
@@ -40,6 +46,35 @@ export function CompanyConfigClientPage() {
     },
   });
 
+  useEffect(() => {
+    const fetchCompanyData = async () => {
+      setIsLoading(true);
+      try {
+        const fetchedData: Record<CompanyId, Company> = {} as Record<CompanyId, Company>;
+        for (const id of companyIds) {
+          const docRef = doc(db, "companies", id);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            fetchedData[id] = docSnap.data() as Company;
+          } else {
+            // Se não existir no Firestore, cria com os dados iniciais do código
+            const initialData = initialCompanyDataFromCode[id];
+            if (initialData) {
+              await setDoc(docRef, initialData);
+              fetchedData[id] = initialData;
+            }
+          }
+        }
+        setCompanyData(fetchedData);
+      } catch (error) {
+        console.error("Erro ao buscar dados das empresas:", error);
+        toast({ title: "Erro ao Carregar Empresas", description: "Não foi possível buscar os dados das empresas.", variant: "destructive" });
+      }
+      setIsLoading(false);
+    };
+    fetchCompanyData();
+  }, [toast]);
+
   const openModal = (company: Company) => {
     setEditingCompany(company);
     form.reset(company);
@@ -49,29 +84,47 @@ export function CompanyConfigClientPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingCompany(null);
-    form.reset();
+    form.reset({ name: "", cnpj: "", address: "", bankName: "", bankAgency: "", bankAccount: "", bankPixKey: ""});
   };
 
-  const onSubmit = (values: z.infer<typeof CompanySchema>) => {
-    if (editingCompany) {
+  const onSubmit = async (values: z.infer<typeof CompanySchema>) => {
+    if (!editingCompany) return;
+
+    try {
+      const companyRef = doc(db, "companies", editingCompany.id);
+      await updateDoc(companyRef, values);
+      
       setCompanyData(prev => ({
         ...prev,
         [editingCompany.id]: { ...editingCompany, ...values }
       }));
       toast({ title: "Informações da Empresa Atualizadas", description: `Os detalhes de ${values.name} foram atualizados.` });
+      closeModal();
+    } catch (error) {
+      console.error("Erro ao atualizar empresa:", error);
+      toast({ title: "Erro ao Atualizar", description: "Não foi possível atualizar os dados da empresa.", variant: "destructive" });
     }
-    closeModal();
   };
   
-  const companyIds = Object.keys(companyData) as CompanyId[];
+  const currentCompanyIds = Object.keys(companyData) as CompanyId[];
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Carregando configurações...</p>
+      </div>
+    );
+  }
 
   return (
     <>
       <PageHeader title="Configurações da Empresa" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {companyIds.map((id) => {
+        {currentCompanyIds.map((id) => {
           const company = companyData[id];
+          if (!company) return null; // Adicionado para segurança
           return (
             <Card key={company.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
               <CardHeader>

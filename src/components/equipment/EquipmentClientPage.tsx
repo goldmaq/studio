@@ -1,10 +1,11 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Edit2, Trash2, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle, User } from "lucide-react";
+import { PlusCircle, Construction, Edit2, Trash2, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,11 +17,8 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-
-const initialEquipment: Equipment[] = [
-  { id: "eq1", brand: "Toyota", model: "8FGCU25", chassisNumber: "TY0012345", equipmentType: "Forklift", manufactureYear: 2021, operationalStatus: "Operacional", customerId: "1" },
-  { id: "eq2", brand: "Hyster", model: "H50FT", chassisNumber: "HY0067890", equipmentType: "Forklift", manufactureYear: 2019, operationalStatus: "Precisa de Reparo", customerId: "2" },
-];
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 
 const statusOptions: Equipment['operationalStatus'][] = ['Operacional', 'Precisa de Reparo', 'Fora de Serviço'];
 const statusIcons = {
@@ -29,11 +27,11 @@ const statusIcons = {
   'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
 };
 
-
 export function EquipmentClientPage() {
-  const [equipmentList, setEquipmentList] = useState<Equipment[]>(initialEquipment);
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof EquipmentSchema>>({
@@ -48,6 +46,22 @@ export function EquipmentClientPage() {
       customerId: "",
     },
   });
+
+  useEffect(() => {
+    const fetchEquipment = async () => {
+      setIsLoading(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, "equipment"));
+        const equipmentData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Equipment));
+        setEquipmentList(equipmentData);
+      } catch (error) {
+        console.error("Erro ao buscar equipamentos:", error);
+        toast({ title: "Erro ao Carregar Equipamentos", description: "Não foi possível buscar os dados dos equipamentos.", variant: "destructive" });
+      }
+      setIsLoading(false);
+    };
+    fetchEquipment();
+  }, [toast]);
 
   const openModal = (equipment?: Equipment) => {
     if (equipment) {
@@ -66,21 +80,44 @@ export function EquipmentClientPage() {
     form.reset();
   };
 
-  const onSubmit = (values: z.infer<typeof EquipmentSchema>) => {
-    if (editingEquipment) {
-      setEquipmentList(equipmentList.map((eq) => (eq.id === editingEquipment.id ? { ...eq, ...values } : eq)));
-      toast({ title: "Equipamento Atualizado", description: `${values.brand} ${values.model} atualizado.` });
-    } else {
-      setEquipmentList([...equipmentList, { id: String(Date.now()), ...values }]);
-      toast({ title: "Equipamento Criado", description: `${values.brand} ${values.model} adicionado.` });
+  const onSubmit = async (values: z.infer<typeof EquipmentSchema>) => {
+    try {
+      if (editingEquipment) {
+        const equipmentRef = doc(db, "equipment", editingEquipment.id);
+        await updateDoc(equipmentRef, values);
+        setEquipmentList(equipmentList.map((eq) => (eq.id === editingEquipment.id ? { ...eq, ...values } : eq)));
+        toast({ title: "Equipamento Atualizado", description: `${values.brand} ${values.model} atualizado.` });
+      } else {
+        const docRef = await addDoc(collection(db, "equipment"), values);
+        setEquipmentList([...equipmentList, { id: docRef.id, ...values }]);
+        toast({ title: "Equipamento Criado", description: `${values.brand} ${values.model} adicionado.` });
+      }
+      closeModal();
+    } catch (error) {
+      console.error("Erro ao salvar equipamento:", error);
+      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados do equipamento.", variant: "destructive" });
     }
-    closeModal();
   };
 
-  const handleDelete = (equipmentId: string) => {
-    setEquipmentList(equipmentList.filter(eq => eq.id !== equipmentId));
-    toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído.", variant: "destructive" });
+  const handleDelete = async (equipmentId: string) => {
+    try {
+      await deleteDoc(doc(db, "equipment", equipmentId));
+      setEquipmentList(equipmentList.filter(eq => eq.id !== equipmentId));
+      toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído.", variant: "default" });
+    } catch (error) {
+      console.error("Erro ao excluir equipamento:", error);
+      toast({ title: "Erro ao Excluir", description: "Não foi possível excluir o equipamento.", variant: "destructive" });
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Carregando equipamentos...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -169,7 +206,7 @@ export function EquipmentClientPage() {
               </FormItem>
             )} />
              <FormField control={form.control} name="customerId" render={({ field }) => (
-              <FormItem><FormLabel>ID do Cliente (Opcional)</FormLabel><FormControl><Input placeholder="Vincular ao cliente, se aplicável" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>ID do Cliente (Opcional)</FormLabel><FormControl><Input placeholder="Vincular ao cliente, se aplicável" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
         </Form>

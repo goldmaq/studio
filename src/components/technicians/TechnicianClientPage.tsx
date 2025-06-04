@@ -1,10 +1,11 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, HardHat, Edit2, Trash2, UserCircle, Briefcase, Wrench } from "lucide-react";
+import { PlusCircle, HardHat, Edit2, Trash2, UserCircle, Wrench, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,22 +16,36 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-
-const initialTechnicians: Technician[] = [
-  { id: "tech1", name: "Carlos Silva", employeeId: "EMP001", specialization: "Motores de Empilhadeira" },
-  { id: "tech2", name: "Mariana Costa", employeeId: "EMP002", specialization: "Sistemas Hidráulicos e Elétricos" },
-];
+import { db } from "@/lib/firebase";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 
 export function TechnicianClientPage() {
-  const [technicians, setTechnicians] = useState<Technician[]>(initialTechnicians);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTechnician, setEditingTechnician] = useState<Technician | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof TechnicianSchema>>({
     resolver: zodResolver(TechnicianSchema),
     defaultValues: { name: "", employeeId: "", specialization: "" },
   });
+
+  useEffect(() => {
+    const fetchTechnicians = async () => {
+      setIsLoading(true);
+      try {
+        const querySnapshot = await getDocs(collection(db, "technicians"));
+        const techniciansData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
+        setTechnicians(techniciansData);
+      } catch (error) {
+        console.error("Erro ao buscar técnicos:", error);
+        toast({ title: "Erro ao Carregar Técnicos", description: "Não foi possível buscar os dados dos técnicos.", variant: "destructive" });
+      }
+      setIsLoading(false);
+    };
+    fetchTechnicians();
+  }, [toast]);
 
   const openModal = (technician?: Technician) => {
     if (technician) {
@@ -49,21 +64,44 @@ export function TechnicianClientPage() {
     form.reset();
   };
 
-  const onSubmit = (values: z.infer<typeof TechnicianSchema>) => {
-    if (editingTechnician) {
-      setTechnicians(technicians.map((t) => (t.id === editingTechnician.id ? { ...t, ...values } : t)));
-      toast({ title: "Técnico Atualizado", description: `${values.name} foi atualizado.` });
-    } else {
-      setTechnicians([...technicians, { id: String(Date.now()), ...values }]);
-      toast({ title: "Técnico Adicionado", description: `${values.name} foi adicionado.` });
+  const onSubmit = async (values: z.infer<typeof TechnicianSchema>) => {
+    try {
+      if (editingTechnician) {
+        const techRef = doc(db, "technicians", editingTechnician.id);
+        await updateDoc(techRef, values);
+        setTechnicians(technicians.map((t) => (t.id === editingTechnician.id ? { ...t, ...values } : t)));
+        toast({ title: "Técnico Atualizado", description: `${values.name} foi atualizado.` });
+      } else {
+        const docRef = await addDoc(collection(db, "technicians"), values);
+        setTechnicians([...technicians, { id: docRef.id, ...values }]);
+        toast({ title: "Técnico Adicionado", description: `${values.name} foi adicionado.` });
+      }
+      closeModal();
+    } catch (error) {
+      console.error("Erro ao salvar técnico:", error);
+      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados do técnico.", variant: "destructive" });
     }
-    closeModal();
   };
 
-  const handleDelete = (technicianId: string) => {
-    setTechnicians(technicians.filter(t => t.id !== technicianId));
-    toast({ title: "Técnico Excluído", description: "O técnico foi removido.", variant: "destructive" });
+  const handleDelete = async (technicianId: string) => {
+    try {
+      await deleteDoc(doc(db, "technicians", technicianId));
+      setTechnicians(technicians.filter(t => t.id !== technicianId));
+      toast({ title: "Técnico Excluído", description: "O técnico foi removido.", variant: "default" });
+    } catch (error) {
+      console.error("Erro ao excluir técnico:", error);
+      toast({ title: "Erro ao Excluir", description: "Não foi possível excluir o técnico.", variant: "destructive" });
+    }
   };
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Carregando técnicos...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -99,7 +137,6 @@ export function TechnicianClientPage() {
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
                 {tech.specialization && <p className="flex items-center"><Wrench className="mr-2 h-4 w-4 text-primary" /> Especialização: {tech.specialization}</p>}
-                {/* Add assignments display here if needed */}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => openModal(tech)}>
@@ -132,7 +169,7 @@ export function TechnicianClientPage() {
               <FormItem><FormLabel>Matrícula</FormLabel><FormControl><Input placeholder="Identificador único do funcionário" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="specialization" render={({ field }) => (
-              <FormItem><FormLabel>Especialização (Opcional)</FormLabel><FormControl><Input placeholder="ex: Hidráulica, Elétrica" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Especialização (Opcional)</FormLabel><FormControl><Input placeholder="ex: Hidráulica, Elétrica" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
         </Form>
