@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { Edit2, Building, Landmark, Hash, QrCode, MapPin, Contact, Loader2, AlertTriangle } from "lucide-react";
+import { Building, Landmark, Hash, QrCode, MapPin, Contact, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 const FIRESTORE_COLLECTION_NAME = "empresas";
 const companyIds: CompanyId[] = ["goldmaq", "goldcomercio", "goldjob"];
 
-// Dados iniciais que podem ser usados se uma empresa não existir no Firestore
 const initialCompanyDataFromCode: Record<CompanyId, Omit<Company, 'id'>> = {
   goldmaq: { name: "Goldmaq Empilhadeiras", cnpj: "00.000.000/0001-00", address: "Rua Goldmaq, 10, São Paulo, SP", bankName: "Banco Alpha", bankAgency: "0001", bankAccount: "12345-6", bankPixKey: "cnpj@goldmaq.com.br" },
   goldcomercio: { name: "Gold Comércio de Peças", cnpj: "11.111.111/0001-11", address: "Av. Comércio, 20, São Paulo, SP", bankName: "Banco Beta", bankAgency: "0002", bankAccount: "65432-1" },
@@ -38,17 +37,15 @@ async function fetchCompanyConfigs(): Promise<Company[]> {
     if (docSnap.exists()) {
       fetchedCompanies.push({ id, ...docSnap.data() } as Company);
     } else {
-      // Se não existir no Firestore, cria com os dados iniciais do código
+      
       const initialData = initialCompanyDataFromCode[id];
       if (initialData) {
-        await setDoc(docRef, initialData); // Salva no Firestore
+        await setDoc(docRef, initialData); 
         fetchedCompanies.push({ id, ...initialData });
       }
     }
   }
-  // Se por algum motivo alguma empresa esperada não foi carregada nem criada,
-  // pode ser necessário adicionar um fallback ou logar um aviso.
-  // Por enquanto, retornamos o que foi possível buscar/criar.
+  
   return fetchedCompanies;
 }
 
@@ -71,7 +68,7 @@ export function CompanyConfigClientPage() {
   const { data: companies = [], isLoading, isError, error } = useQuery<Company[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchCompanyConfigs,
-     // staleTime: Infinity, // Configurações da empresa raramente mudam, pode ser cacheado por mais tempo.
+     
   });
 
   const updateCompanyMutation = useMutation({
@@ -162,15 +159,7 @@ export function CompanyConfigClientPage() {
                   {company.bankPixKey && <p className="flex items-center"><QrCode className="mr-2 h-4 w-4 text-primary" /> PIX: {company.bankPixKey}</p>}
                 </CardContent>
                 <CardFooter className="border-t pt-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={(e) => { e.stopPropagation(); openModal(company); }} 
-                    className="w-full" 
-                    disabled={updateCompanyMutation.isPending}
-                  >
-                    <Edit2 className="mr-2 h-4 w-4" /> Editar Informações
-                  </Button>
+                  {/* Botão Editar removido, ação de clique no card */}
                 </CardFooter>
               </Card>
             ))}

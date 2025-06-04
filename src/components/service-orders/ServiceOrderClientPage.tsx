@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, Edit2, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIcon, X, Loader2, Trash2 } from "lucide-react";
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIcon, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,7 +41,7 @@ const formatDateForInput = (date: any): string => {
   if (typeof date === 'string') {
     try {
       const d = new Date(date);
-      if (isNaN(d.getTime())) return ""; // Handle invalid date strings
+      if (isNaN(d.getTime())) return ""; 
       return d.toISOString().split('T')[0];
     } catch (e) { return ""; }
   }
@@ -57,7 +57,7 @@ const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
   if (!dateString) return null;
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return null;
-  // Ensure the timestamp is created from UTC date parts to avoid timezone shifts
+  
   const adjustedDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   return Timestamp.fromDate(adjustedDate);
 };
@@ -151,7 +151,7 @@ export function ServiceOrderClientPage() {
     onSuccess: (_, orderId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Ordem de Serviço Excluída", description: `A OS foi excluída.` });
-      closeModal(); // Close modal after successful deletion
+      closeModal(); 
     },
     onError: (err: Error, orderId) => {
       toast({ title: "Erro ao Excluir OS", description: `Não foi possível excluir a OS. Detalhe: ${err.message}`, variant: "destructive" });
@@ -272,14 +272,7 @@ export function ServiceOrderClientPage() {
                 <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Desc.: {order.description}</p>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={(e) => { e.stopPropagation(); openModal(order);}} 
-                  disabled={isMutating || deleteServiceOrderMutation.isPending}
-                >
-                  <Edit2 className="mr-2 h-4 w-4" /> Editar
-                </Button>
+                {/* Botão Editar removido */}
               </CardFooter>
             </Card>
           ))}

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Edit2, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIcon, User, Loader2, Trash2 } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIcon, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -100,7 +100,7 @@ export function EquipmentClientPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído." });
-      closeModal(); // Close modal after successful deletion
+      closeModal(); 
     },
     onError: (err: Error) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o equipamento. Detalhe: ${err.message}`, variant: "destructive" });
@@ -204,14 +204,7 @@ export function EquipmentClientPage() {
                 {eq.customerId && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> ID Cliente: {eq.customerId}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={(e) => { e.stopPropagation(); openModal(eq);}} 
-                  disabled={isMutating || deleteEquipmentMutation.isPending}
-                >
-                  <Edit2 className="mr-2 h-4 w-4" /> Editar
-                </Button>
+                {/* Botão Editar removido */}
               </CardFooter>
             </Card>
           ))}

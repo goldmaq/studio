@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, HardHat, Edit2, UserCircle, Wrench, Loader2, AlertTriangle, Trash2 } from "lucide-react";
+import { PlusCircle, HardHat, UserCircle, Wrench, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -84,7 +84,7 @@ export function TechnicianClientPage() {
     onSuccess: (_, technicianId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Técnico Excluído", description: `O técnico foi removido.` });
-      closeModal(); // Close modal after successful deletion
+      closeModal(); 
     },
     onError: (err: Error, technicianId) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o técnico. Detalhe: ${err.message}`, variant: "destructive" });
@@ -186,14 +186,7 @@ export function TechnicianClientPage() {
                 {tech.specialization && <p className="flex items-center"><Wrench className="mr-2 h-4 w-4 text-primary" /> Especialização: {tech.specialization}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={(e) => { e.stopPropagation(); openModal(tech);}} 
-                  disabled={isMutating || deleteTechnicianMutation.isPending}
-                >
-                  <Edit2 className="mr-2 h-4 w-4" /> Editar
-                </Button>
+                {/* Botão Editar removido */}
               </CardFooter>
             </Card>
           ))}

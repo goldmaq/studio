@@ -1,10 +1,11 @@
 
-
 export interface Customer {
   id: string;
   name: string;
   cnpj: string;
   email: string;
+  phone?: string; // Novo campo para telefone
+  contactName?: string; // Novo campo para nome de contato
   cep?: string | null;
   street: string;
   number?: string;
@@ -81,14 +82,16 @@ import { z } from 'zod';
 
 export const CustomerSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
-  cnpj: z.string().min(1, "CNPJ é obrigatório"), // TODO: Add CNPJ validation/masking later
+  cnpj: z.string().min(1, "CNPJ é obrigatório"), 
   email: z.string().email("Endereço de email inválido"),
+  phone: z.string().optional(),
+  contactName: z.string().optional(),
   cep: z.string()
     .refine(val => !val || /^\d{5}-?\d{3}$/.test(val), { message: "CEP inválido. Use o formato XXXXX-XXX ou XXXXXXXX." })
     .optional()
     .nullable()
-    .transform(val => val ? val.replace(/\D/g, '') : null) // Remove non-digits before saving
-    .transform(val => val && val.length === 8 ? `${val.slice(0,5)}-${val.slice(5)}` : val), // Format for display/storage if 8 digits
+    .transform(val => val ? val.replace(/\D/g, '') : null) 
+    .transform(val => val && val.length === 8 ? `${val.slice(0,5)}-${val.slice(5)}` : val), 
   street: z.string().min(1, "Rua é obrigatória"),
   number: z.string().optional(),
   complement: z.string().optional(),

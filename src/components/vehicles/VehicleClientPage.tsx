@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, CarFront, Edit2, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle, Trash2 } from "lucide-react";
+import { PlusCircle, CarFront, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -104,7 +104,7 @@ export function VehicleClientPage() {
     onSuccess: (_, vehicleId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Veículo Excluído", description: `O veículo foi removido.` });
-      closeModal(); // Close modal after successful deletion
+      closeModal(); 
     },
     onError: (err: Error, vehicleId) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o veículo. Detalhe: ${err.message}`, variant: "destructive" });
@@ -220,14 +220,7 @@ export function VehicleClientPage() {
                 {vehicle.registrationInfo && <p className="flex items-center"><FileBadge className="mr-2 h-4 w-4 text-primary" /> Info. Reg.: {vehicle.registrationInfo}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={(e) => { e.stopPropagation(); openModal(vehicle);}} 
-                  disabled={isMutating || deleteVehicleMutation.isPending}
-                >
-                  <Edit2 className="mr-2 h-4 w-4" /> Editar
-                </Button>
+                {/* Botão Editar removido */}
               </CardFooter>
             </Card>
           ))}

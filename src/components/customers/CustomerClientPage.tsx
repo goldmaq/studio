@@ -5,13 +5,13 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, Edit2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Search } from "lucide-react";
+import { PlusCircle, Users, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Search, Phone, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-// import { Textarea } from "@/components/ui/textarea"; // No longer needed for address
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { Customer } from "@/types";
+import type { Customer, Technician } from "@/types";
 import { CustomerSchema } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
@@ -22,12 +22,19 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "../ui/textarea";
 
-const FIRESTORE_COLLECTION_NAME = "clientes";
+const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
+const FIRESTORE_TECHNICIAN_COLLECTION_NAME = "tecnicos";
 
 async function fetchCustomers(): Promise<Customer[]> {
-  const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("name", "asc"));
+  const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
+}
+
+async function fetchTechnicians(): Promise<Technician[]> {
+  const q = query(collection(db, FIRESTORE_TECHNICIAN_COLLECTION_NAME), orderBy("name", "asc"));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
 }
 
 interface ViaCepResponse {
@@ -74,6 +81,8 @@ export function CustomerClientPage() {
       name: "",
       cnpj: "",
       email: "",
+      phone: "",
+      contactName: "",
       cep: "",
       street: "",
       number: "",
@@ -86,18 +95,23 @@ export function CustomerClientPage() {
     },
   });
 
-  const { data: customers = [], isLoading, isError, error } = useQuery<Customer[], Error>({
-    queryKey: [FIRESTORE_COLLECTION_NAME],
+  const { data: customers = [], isLoading: isLoadingCustomers, isError: isErrorCustomers, error: errorCustomers } = useQuery<Customer[], Error>({
+    queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME],
     queryFn: fetchCustomers,
+  });
+
+  const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery<Technician[], Error>({
+    queryKey: [FIRESTORE_TECHNICIAN_COLLECTION_NAME],
+    queryFn: fetchTechnicians,
   });
 
   const addCustomerMutation = useMutation({
     mutationFn: async (newCustomerData: z.infer<typeof CustomerSchema>) => {
-      const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newCustomerData);
+      const docRef = await addDoc(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), newCustomerData);
       return docRef;
     },
     onSuccess: (docRef, variables) => {
-      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME] });
       toast({ title: "Cliente Criado", description: `${variables.name} foi adicionado.` });
       closeModal();
     },
@@ -110,11 +124,11 @@ export function CustomerClientPage() {
     mutationFn: async (customerData: Customer) => {
       const { id, ...dataToUpdate } = customerData;
       if (!id) throw new Error("ID do cliente é necessário para atualização.");
-      const customerRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
+      const customerRef = doc(db, FIRESTORE_CUSTOMER_COLLECTION_NAME, id);
       await updateDoc(customerRef, dataToUpdate);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME] });
       toast({ title: "Cliente Atualizado", description: `${variables.name} foi atualizado.` });
       closeModal();
     },
@@ -126,10 +140,10 @@ export function CustomerClientPage() {
   const deleteCustomerMutation = useMutation({
     mutationFn: async (customerId: string) => {
       if (!customerId) throw new Error("ID do cliente é necessário para exclusão.");
-      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, customerId));
+      await deleteDoc(doc(db, FIRESTORE_CUSTOMER_COLLECTION_NAME, customerId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME] });
       toast({ title: "Cliente Excluído", description: `O cliente foi excluído.` });
       closeModal(); 
     },
@@ -183,7 +197,7 @@ export function CustomerClientPage() {
     } else {
       setEditingCustomer(null);
       form.reset({
-        name: "", cnpj: "", email: "", cep: "", street: "", number: "",
+        name: "", cnpj: "", email: "", phone: "", contactName: "", cep: "", street: "", number: "",
         complement: "", neighborhood: "", city: "", state: "",
         preferredTechnician: "", notes: ""
       });
@@ -214,23 +228,24 @@ export function CustomerClientPage() {
   };
   
   const isMutating = addCustomerMutation.isPending || updateCustomerMutation.isPending;
+  const isLoading = isLoadingCustomers || isLoadingTechnicians;
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2">Carregando clientes...</p>
+        <p className="ml-2">Carregando dados...</p>
       </div>
     );
   }
 
-  if (isError) {
+  if (isErrorCustomers) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
         <AlertTriangle className="h-12 w-12 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Clientes</h2>
         <p className="text-center">Não foi possível buscar os dados dos clientes. Tente novamente mais tarde.</p>
-        <p className="text-sm mt-2">Detalhe: {error?.message}</p>
+        <p className="text-sm mt-2">Detalhe: {errorCustomers?.message}</p>
       </div>
     );
   }
@@ -246,7 +261,7 @@ export function CustomerClientPage() {
         } 
       />
 
-      {customers.length === 0 && !isLoading ? (
+      {customers.length === 0 && !isLoadingCustomers ? (
         <DataTablePlaceholder
           icon={Users}
           title="Nenhum Cliente Ainda"
@@ -269,24 +284,19 @@ export function CustomerClientPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
+                {customer.contactName && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Contato: {customer.contactName}</p>}
+                <p className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> {customer.email}</p>
+                {customer.phone && <p className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> {customer.phone}</p>}
                 <p className="flex items-start">
                   <MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> 
                   {formatAddressForDisplay(customer)}
                 </p>
                 {customer.cep && <p className="text-xs text-muted-foreground ml-6">CEP: {customer.cep}</p>}
-                <p className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> {customer.email}</p>
                 {customer.preferredTechnician && <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> Técnico Pref.: {customer.preferredTechnician}</p>}
                 {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={(e) => { e.stopPropagation(); openModal(customer);}} 
-                  disabled={isMutating || deleteCustomerMutation.isPending}
-                >
-                  <Edit2 className="mr-2 h-4 w-4" /> Editar
-                </Button>
+                {/* Botão Editar removido */}
               </CardFooter>
             </Card>
           ))}
@@ -313,8 +323,14 @@ export function CustomerClientPage() {
             <FormField control={form.control} name="cnpj" render={({ field }) => (
               <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input placeholder="00.000.000/0000-00" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+            <FormField control={form.control} name="contactName" render={({ field }) => (
+              <FormItem><FormLabel>Nome do Contato (Opcional)</FormLabel><FormControl><Input placeholder="Nome da pessoa de contato" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+            )} />
              <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="contato@exemplo.com" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Email Principal</FormLabel><FormControl><Input type="email" placeholder="contato@exemplo.com" {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="phone" render={({ field }) => (
+              <FormItem><FormLabel>Telefone Principal (Opcional)</FormLabel><FormControl><Input placeholder="(00) 00000-0000" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
 
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Endereço</h3>
@@ -372,9 +388,37 @@ export function CustomerClientPage() {
             </div>
             
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Outras Informações</h3>
-            <FormField control={form.control} name="preferredTechnician" render={({ field }) => (
-              <FormItem><FormLabel>Técnico Preferencial (Opcional)</FormLabel><FormControl><Input placeholder="Nome do técnico" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
+            <FormField
+              control={form.control}
+              name="preferredTechnician"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Técnico Preferencial (Opcional)</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value ?? ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingTechnicians ? "Carregando técnicos..." : "Selecione um técnico"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {isLoadingTechnicians ? (
+                        <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                      ) : (
+                        <>
+                          <SelectItem value="">Nenhum</SelectItem>
+                          {technicians.map((tech) => (
+                            <SelectItem key={tech.id} value={tech.name}>
+                              {tech.name}
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Quaisquer observações relevantes sobre o cliente" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
