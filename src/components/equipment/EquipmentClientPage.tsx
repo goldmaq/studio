@@ -27,6 +27,8 @@ const statusIcons = {
   'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
 };
 
+const FIRESTORE_COLLECTION_NAME = "equipamentos";
+
 export function EquipmentClientPage() {
   const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,7 +53,7 @@ export function EquipmentClientPage() {
     const fetchEquipment = async () => {
       setIsLoading(true);
       try {
-        const querySnapshot = await getDocs(collection(db, "equipment"));
+        const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
         const equipmentData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Equipment));
         setEquipmentList(equipmentData);
       } catch (error) {
@@ -83,12 +85,12 @@ export function EquipmentClientPage() {
   const onSubmit = async (values: z.infer<typeof EquipmentSchema>) => {
     try {
       if (editingEquipment) {
-        const equipmentRef = doc(db, "equipment", editingEquipment.id);
+        const equipmentRef = doc(db, FIRESTORE_COLLECTION_NAME, editingEquipment.id);
         await updateDoc(equipmentRef, values);
         setEquipmentList(equipmentList.map((eq) => (eq.id === editingEquipment.id ? { ...eq, ...values } : eq)));
         toast({ title: "Equipamento Atualizado", description: `${values.brand} ${values.model} atualizado.` });
       } else {
-        const docRef = await addDoc(collection(db, "equipment"), values);
+        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), values);
         setEquipmentList([...equipmentList, { id: docRef.id, ...values }]);
         toast({ title: "Equipamento Criado", description: `${values.brand} ${values.model} adicionado.` });
       }
@@ -101,7 +103,7 @@ export function EquipmentClientPage() {
 
   const handleDelete = async (equipmentId: string) => {
     try {
-      await deleteDoc(doc(db, "equipment", equipmentId));
+      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, equipmentId));
       setEquipmentList(equipmentList.filter(eq => eq.id !== equipmentId));
       toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído.", variant: "default" });
     } catch (error) {

@@ -25,6 +25,7 @@ const initialCompanyDataFromCode: Record<CompanyId, Company> = {
 };
 
 const companyIds: CompanyId[] = ["goldmaq", "goldcomercio", "goldjob"];
+const FIRESTORE_COLLECTION_NAME = "empresas";
 
 export function CompanyConfigClientPage() {
   const [companyData, setCompanyData] = useState<Record<CompanyId, Company>>({} as Record<CompanyId, Company>);
@@ -52,7 +53,7 @@ export function CompanyConfigClientPage() {
       try {
         const fetchedData: Record<CompanyId, Company> = {} as Record<CompanyId, Company>;
         for (const id of companyIds) {
-          const docRef = doc(db, "companies", id);
+          const docRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             fetchedData[id] = docSnap.data() as Company;
@@ -91,7 +92,7 @@ export function CompanyConfigClientPage() {
     if (!editingCompany) return;
 
     try {
-      const companyRef = doc(db, "companies", editingCompany.id);
+      const companyRef = doc(db, FIRESTORE_COLLECTION_NAME, editingCompany.id);
       await updateDoc(companyRef, values);
       
       setCompanyData(prev => ({

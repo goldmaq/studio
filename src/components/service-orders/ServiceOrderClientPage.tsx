@@ -44,6 +44,7 @@ const formatDateForInput = (date: any): string => {
   return "";
 };
 
+const FIRESTORE_COLLECTION_NAME = "ordensDeServico";
 
 export function ServiceOrderClientPage() {
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
@@ -65,7 +66,7 @@ export function ServiceOrderClientPage() {
     const fetchServiceOrders = async () => {
       setIsLoading(true);
       try {
-        const querySnapshot = await getDocs(collection(db, "serviceOrders"));
+        const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
         const ordersData = querySnapshot.docs.map(doc => {
           const data = doc.data();
           return { 
@@ -120,12 +121,12 @@ export function ServiceOrderClientPage() {
       };
 
       if (editingOrder) {
-        const orderRef = doc(db, "serviceOrders", editingOrder.id);
+        const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, editingOrder.id);
         await updateDoc(orderRef, dataToSave);
         setServiceOrders(serviceOrders.map((o) => (o.id === editingOrder.id ? { ...editingOrder, ...values } : o))); // Usa values para UI
         toast({ title: "Ordem de Serviço Atualizada", description: `Ordem ${values.orderNumber} atualizada.` });
       } else {
-        const docRef = await addDoc(collection(db, "serviceOrders"), dataToSave);
+        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), dataToSave);
         setServiceOrders([...serviceOrders, { id: docRef.id, ...values }]); // Usa values para UI
         toast({ title: "Ordem de Serviço Criada", description: `Ordem ${values.orderNumber} criada.` });
       }
@@ -138,7 +139,7 @@ export function ServiceOrderClientPage() {
 
   const handleDelete = async (orderId: string) => {
     try {
-      await deleteDoc(doc(db, "serviceOrders", orderId));
+      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderId));
       setServiceOrders(serviceOrders.filter(o => o.id !== orderId));
       toast({ title: "Ordem de Serviço Excluída", description: "A ordem de serviço foi excluída.", variant: "default" });
     } catch (error) {

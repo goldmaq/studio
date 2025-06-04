@@ -19,6 +19,8 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
 
+const FIRESTORE_COLLECTION_NAME = "tecnicos";
+
 export function TechnicianClientPage() {
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,7 +37,7 @@ export function TechnicianClientPage() {
     const fetchTechnicians = async () => {
       setIsLoading(true);
       try {
-        const querySnapshot = await getDocs(collection(db, "technicians"));
+        const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
         const techniciansData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Technician));
         setTechnicians(techniciansData);
       } catch (error) {
@@ -67,12 +69,12 @@ export function TechnicianClientPage() {
   const onSubmit = async (values: z.infer<typeof TechnicianSchema>) => {
     try {
       if (editingTechnician) {
-        const techRef = doc(db, "technicians", editingTechnician.id);
+        const techRef = doc(db, FIRESTORE_COLLECTION_NAME, editingTechnician.id);
         await updateDoc(techRef, values);
         setTechnicians(technicians.map((t) => (t.id === editingTechnician.id ? { ...t, ...values } : t)));
         toast({ title: "Técnico Atualizado", description: `${values.name} foi atualizado.` });
       } else {
-        const docRef = await addDoc(collection(db, "technicians"), values);
+        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), values);
         setTechnicians([...technicians, { id: docRef.id, ...values }]);
         toast({ title: "Técnico Adicionado", description: `${values.name} foi adicionado.` });
       }
@@ -85,7 +87,7 @@ export function TechnicianClientPage() {
 
   const handleDelete = async (technicianId: string) => {
     try {
-      await deleteDoc(doc(db, "technicians", technicianId));
+      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, technicianId));
       setTechnicians(technicians.filter(t => t.id !== technicianId));
       toast({ title: "Técnico Excluído", description: "O técnico foi removido.", variant: "default" });
     } catch (error) {

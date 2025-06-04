@@ -27,6 +27,8 @@ const statusIcons = {
   Manutenção: <WrenchIcon className="h-4 w-4 text-yellow-500" />,
 };
 
+const FIRESTORE_COLLECTION_NAME = "veiculos";
+
 export function VehicleClientPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -43,7 +45,7 @@ export function VehicleClientPage() {
     const fetchVehicles = async () => {
       setIsLoading(true);
       try {
-        const querySnapshot = await getDocs(collection(db, "vehicles"));
+        const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
         const vehiclesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vehicle));
         setVehicles(vehiclesData);
       } catch (error) {
@@ -75,12 +77,12 @@ export function VehicleClientPage() {
   const onSubmit = async (values: z.infer<typeof VehicleSchema>) => {
     try {
       if (editingVehicle) {
-        const vehicleRef = doc(db, "vehicles", editingVehicle.id);
+        const vehicleRef = doc(db, FIRESTORE_COLLECTION_NAME, editingVehicle.id);
         await updateDoc(vehicleRef, values);
         setVehicles(vehicles.map((v) => (v.id === editingVehicle.id ? { ...v, ...values } : v)));
         toast({ title: "Veículo Atualizado", description: `${values.model} (${values.licensePlate}) atualizado.` });
       } else {
-        const docRef = await addDoc(collection(db, "vehicles"), values);
+        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), values);
         setVehicles([...vehicles, { id: docRef.id, ...values }]);
         toast({ title: "Veículo Adicionado", description: `${values.model} (${values.licensePlate}) adicionado.` });
       }
@@ -93,7 +95,7 @@ export function VehicleClientPage() {
 
   const handleDelete = async (vehicleId: string) => {
     try {
-      await deleteDoc(doc(db, "vehicles", vehicleId));
+      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, vehicleId));
       setVehicles(vehicles.filter(v => v.id !== vehicleId));
       toast({ title: "Veículo Excluído", description: "O veículo foi removido.", variant: "default" });
     } catch (error) {
