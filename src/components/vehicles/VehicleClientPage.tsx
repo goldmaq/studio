@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, CarFront, Edit2, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle } from "lucide-react";
+import { PlusCircle, CarFront, Edit2, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const statusOptions: Vehicle['status'][] = ['Disponível', 'Em Uso', 'Manutenção'];
@@ -31,7 +31,8 @@ const statusIcons = {
 const FIRESTORE_COLLECTION_NAME = "veiculos";
 
 async function fetchVehicles(): Promise<Vehicle[]> {
-  const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
+  const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("model", "asc"), orderBy("licensePlate", "asc"));
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Vehicle));
 }
 
@@ -103,7 +104,7 @@ export function VehicleClientPage() {
     onSuccess: (_, vehicleId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Veículo Excluído", description: `O veículo foi removido.` });
-      closeModal();
+      closeModal(); // Close modal after successful deletion
     },
     onError: (err: Error, vehicleId) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o veículo. Detalhe: ${err.message}`, variant: "destructive" });
@@ -198,7 +199,11 @@ export function VehicleClientPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {vehicles.map((vehicle) => (
-            <Card key={vehicle.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              key={vehicle.id} 
+              className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+              onClick={() => openModal(vehicle)}
+            >
               <CardHeader>
                 <CardTitle className="font-headline text-xl">{vehicle.model}</CardTitle>
                 <CardDescription className="flex items-center text-sm">
@@ -215,7 +220,12 @@ export function VehicleClientPage() {
                 {vehicle.registrationInfo && <p className="flex items-center"><FileBadge className="mr-2 h-4 w-4 text-primary" /> Info. Reg.: {vehicle.registrationInfo}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(vehicle)} disabled={isMutating || deleteVehicleMutation.isPending}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={(e) => { e.stopPropagation(); openModal(vehicle);}} 
+                  disabled={isMutating || deleteVehicleMutation.isPending}
+                >
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
               </CardFooter>
@@ -232,8 +242,9 @@ export function VehicleClientPage() {
         formId="vehicle-form"
         isSubmitting={isMutating}
         editingItem={editingVehicle}
-        onDeleteConfirm={editingVehicle ? handleModalDeleteConfirm : undefined}
+        onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteVehicleMutation.isPending}
+        deleteButtonLabel="Excluir Veículo"
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="vehicle-form" className="space-y-4">

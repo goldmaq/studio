@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Edit2, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIcon, User, Loader2 } from "lucide-react"; // Renomeado AlertTriangle para evitar conflito
+import { PlusCircle, Construction, Edit2, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIcon, User, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,20 +18,21 @@ import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const statusOptions: Equipment['operationalStatus'][] = ['Operacional', 'Precisa de Reparo', 'Fora de Serviço'];
 const statusIcons = {
   Operacional: <CheckCircle className="h-4 w-4 text-green-500" />,
-  'Precisa de Reparo': <AlertIcon className="h-4 w-4 text-yellow-500" />, // Usando o alias
+  'Precisa de Reparo': <AlertIcon className="h-4 w-4 text-yellow-500" />, 
   'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
 };
 
 const FIRESTORE_COLLECTION_NAME = "equipamentos";
 
 async function fetchEquipment(): Promise<Equipment[]> {
-  const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
+  const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Equipment));
 }
 
@@ -99,7 +100,7 @@ export function EquipmentClientPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído." });
-      closeModal();
+      closeModal(); // Close modal after successful deletion
     },
     onError: (err: Error) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o equipamento. Detalhe: ${err.message}`, variant: "destructive" });
@@ -183,7 +184,11 @@ export function EquipmentClientPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {equipmentList.map((eq) => (
-            <Card key={eq.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              key={eq.id} 
+              className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+              onClick={() => openModal(eq)}
+            >
               <CardHeader>
                 <CardTitle className="font-headline text-xl">{eq.brand} {eq.model}</CardTitle>
                 <CardDescription className="flex items-center text-sm">
@@ -199,7 +204,12 @@ export function EquipmentClientPage() {
                 {eq.customerId && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> ID Cliente: {eq.customerId}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(eq)} disabled={isMutating || deleteEquipmentMutation.isPending}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={(e) => { e.stopPropagation(); openModal(eq);}} 
+                  disabled={isMutating || deleteEquipmentMutation.isPending}
+                >
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
               </CardFooter>
@@ -216,8 +226,9 @@ export function EquipmentClientPage() {
         formId="equipment-form"
         isSubmitting={isMutating}
         editingItem={editingEquipment}
-        onDeleteConfirm={editingEquipment ? handleModalDeleteConfirm : undefined}
+        onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteEquipmentMutation.isPending}
+        deleteButtonLabel="Excluir Equipamento"
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="equipment-form" className="space-y-4">

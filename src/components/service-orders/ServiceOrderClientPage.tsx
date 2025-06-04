@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, Edit2, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIcon, X, Loader2 } from "lucide-react"; // Renomeado AlertTriangle para evitar conflito
+import { PlusCircle, ClipboardList, Edit2, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIcon, X, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,12 +19,12 @@ import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
 const phaseIcons = {
-  Pendente: <AlertIcon className="h-4 w-4 text-yellow-400" />, // Usando o alias
+  Pendente: <AlertIcon className="h-4 w-4 text-yellow-400" />, 
   'Em Progresso': <Play className="h-4 w-4 text-blue-500" />,
   'Aguardando Peças': <Pause className="h-4 w-4 text-orange-500" />,
   Concluída: <Check className="h-4 w-4 text-green-500" />,
@@ -40,22 +40,32 @@ const formatDateForInput = (date: any): string => {
   }
   if (typeof date === 'string') {
     try {
-      return new Date(date).toISOString().split('T')[0];
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return ""; // Handle invalid date strings
+      return d.toISOString().split('T')[0];
     } catch (e) { return ""; }
+  }
+  if (date instanceof Date) {
+     if (isNaN(date.getTime())) return "";
+    return date.toISOString().split('T')[0];
   }
   return "";
 };
+
 
 const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
   if (!dateString) return null;
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return null;
-  const adjustedDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  // Ensure the timestamp is created from UTC date parts to avoid timezone shifts
+  const adjustedDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   return Timestamp.fromDate(adjustedDate);
 };
 
+
 async function fetchServiceOrders(): Promise<ServiceOrder[]> {
-  const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
+  const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("startDate", "desc"), orderBy("orderNumber", "desc"));
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data();
     return {
@@ -141,7 +151,7 @@ export function ServiceOrderClientPage() {
     onSuccess: (_, orderId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Ordem de Serviço Excluída", description: `A OS foi excluída.` });
-      closeModal();
+      closeModal(); // Close modal after successful deletion
     },
     onError: (err: Error, orderId) => {
       toast({ title: "Erro ao Excluir OS", description: `Não foi possível excluir a OS. Detalhe: ${err.message}`, variant: "destructive" });
@@ -241,7 +251,11 @@ export function ServiceOrderClientPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {serviceOrders.map((order) => (
-            <Card key={order.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              key={order.id} 
+              className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+              onClick={() => openModal(order)}
+            >
               <CardHeader>
                 <CardTitle className="font-headline text-xl">Ordem: {order.orderNumber}</CardTitle>
                 <CardDescription className="flex items-center text-sm">
@@ -258,7 +272,12 @@ export function ServiceOrderClientPage() {
                 <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Desc.: {order.description}</p>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(order)} disabled={isMutating || deleteServiceOrderMutation.isPending}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={(e) => { e.stopPropagation(); openModal(order);}} 
+                  disabled={isMutating || deleteServiceOrderMutation.isPending}
+                >
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
               </CardFooter>
@@ -275,8 +294,9 @@ export function ServiceOrderClientPage() {
         formId="service-order-form"
         isSubmitting={isMutating}
         editingItem={editingOrder}
-        onDeleteConfirm={editingOrder ? handleModalDeleteConfirm : undefined}
+        onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteServiceOrderMutation.isPending}
+        deleteButtonLabel="Excluir OS"
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">

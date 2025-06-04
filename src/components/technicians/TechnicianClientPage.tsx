@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, HardHat, Edit2, UserCircle, Wrench, Loader2, AlertTriangle } from "lucide-react";
+import { PlusCircle, HardHat, Edit2, UserCircle, Wrench, Loader2, AlertTriangle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,13 +17,14 @@ import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const FIRESTORE_COLLECTION_NAME = "tecnicos";
 
 async function fetchTechnicians(): Promise<Technician[]> {
-  const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
+  const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("name", "asc"));
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
 }
 
@@ -83,7 +84,7 @@ export function TechnicianClientPage() {
     onSuccess: (_, technicianId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Técnico Excluído", description: `O técnico foi removido.` });
-      closeModal();
+      closeModal(); // Close modal after successful deletion
     },
     onError: (err: Error, technicianId) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o técnico. Detalhe: ${err.message}`, variant: "destructive" });
@@ -167,7 +168,11 @@ export function TechnicianClientPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {technicians.map((tech) => (
-            <Card key={tech.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              key={tech.id} 
+              className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+              onClick={() => openModal(tech)}
+            >
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <UserCircle className="w-10 h-10 text-primary" />
@@ -181,7 +186,12 @@ export function TechnicianClientPage() {
                 {tech.specialization && <p className="flex items-center"><Wrench className="mr-2 h-4 w-4 text-primary" /> Especialização: {tech.specialization}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(tech)} disabled={isMutating || deleteTechnicianMutation.isPending}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={(e) => { e.stopPropagation(); openModal(tech);}} 
+                  disabled={isMutating || deleteTechnicianMutation.isPending}
+                >
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
               </CardFooter>
@@ -198,8 +208,9 @@ export function TechnicianClientPage() {
         formId="technician-form"
         isSubmitting={isMutating}
         editingItem={editingTechnician}
-        onDeleteConfirm={editingTechnician ? handleModalDeleteConfirm : undefined}
+        onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteTechnicianMutation.isPending}
+        deleteButtonLabel="Excluir Técnico"
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="technician-form" className="space-y-4">

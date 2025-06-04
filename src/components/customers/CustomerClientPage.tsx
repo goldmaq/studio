@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, Edit2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle } from "lucide-react";
+import { PlusCircle, Users, Edit2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,13 +18,14 @@ import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const FIRESTORE_COLLECTION_NAME = "clientes";
 
 async function fetchCustomers(): Promise<Customer[]> {
-  const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
+  const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("name", "asc"));
+  const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
 }
 
@@ -92,7 +93,7 @@ export function CustomerClientPage() {
     onSuccess: (_, customerId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Cliente Excluído", description: `O cliente foi excluído.` });
-      closeModal();
+      closeModal(); // Close modal after successful deletion
     },
     onError: (err: Error, customerId) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o cliente. Detalhe: ${err.message}`, variant: "destructive" });
@@ -176,7 +177,11 @@ export function CustomerClientPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {customers.map((customer) => (
-            <Card key={customer.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <Card 
+              key={customer.id} 
+              className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+              onClick={() => openModal(customer)}
+            >
               <CardHeader>
                 <CardTitle className="font-headline text-xl">{customer.name}</CardTitle>
                 <CardDescription className="flex items-center text-sm">
@@ -190,7 +195,12 @@ export function CustomerClientPage() {
                 {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(customer)} disabled={isMutating || deleteCustomerMutation.isPending}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={(e) => { e.stopPropagation(); openModal(customer);}} 
+                  disabled={isMutating || deleteCustomerMutation.isPending}
+                >
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
               </CardFooter>
@@ -207,8 +217,9 @@ export function CustomerClientPage() {
         formId="customer-form"
         isSubmitting={isMutating}
         editingItem={editingCustomer}
-        onDeleteConfirm={editingCustomer ? handleModalDeleteConfirm : undefined}
+        onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteCustomerMutation.isPending}
+        deleteButtonLabel="Excluir Cliente"
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="customer-form" className="space-y-4">
