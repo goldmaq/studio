@@ -1,6 +1,8 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
+import { AppQueryProvider } from '@/components/shared/QueryProvider'; // Import the QueryProvider
 
 export const metadata: Metadata = {
   title: 'Gold Maq Controle',
@@ -20,8 +22,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <AppQueryProvider> {/* Wrap children with QueryProvider */}
+          {children}
+          <Toaster />
+        </AppQueryProvider>
       </body>
     </html>
   );
