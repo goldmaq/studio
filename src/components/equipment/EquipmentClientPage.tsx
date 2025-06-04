@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Edit2, Trash2, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle, User, Loader2 } from "lucide-react";
+import { PlusCircle, Construction, Edit2, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIcon, User, Loader2 } from "lucide-react"; // Renomeado AlertTriangle para evitar conflito
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 const statusOptions: Equipment['operationalStatus'][] = ['Operacional', 'Precisa de Reparo', 'Fora de Serviço'];
 const statusIcons = {
   Operacional: <CheckCircle className="h-4 w-4 text-green-500" />,
-  'Precisa de Reparo': <AlertTriangle className="h-4 w-4 text-yellow-500" />,
+  'Precisa de Reparo': <AlertIcon className="h-4 w-4 text-yellow-500" />, // Usando o alias
   'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
 };
 
@@ -70,7 +70,6 @@ export function EquipmentClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao criar equipamento:", err);
       toast({ title: "Erro ao Criar", description: `Não foi possível criar ${variables.brand} ${variables.model}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -88,7 +87,6 @@ export function EquipmentClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao atualizar equipamento:", err);
       toast({ title: "Erro ao Atualizar", description: `Não foi possível atualizar ${variables.brand} ${variables.model}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -101,13 +99,12 @@ export function EquipmentClientPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído." });
+      closeModal();
     },
     onError: (err: Error) => {
-      console.error("Erro ao excluir equipamento:", err);
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o equipamento. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
-
 
   const openModal = (equipment?: Equipment) => {
     if (equipment) {
@@ -134,9 +131,11 @@ export function EquipmentClientPage() {
     }
   };
 
-  const handleDelete = async (equipmentId: string) => {
-     if (window.confirm("Tem certeza que deseja excluir este equipamento?")) {
-      deleteEquipmentMutation.mutate(equipmentId);
+  const handleModalDeleteConfirm = () => {
+    if (editingEquipment && editingEquipment.id) {
+      if (window.confirm(`Tem certeza que deseja excluir o equipamento "${editingEquipment.brand} ${editingEquipment.model}"?`)) {
+        deleteEquipmentMutation.mutate(editingEquipment.id);
+      }
     }
   };
   
@@ -154,7 +153,7 @@ export function EquipmentClientPage() {
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
-        <AlertTriangle className="h-12 w-12 mb-4" />
+        <AlertIcon className="h-12 w-12 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Equipamentos</h2>
         <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
         <p className="text-sm mt-2">Detalhe: {error?.message}</p>
@@ -203,10 +202,6 @@ export function EquipmentClientPage() {
                 <Button variant="outline" size="sm" onClick={() => openModal(eq)} disabled={isMutating || deleteEquipmentMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(eq.id)} disabled={isMutating || deleteEquipmentMutation.isPending && deleteEquipmentMutation.variables === eq.id}>
-                  {deleteEquipmentMutation.isPending && deleteEquipmentMutation.variables === eq.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                  Excluir
-                </Button>
               </CardFooter>
             </Card>
           ))}
@@ -221,6 +216,8 @@ export function EquipmentClientPage() {
         formId="equipment-form"
         isSubmitting={isMutating}
         editingItem={editingEquipment}
+        onDeleteConfirm={editingEquipment ? handleModalDeleteConfirm : undefined}
+        isDeleting={deleteEquipmentMutation.isPending}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="equipment-form" className="space-y-4">
@@ -258,5 +255,3 @@ export function EquipmentClientPage() {
     </>
   );
 }
-
-    

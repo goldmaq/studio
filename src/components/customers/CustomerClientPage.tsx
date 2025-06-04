@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, Edit2, Trash2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle } from "lucide-react";
+import { PlusCircle, Users, Edit2, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -54,13 +54,8 @@ export function CustomerClientPage() {
 
   const addCustomerMutation = useMutation({
     mutationFn: async (newCustomerData: z.infer<typeof CustomerSchema>) => {
-      try {
-        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newCustomerData);
-        return docRef;
-      } catch (e) {
-        console.error("Error directly in addDoc while creating customer:", e);
-        throw e; 
-      }
+      const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newCustomerData);
+      return docRef;
     },
     onSuccess: (docRef, variables) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -68,7 +63,6 @@ export function CustomerClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao criar cliente (onError):", err);
       toast({ title: "Erro ao Criar", description: `Não foi possível criar o cliente ${variables.name}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -78,12 +72,7 @@ export function CustomerClientPage() {
       const { id, ...dataToUpdate } = customerData;
       if (!id) throw new Error("ID do cliente é necessário para atualização.");
       const customerRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
-      try {
-        await updateDoc(customerRef, dataToUpdate);
-      } catch (e) {
-        console.error("Error directly in updateDoc for customer:", e);
-        throw e;
-      }
+      await updateDoc(customerRef, dataToUpdate);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -91,7 +80,6 @@ export function CustomerClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao atualizar cliente (onError):", err);
       toast({ title: "Erro ao Atualizar", description: `Não foi possível atualizar o cliente ${variables.name}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -99,20 +87,15 @@ export function CustomerClientPage() {
   const deleteCustomerMutation = useMutation({
     mutationFn: async (customerId: string) => {
       if (!customerId) throw new Error("ID do cliente é necessário para exclusão.");
-      try {
-        await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, customerId));
-      } catch (e) {
-        console.error("Error directly in deleteDoc for customer:", e);
-        throw e;
-      }
+      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, customerId));
     },
     onSuccess: (_, customerId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
-      toast({ title: "Cliente Excluído", description: `O cliente (ID: ${customerId}) foi excluído.` });
+      toast({ title: "Cliente Excluído", description: `O cliente foi excluído.` });
+      closeModal();
     },
     onError: (err: Error, customerId) => {
-      console.error("Erro ao excluir cliente (onError):", err);
-      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o cliente (ID: ${customerId}). Detalhe: ${err.message}`, variant: "destructive" });
+      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o cliente. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
 
@@ -140,10 +123,12 @@ export function CustomerClientPage() {
       addCustomerMutation.mutate(values);
     }
   };
-
-  const handleDelete = async (customer: Customer) => {
-    if (window.confirm(`Tem certeza que deseja excluir o cliente "${customer.name}"?`)) {
-      deleteCustomerMutation.mutate(customer.id);
+  
+  const handleModalDeleteConfirm = () => {
+    if (editingCustomer && editingCustomer.id) {
+      if (window.confirm(`Tem certeza que deseja excluir o cliente "${editingCustomer.name}"?`)) {
+        deleteCustomerMutation.mutate(editingCustomer.id);
+      }
     }
   };
   
@@ -208,10 +193,6 @@ export function CustomerClientPage() {
                 <Button variant="outline" size="sm" onClick={() => openModal(customer)} disabled={isMutating || deleteCustomerMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(customer)} disabled={deleteCustomerMutation.isPending && deleteCustomerMutation.variables === customer.id}>
-                  {deleteCustomerMutation.isPending && deleteCustomerMutation.variables === customer.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                  Excluir
-                </Button>
               </CardFooter>
             </Card>
           ))}
@@ -226,6 +207,8 @@ export function CustomerClientPage() {
         formId="customer-form"
         isSubmitting={isMutating}
         editingItem={editingCustomer}
+        onDeleteConfirm={editingCustomer ? handleModalDeleteConfirm : undefined}
+        isDeleting={deleteCustomerMutation.isPending}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="customer-form" className="space-y-4">

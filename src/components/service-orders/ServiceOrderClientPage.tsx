@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, Edit2, Trash2, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle, X, Loader2 } from "lucide-react";
+import { PlusCircle, ClipboardList, Edit2, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIcon, X, Loader2 } from "lucide-react"; // Renomeado AlertTriangle para evitar conflito
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
 const phaseIcons = {
-  Pendente: <AlertTriangle className="h-4 w-4 text-yellow-400" />,
+  Pendente: <AlertIcon className="h-4 w-4 text-yellow-400" />, // Usando o alias
   'Em Progresso': <Play className="h-4 w-4 text-blue-500" />,
   'Aguardando Peças': <Pause className="h-4 w-4 text-orange-500" />,
   Concluída: <Check className="h-4 w-4 text-green-500" />,
@@ -33,7 +33,6 @@ const phaseIcons = {
 
 const FIRESTORE_COLLECTION_NAME = "ordensDeServico";
 
-// Helper para converter Timestamp do Firestore para string YYYY-MM-DD e vice-versa
 const formatDateForInput = (date: any): string => {
   if (!date) return "";
   if (date instanceof Timestamp) {
@@ -50,7 +49,6 @@ const formatDateForInput = (date: any): string => {
 const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
   if (!dateString) return null;
   const date = new Date(dateString);
-  // Check if date is valid after parsing. Add one day to counteract timezone issues if only date is provided.
   if (isNaN(date.getTime())) return null;
   const adjustedDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
   return Timestamp.fromDate(adjustedDate);
@@ -68,7 +66,6 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
     } as ServiceOrder;
   });
 }
-
 
 export function ServiceOrderClientPage() {
   const queryClient = useQueryClient();
@@ -108,7 +105,6 @@ export function ServiceOrderClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao criar ordem de serviço:", err);
       toast({ title: "Erro ao Criar OS", description: `Não foi possível criar a OS ${variables.orderNumber}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -133,7 +129,6 @@ export function ServiceOrderClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao atualizar ordem de serviço:", err);
       toast({ title: "Erro ao Atualizar OS", description: `Não foi possível atualizar a OS ${variables.orderNumber}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -145,14 +140,13 @@ export function ServiceOrderClientPage() {
     },
     onSuccess: (_, orderId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
-      toast({ title: "Ordem de Serviço Excluída", description: `A OS (ID: ${orderId}) foi excluída.` });
+      toast({ title: "Ordem de Serviço Excluída", description: `A OS foi excluída.` });
+      closeModal();
     },
     onError: (err: Error, orderId) => {
-      console.error("Erro ao excluir ordem de serviço:", err);
-      toast({ title: "Erro ao Excluir OS", description: `Não foi possível excluir a OS (ID: ${orderId}). Detalhe: ${err.message}`, variant: "destructive" });
+      toast({ title: "Erro ao Excluir OS", description: `Não foi possível excluir a OS. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
-
 
   const openModal = (order?: ServiceOrder) => {
     if (order) {
@@ -195,9 +189,11 @@ export function ServiceOrderClientPage() {
     }
   };
 
-  const handleDelete = async (order: ServiceOrder) => {
-    if (window.confirm(`Tem certeza que deseja excluir a Ordem de Serviço "${order.orderNumber}"?`)) {
-      deleteServiceOrderMutation.mutate(order.id);
+  const handleModalDeleteConfirm = () => {
+    if (editingOrder && editingOrder.id) {
+       if (window.confirm(`Tem certeza que deseja excluir a Ordem de Serviço "${editingOrder.orderNumber}"?`)) {
+        deleteServiceOrderMutation.mutate(editingOrder.id);
+      }
     }
   };
   
@@ -215,7 +211,7 @@ export function ServiceOrderClientPage() {
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
-        <AlertTriangle className="h-12 w-12 mb-4" />
+        <AlertIcon className="h-12 w-12 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Ordens de Serviço</h2>
         <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
         <p className="text-sm mt-2">Detalhe: {error?.message}</p>
@@ -265,10 +261,6 @@ export function ServiceOrderClientPage() {
                 <Button variant="outline" size="sm" onClick={() => openModal(order)} disabled={isMutating || deleteServiceOrderMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(order)} disabled={deleteServiceOrderMutation.isPending && deleteServiceOrderMutation.variables === order.id}>
-                   {deleteServiceOrderMutation.isPending && deleteServiceOrderMutation.variables === order.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                  Excluir
-                </Button>
               </CardFooter>
             </Card>
           ))}
@@ -283,6 +275,8 @@ export function ServiceOrderClientPage() {
         formId="service-order-form"
         isSubmitting={isMutating}
         editingItem={editingOrder}
+        onDeleteConfirm={editingOrder ? handleModalDeleteConfirm : undefined}
+        isDeleting={deleteServiceOrderMutation.isPending}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">

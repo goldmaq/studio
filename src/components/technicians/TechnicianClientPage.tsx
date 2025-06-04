@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, HardHat, Edit2, Trash2, UserCircle, Wrench, Loader2, AlertTriangle } from "lucide-react";
+import { PlusCircle, HardHat, Edit2, UserCircle, Wrench, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -54,7 +54,6 @@ export function TechnicianClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao adicionar técnico:", err);
       toast({ title: "Erro ao Adicionar", description: `Não foi possível adicionar o técnico ${variables.name}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -72,7 +71,6 @@ export function TechnicianClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao atualizar técnico:", err);
       toast({ title: "Erro ao Atualizar", description: `Não foi possível atualizar o técnico ${variables.name}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -84,11 +82,11 @@ export function TechnicianClientPage() {
     },
     onSuccess: (_, technicianId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
-      toast({ title: "Técnico Excluído", description: `O técnico (ID: ${technicianId}) foi removido.` });
+      toast({ title: "Técnico Excluído", description: `O técnico foi removido.` });
+      closeModal();
     },
     onError: (err: Error, technicianId) => {
-      console.error("Erro ao excluir técnico:", err);
-      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o técnico (ID: ${technicianId}). Detalhe: ${err.message}`, variant: "destructive" });
+      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o técnico. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
 
@@ -117,9 +115,11 @@ export function TechnicianClientPage() {
     }
   };
 
-  const handleDelete = async (technician: Technician) => {
-    if (window.confirm(`Tem certeza que deseja excluir o técnico "${technician.name}"?`)) {
-      deleteTechnicianMutation.mutate(technician.id);
+  const handleModalDeleteConfirm = () => {
+    if (editingTechnician && editingTechnician.id) {
+      if (window.confirm(`Tem certeza que deseja excluir o técnico "${editingTechnician.name}"?`)) {
+        deleteTechnicianMutation.mutate(editingTechnician.id);
+      }
     }
   };
   
@@ -184,10 +184,6 @@ export function TechnicianClientPage() {
                 <Button variant="outline" size="sm" onClick={() => openModal(tech)} disabled={isMutating || deleteTechnicianMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(tech)} disabled={deleteTechnicianMutation.isPending && deleteTechnicianMutation.variables === tech.id}>
-                  {deleteTechnicianMutation.isPending && deleteTechnicianMutation.variables === tech.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                  Excluir
-                </Button>
               </CardFooter>
             </Card>
           ))}
@@ -202,6 +198,8 @@ export function TechnicianClientPage() {
         formId="technician-form"
         isSubmitting={isMutating}
         editingItem={editingTechnician}
+        onDeleteConfirm={editingTechnician ? handleModalDeleteConfirm : undefined}
+        isDeleting={deleteTechnicianMutation.isPending}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="technician-form" className="space-y-4">

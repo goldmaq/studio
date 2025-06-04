@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, CarFront, Edit2, Trash2, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle } from "lucide-react";
+import { PlusCircle, CarFront, Edit2, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -68,7 +68,6 @@ export function VehicleClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao adicionar veículo:", err);
       toast({ title: "Erro ao Adicionar", description: `Não foi possível adicionar ${variables.model}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -92,7 +91,6 @@ export function VehicleClientPage() {
       closeModal();
     },
     onError: (err: Error, variables) => {
-      console.error("Erro ao atualizar veículo:", err);
       toast({ title: "Erro ao Atualizar", description: `Não foi possível atualizar ${variables.model}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -104,11 +102,11 @@ export function VehicleClientPage() {
     },
     onSuccess: (_, vehicleId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
-      toast({ title: "Veículo Excluído", description: `O veículo (ID: ${vehicleId}) foi removido.` });
+      toast({ title: "Veículo Excluído", description: `O veículo foi removido.` });
+      closeModal();
     },
     onError: (err: Error, vehicleId) => {
-      console.error("Erro ao excluir veículo:", err);
-      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o veículo (ID: ${vehicleId}). Detalhe: ${err.message}`, variant: "destructive" });
+      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o veículo. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
 
@@ -148,9 +146,11 @@ export function VehicleClientPage() {
     }
   };
 
-  const handleDelete = async (vehicle: Vehicle) => {
-    if (window.confirm(`Tem certeza que deseja excluir o veículo "${vehicle.model} (${vehicle.licensePlate})"?`)) {
-      deleteVehicleMutation.mutate(vehicle.id);
+  const handleModalDeleteConfirm = () => {
+    if (editingVehicle && editingVehicle.id) {
+       if (window.confirm(`Tem certeza que deseja excluir o veículo "${editingVehicle.model} (${editingVehicle.licensePlate})"?`)) {
+        deleteVehicleMutation.mutate(editingVehicle.id);
+      }
     }
   };
 
@@ -218,10 +218,6 @@ export function VehicleClientPage() {
                 <Button variant="outline" size="sm" onClick={() => openModal(vehicle)} disabled={isMutating || deleteVehicleMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(vehicle)} disabled={deleteVehicleMutation.isPending && deleteVehicleMutation.variables === vehicle.id}>
-                   {deleteVehicleMutation.isPending && deleteVehicleMutation.variables === vehicle.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                  Excluir
-                </Button>
               </CardFooter>
             </Card>
           ))}
@@ -236,6 +232,8 @@ export function VehicleClientPage() {
         formId="vehicle-form"
         isSubmitting={isMutating}
         editingItem={editingVehicle}
+        onDeleteConfirm={editingVehicle ? handleModalDeleteConfirm : undefined}
+        isDeleting={deleteVehicleMutation.isPending}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="vehicle-form" className="space-y-4">
