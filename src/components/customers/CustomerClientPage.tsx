@@ -54,10 +54,8 @@ export function CustomerClientPage() {
 
   const addCustomerMutation = useMutation({
     mutationFn: async (newCustomerData: z.infer<typeof CustomerSchema>) => {
-      console.log("Attempting to add customer to Firestore:", newCustomerData);
       try {
         const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newCustomerData);
-        console.log("Customer added to Firestore with ID:", docRef.id);
         return docRef;
       } catch (e) {
         console.error("Error directly in addDoc while creating customer:", e);
@@ -79,11 +77,9 @@ export function CustomerClientPage() {
     mutationFn: async (customerData: Customer) => {
       const { id, ...dataToUpdate } = customerData;
       if (!id) throw new Error("ID do cliente é necessário para atualização.");
-      console.log("Attempting to update customer in Firestore, ID:", id, dataToUpdate);
       const customerRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
       try {
         await updateDoc(customerRef, dataToUpdate);
-        console.log("Customer updated in Firestore, ID:", id);
       } catch (e) {
         console.error("Error directly in updateDoc for customer:", e);
         throw e;
@@ -103,10 +99,8 @@ export function CustomerClientPage() {
   const deleteCustomerMutation = useMutation({
     mutationFn: async (customerId: string) => {
       if (!customerId) throw new Error("ID do cliente é necessário para exclusão.");
-      console.log("Attempting to delete customer from Firestore, ID:", customerId);
       try {
         await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, customerId));
-        console.log("Customer deleted from Firestore, ID:", customerId);
       } catch (e) {
         console.error("Error directly in deleteDoc for customer:", e);
         throw e;
