@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
@@ -19,6 +19,7 @@ import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const statusOptions: Equipment['operationalStatus'][] = ['Operacional', 'Precisa de Reparo', 'Fora de Serviço'];
 const statusIcons = {
@@ -29,12 +30,17 @@ const statusIcons = {
 
 const FIRESTORE_COLLECTION_NAME = "equipamentos";
 
+async function fetchEquipment(): Promise<Equipment[]> {
+  const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Equipment));
+}
+
 export function EquipmentClientPage() {
-  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof EquipmentSchema>>({
     resolver: zodResolver(EquipmentSchema),
@@ -49,21 +55,59 @@ export function EquipmentClientPage() {
     },
   });
 
-  useEffect(() => {
-    const fetchEquipment = async () => {
-      setIsLoading(true);
-      try {
-        const querySnapshot = await getDocs(collection(db, FIRESTORE_COLLECTION_NAME));
-        const equipmentData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Equipment));
-        setEquipmentList(equipmentData);
-      } catch (error) {
-        console.error("Erro ao buscar equipamentos:", error);
-        toast({ title: "Erro ao Carregar Equipamentos", description: "Não foi possível buscar os dados dos equipamentos.", variant: "destructive" });
-      }
-      setIsLoading(false);
-    };
-    fetchEquipment();
-  }, [toast]);
+  const { data: equipmentList = [], isLoading, isError, error } = useQuery<Equipment[], Error>({
+    queryKey: [FIRESTORE_COLLECTION_NAME],
+    queryFn: fetchEquipment,
+  });
+
+  const addEquipmentMutation = useMutation({
+    mutationFn: async (newEquipmentData: z.infer<typeof EquipmentSchema>) => {
+      return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newEquipmentData);
+    },
+    onSuccess: (docRef, variables) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Equipamento Criado", description: `${variables.brand} ${variables.model} adicionado.` });
+      closeModal();
+    },
+    onError: (err: Error, variables) => {
+      console.error("Erro ao criar equipamento:", err);
+      toast({ title: "Erro ao Criar", description: `Não foi possível criar ${variables.brand} ${variables.model}. Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+
+  const updateEquipmentMutation = useMutation({
+    mutationFn: async (equipmentData: Equipment) => {
+      const { id, ...dataToUpdate } = equipmentData;
+      if (!id) throw new Error("ID do equipamento é necessário para atualização.");
+      const equipmentRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
+      return updateDoc(equipmentRef, dataToUpdate);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Equipamento Atualizado", description: `${variables.brand} ${variables.model} atualizado.` });
+      closeModal();
+    },
+    onError: (err: Error, variables) => {
+      console.error("Erro ao atualizar equipamento:", err);
+      toast({ title: "Erro ao Atualizar", description: `Não foi possível atualizar ${variables.brand} ${variables.model}. Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+  
+  const deleteEquipmentMutation = useMutation({
+    mutationFn: async (equipmentId: string) => {
+      if (!equipmentId) throw new Error("ID do equipamento é necessário para exclusão.");
+      return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, equipmentId));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído." });
+    },
+    onError: (err: Error) => {
+      console.error("Erro ao excluir equipamento:", err);
+      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o equipamento. Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+
 
   const openModal = (equipment?: Equipment) => {
     if (equipment) {
@@ -83,34 +127,20 @@ export function EquipmentClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof EquipmentSchema>) => {
-    try {
-      if (editingEquipment) {
-        const equipmentRef = doc(db, FIRESTORE_COLLECTION_NAME, editingEquipment.id);
-        await updateDoc(equipmentRef, values);
-        setEquipmentList(equipmentList.map((eq) => (eq.id === editingEquipment.id ? { ...eq, ...values } : eq)));
-        toast({ title: "Equipamento Atualizado", description: `${values.brand} ${values.model} atualizado.` });
-      } else {
-        const docRef = await addDoc(collection(db, FIRESTORE_COLLECTION_NAME), values);
-        setEquipmentList([...equipmentList, { id: docRef.id, ...values }]);
-        toast({ title: "Equipamento Criado", description: `${values.brand} ${values.model} adicionado.` });
-      }
-      closeModal();
-    } catch (error) {
-      console.error("Erro ao salvar equipamento:", error);
-      toast({ title: "Erro ao Salvar", description: "Não foi possível salvar os dados do equipamento.", variant: "destructive" });
+    if (editingEquipment && editingEquipment.id) {
+      updateEquipmentMutation.mutate({ ...values, id: editingEquipment.id });
+    } else {
+      addEquipmentMutation.mutate(values);
     }
   };
 
   const handleDelete = async (equipmentId: string) => {
-    try {
-      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, equipmentId));
-      setEquipmentList(equipmentList.filter(eq => eq.id !== equipmentId));
-      toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído.", variant: "default" });
-    } catch (error) {
-      console.error("Erro ao excluir equipamento:", error);
-      toast({ title: "Erro ao Excluir", description: "Não foi possível excluir o equipamento.", variant: "destructive" });
+     if (window.confirm("Tem certeza que deseja excluir este equipamento?")) {
+      deleteEquipmentMutation.mutate(equipmentId);
     }
   };
+  
+  const isMutating = addEquipmentMutation.isPending || updateEquipmentMutation.isPending;
 
   if (isLoading) {
     return (
@@ -121,18 +151,29 @@ export function EquipmentClientPage() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-destructive">
+        <AlertTriangle className="h-12 w-12 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Equipamentos</h2>
+        <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
+        <p className="text-sm mt-2">Detalhe: {error?.message}</p>
+      </div>
+    );
+  }
+
   return (
     <>
       <PageHeader 
         title="Rastreamento de Equipamentos" 
         actions={
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || deleteEquipmentMutation.isPending}>
             <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Equipamento
           </Button>
         }
       />
 
-      {equipmentList.length === 0 ? (
+      {equipmentList.length === 0 && !isLoading ? (
         <DataTablePlaceholder
           icon={Construction}
           title="Nenhum Equipamento Registrado"
@@ -159,11 +200,12 @@ export function EquipmentClientPage() {
                 {eq.customerId && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> ID Cliente: {eq.customerId}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => openModal(eq)}>
+                <Button variant="outline" size="sm" onClick={() => openModal(eq)} disabled={isMutating || deleteEquipmentMutation.isPending}>
                   <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
-                <Button variant="destructive" size="sm" onClick={() => handleDelete(eq.id)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                <Button variant="destructive" size="sm" onClick={() => handleDelete(eq.id)} disabled={isMutating || deleteEquipmentMutation.isPending && deleteEquipmentMutation.variables === eq.id}>
+                  {deleteEquipmentMutation.isPending && deleteEquipmentMutation.variables === eq.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Excluir
                 </Button>
               </CardFooter>
             </Card>
@@ -177,7 +219,7 @@ export function EquipmentClientPage() {
         title={editingEquipment ? "Editar Equipamento" : "Adicionar Novo Equipamento"}
         description="Forneça os detalhes do equipamento."
         formId="equipment-form"
-        isSubmitting={form.formState.isSubmitting}
+        isSubmitting={isMutating}
         editingItem={editingEquipment}
       >
         <Form {...form}>
@@ -195,7 +237,7 @@ export function EquipmentClientPage() {
               <FormItem><FormLabel>Tipo de Equipamento</FormLabel><FormControl><Input placeholder="ex: Empilhadeira, Paleteira" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="manufactureYear" render={({ field }) => (
-              <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="ex: 2022" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="ex: 2022" {...field} onChange={e => field.onChange(parseInt(e.target.value,10) || 0)} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="operationalStatus" render={({ field }) => (
               <FormItem><FormLabel>Status Operacional</FormLabel>
@@ -216,3 +258,5 @@ export function EquipmentClientPage() {
     </>
   );
 }
+
+    
