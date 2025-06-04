@@ -36,13 +36,13 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/customers", icon: Users, label: "Customers" },
-  { href: "/equipment", icon: Construction, label: "Equipment" },
-  { href: "/service-orders", icon: ClipboardList, label: "Service Orders" },
-  { href: "/technicians", icon: HardHat, label: "Technicians" },
-  { href: "/vehicles", icon: CarFront, label: "Vehicles" },
-  { href: "/company-config", icon: SlidersHorizontal, label: "Company Config" },
+  { href: "/", icon: LayoutDashboard, label: "Painel" },
+  { href: "/customers", icon: Users, label: "Clientes" },
+  { href: "/equipment", icon: Construction, label: "Equipamentos" },
+  { href: "/service-orders", icon: ClipboardList, label: "Ordens de Serviço" },
+  { href: "/technicians", icon: HardHat, label: "Técnicos" },
+  { href: "/vehicles", icon: CarFront, label: "Veículos" },
+  { href: "/company-config", icon: SlidersHorizontal, label: "Config. Empresa" },
 ];
 
 function MainSidebar() {
@@ -59,7 +59,7 @@ function MainSidebar() {
         <Link href="/" className="flex items-center gap-2">
           <Package className="w-8 h-8 text-primary" />
           <span className="font-headline text-xl font-semibold text-foreground">
-            GoldMaq Control
+            GoldMaq Controle
           </span>
         </Link>
       </SidebarHeader>
@@ -88,6 +88,10 @@ function MainSidebar() {
 }
 
 export function AppLayout({ children }: { children: ReactNode }) {
+  const currentPathname = usePathname();
+  const currentNavItem = navItems.find(item => item.href === currentPathname || (item.href !== "/" && currentPathname.startsWith(item.href)));
+  const pageTitle = currentNavItem?.label || "Painel";
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen">
@@ -98,7 +102,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                <SidebarTrigger className="md:hidden"/>
             </div>
             <div className="font-headline text-lg font-semibold">
-              {navItems.find(item => item.href === usePathname() || (item.href !== "/" && usePathname().startsWith(item.href)))?.label || "Dashboard"}
+              {pageTitle}
             </div>
             <div>{/* User menu or other actions can go here */}</div>
           </header>

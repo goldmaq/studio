@@ -18,15 +18,15 @@ import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 
 const initialEquipment: Equipment[] = [
-  { id: "eq1", brand: "Toyota", model: "8FGCU25", chassisNumber: "TY0012345", equipmentType: "Forklift", manufactureYear: 2021, operationalStatus: "Operational", customerId: "1" },
-  { id: "eq2", brand: "Hyster", model: "H50FT", chassisNumber: "HY0067890", equipmentType: "Forklift", manufactureYear: 2019, operationalStatus: "Needs Repair", customerId: "2" },
+  { id: "eq1", brand: "Toyota", model: "8FGCU25", chassisNumber: "TY0012345", equipmentType: "Forklift", manufactureYear: 2021, operationalStatus: "Operacional", customerId: "1" },
+  { id: "eq2", brand: "Hyster", model: "H50FT", chassisNumber: "HY0067890", equipmentType: "Forklift", manufactureYear: 2019, operationalStatus: "Precisa de Reparo", customerId: "2" },
 ];
 
-const statusOptions: Equipment['operationalStatus'][] = ['Operational', 'Needs Repair', 'Out of Service'];
+const statusOptions: Equipment['operationalStatus'][] = ['Operacional', 'Precisa de Reparo', 'Fora de Serviço'];
 const statusIcons = {
-  Operational: <CheckCircle className="h-4 w-4 text-green-500" />,
-  'Needs Repair': <AlertTriangle className="h-4 w-4 text-yellow-500" />,
-  'Out of Service': <XCircle className="h-4 w-4 text-red-500" />,
+  Operacional: <CheckCircle className="h-4 w-4 text-green-500" />,
+  'Precisa de Reparo': <AlertTriangle className="h-4 w-4 text-yellow-500" />,
+  'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
 };
 
 
@@ -44,7 +44,7 @@ export function EquipmentClientPage() {
       chassisNumber: "",
       equipmentType: "",
       manufactureYear: new Date().getFullYear(),
-      operationalStatus: "Operational",
+      operationalStatus: "Operacional",
       customerId: "",
     },
   });
@@ -55,7 +55,7 @@ export function EquipmentClientPage() {
       form.reset(equipment);
     } else {
       setEditingEquipment(null);
-      form.reset({ brand: "", model: "", chassisNumber: "", equipmentType: "", manufactureYear: new Date().getFullYear(), operationalStatus: "Operational", customerId: "" });
+      form.reset({ brand: "", model: "", chassisNumber: "", equipmentType: "", manufactureYear: new Date().getFullYear(), operationalStatus: "Operacional", customerId: "" });
     }
     setIsModalOpen(true);
   };
@@ -69,26 +69,26 @@ export function EquipmentClientPage() {
   const onSubmit = (values: z.infer<typeof EquipmentSchema>) => {
     if (editingEquipment) {
       setEquipmentList(equipmentList.map((eq) => (eq.id === editingEquipment.id ? { ...eq, ...values } : eq)));
-      toast({ title: "Equipment Updated", description: `${values.brand} ${values.model} updated.` });
+      toast({ title: "Equipamento Atualizado", description: `${values.brand} ${values.model} atualizado.` });
     } else {
       setEquipmentList([...equipmentList, { id: String(Date.now()), ...values }]);
-      toast({ title: "Equipment Created", description: `${values.brand} ${values.model} added.` });
+      toast({ title: "Equipamento Criado", description: `${values.brand} ${values.model} adicionado.` });
     }
     closeModal();
   };
 
   const handleDelete = (equipmentId: string) => {
     setEquipmentList(equipmentList.filter(eq => eq.id !== equipmentId));
-    toast({ title: "Equipment Deleted", description: "The equipment has been deleted.", variant: "destructive" });
+    toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído.", variant: "destructive" });
   };
 
   return (
     <>
       <PageHeader 
-        title="Equipment Tracking" 
+        title="Rastreamento de Equipamentos" 
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Equipment
+            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Equipamento
           </Button>
         }
       />
@@ -96,9 +96,9 @@ export function EquipmentClientPage() {
       {equipmentList.length === 0 ? (
         <DataTablePlaceholder
           icon={Construction}
-          title="No Equipment Registered"
-          description="Add your first piece of equipment to start tracking."
-          buttonLabel="Add Equipment"
+          title="Nenhum Equipamento Registrado"
+          description="Adicione seu primeiro equipamento para começar a rastrear."
+          buttonLabel="Adicionar Equipamento"
           onButtonClick={() => openModal()}
         />
       ) : (
@@ -108,23 +108,23 @@ export function EquipmentClientPage() {
               <CardHeader>
                 <CardTitle className="font-headline text-xl">{eq.brand} {eq.model}</CardTitle>
                 <CardDescription className="flex items-center text-sm">
-                  <Tag className="mr-2 h-4 w-4 text-muted-foreground" /> Chassis: {eq.chassisNumber}
+                  <Tag className="mr-2 h-4 w-4 text-muted-foreground" /> Chassi: {eq.chassisNumber}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Type: {eq.equipmentType}</p>
-                <p className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> Year: {eq.manufactureYear}</p>
+                <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Tipo: {eq.equipmentType}</p>
+                <p className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> Ano: {eq.manufactureYear}</p>
                 <p className="flex items-center">
                   {statusIcons[eq.operationalStatus]} <span className="ml-2">Status: {eq.operationalStatus}</span>
                 </p>
-                {eq.customerId && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Customer ID: {eq.customerId}</p>}
+                {eq.customerId && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> ID Cliente: {eq.customerId}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => openModal(eq)}>
-                  <Edit2 className="mr-2 h-4 w-4" /> Edit
+                  <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(eq.id)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
                 </Button>
               </CardFooter>
             </Card>
@@ -135,8 +135,8 @@ export function EquipmentClientPage() {
       <FormModal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editingEquipment ? "Edit Equipment" : "Add New Equipment"}
-        description="Provide details for the equipment."
+        title={editingEquipment ? "Editar Equipamento" : "Adicionar Novo Equipamento"}
+        description="Forneça os detalhes do equipamento."
         formId="equipment-form"
         isSubmitting={form.formState.isSubmitting}
         editingItem={editingEquipment}
@@ -144,24 +144,24 @@ export function EquipmentClientPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="equipment-form" className="space-y-4">
             <FormField control={form.control} name="brand" render={({ field }) => (
-              <FormItem><FormLabel>Brand</FormLabel><FormControl><Input placeholder="e.g., Toyota" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Marca</FormLabel><FormControl><Input placeholder="ex: Toyota" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="model" render={({ field }) => (
-              <FormItem><FormLabel>Model</FormLabel><FormControl><Input placeholder="e.g., 8FGCU25" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Modelo</FormLabel><FormControl><Input placeholder="ex: 8FGCU25" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="chassisNumber" render={({ field }) => (
-              <FormItem><FormLabel>Chassis Number</FormLabel><FormControl><Input placeholder="Unique chassis number" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="equipmentType" render={({ field }) => (
-              <FormItem><FormLabel>Equipment Type</FormLabel><FormControl><Input placeholder="e.g., Forklift, Pallet Jack" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Tipo de Equipamento</FormLabel><FormControl><Input placeholder="ex: Empilhadeira, Paleteira" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="manufactureYear" render={({ field }) => (
-              <FormItem><FormLabel>Manufacture Year</FormLabel><FormControl><Input type="number" placeholder="e.g., 2022" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="ex: 2022" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="operationalStatus" render={({ field }) => (
-              <FormItem><FormLabel>Operational Status</FormLabel>
+              <FormItem><FormLabel>Status Operacional</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
                   <SelectContent>
                     {statusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
                   </SelectContent>
@@ -169,7 +169,7 @@ export function EquipmentClientPage() {
               </FormItem>
             )} />
              <FormField control={form.control} name="customerId" render={({ field }) => (
-              <FormItem><FormLabel>Customer ID (Optional)</FormLabel><FormControl><Input placeholder="Link to customer if applicable" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>ID do Cliente (Opcional)</FormLabel><FormControl><Input placeholder="Vincular ao cliente, se aplicável" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
         </Form>

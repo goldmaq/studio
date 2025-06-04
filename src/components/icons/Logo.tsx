@@ -7,7 +7,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
       viewBox="0 0 200 50"
       width="120"
       height="30"
-      aria-label="Gold Maq Control Logo"
+      aria-label="Logo Gold Maq Controle"
       {...props}
     >
       <rect width="200" height="50" fill="transparent" />

@@ -49,7 +49,7 @@ export function CompanyConfigClientPage() {
         ...prev,
         [editingCompany.id]: { ...editingCompany, ...values }
       }));
-      toast({ title: "Company Info Updated", description: `${values.name} details have been updated.` });
+      toast({ title: "Informações da Empresa Atualizadas", description: `Os detalhes de ${values.name} foram atualizados.` });
     }
     closeModal();
   };
@@ -58,7 +58,7 @@ export function CompanyConfigClientPage() {
 
   return (
     <>
-      <PageHeader title="Company Configurations" />
+      <PageHeader title="Configurações da Empresa" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {companyIds.map((id) => {
@@ -74,13 +74,13 @@ export function CompanyConfigClientPage() {
               <CardContent className="flex-grow space-y-2 text-sm">
                 <p className="flex items-start"><MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> {company.address}</p>
                 {company.bankName && <p className="flex items-center"><Landmark className="mr-2 h-4 w-4 text-primary" /> {company.bankName}</p>}
-                {company.bankAgency && <p className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" /> Agency: {company.bankAgency}</p>}
-                {company.bankAccount && <p className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" /> Account: {company.bankAccount}</p>}
+                {company.bankAgency && <p className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" /> Agência: {company.bankAgency}</p>}
+                {company.bankAccount && <p className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" /> Conta: {company.bankAccount}</p>}
                 {company.bankPixKey && <p className="flex items-center"><QrCode className="mr-2 h-4 w-4 text-primary" /> PIX: {company.bankPixKey}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4">
                 <Button variant="outline" size="sm" onClick={() => openModal(company)} className="w-full">
-                  <Edit2 className="mr-2 h-4 w-4" /> Edit Information
+                  <Edit2 className="mr-2 h-4 w-4" /> Editar Informações
                 </Button>
               </CardFooter>
             </Card>
@@ -91,8 +91,8 @@ export function CompanyConfigClientPage() {
       <FormModal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={`Edit ${editingCompany?.name || 'Company'} Information`}
-        description="Update the company's registration and banking details."
+        title={`Editar Informações da ${editingCompany?.name || 'Empresa'}`}
+        description="Atualize os dados cadastrais e bancários da empresa."
         formId="company-form"
         isSubmitting={form.formState.isSubmitting}
         editingItem={editingCompany}
@@ -100,28 +100,28 @@ export function CompanyConfigClientPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="company-form" className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Company Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Nome da Empresa</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="cnpj" render={({ field }) => (
               <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="address" render={({ field }) => (
-              <FormItem><FormLabel>Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Endereço</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
-            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Banking Information (Optional)</h3>
+            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Bancárias (Opcional)</h3>
             <FormField control={form.control} name="bankName" render={({ field }) => (
-              <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Nome do Banco</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="bankAgency" render={({ field }) => (
-                <FormItem><FormLabel>Agency</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Agência</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="bankAccount" render={({ field }) => (
-                <FormItem><FormLabel>Account</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Conta</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
             <FormField control={form.control} name="bankPixKey" render={({ field }) => (
-              <FormItem><FormLabel>PIX Key</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Chave PIX</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
         </Form>

@@ -46,10 +46,10 @@ export function FormModal<T>({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-            Cancel
+            Cancelar
           </Button>
           <Button type="submit" form={formId} disabled={isSubmitting} className="bg-primary hover:bg-primary/90">
-            {isSubmitting ? "Saving..." : (editingItem ? "Save Changes" : "Create")}
+            {isSubmitting ? "Salvando..." : (editingItem ? "Salvar Alterações" : "Criar")}
           </Button>
         </DialogFooter>
       </DialogContent>

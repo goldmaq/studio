@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, Edit2, Trash2, FileText, MapPin, Mail, Building } from "lucide-react";
+import { PlusCircle, Users, Edit2, Trash2, FileText, MapPin, Mail, Building, HardHat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,26 +60,26 @@ export function CustomerClientPage() {
   const onSubmit = (values: z.infer<typeof CustomerSchema>) => {
     if (editingCustomer) {
       setCustomers(customers.map((c) => (c.id === editingCustomer.id ? { ...c, ...values } : c)));
-      toast({ title: "Customer Updated", description: `${values.name} has been updated.` });
+      toast({ title: "Cliente Atualizado", description: `${values.name} foi atualizado.` });
     } else {
       setCustomers([...customers, { id: String(Date.now()), ...values }]);
-      toast({ title: "Customer Created", description: `${values.name} has been added.` });
+      toast({ title: "Cliente Criado", description: `${values.name} foi adicionado.` });
     }
     closeModal();
   };
 
   const handleDelete = (customerId: string) => {
     setCustomers(customers.filter(c => c.id !== customerId));
-    toast({ title: "Customer Deleted", description: "The customer has been deleted.", variant: "destructive" });
+    toast({ title: "Cliente Excluído", description: "O cliente foi excluído.", variant: "destructive" });
   };
 
   return (
     <>
       <PageHeader 
-        title="Customers" 
+        title="Clientes" 
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
+            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Cliente
           </Button>
         } 
       />
@@ -87,9 +87,9 @@ export function CustomerClientPage() {
       {customers.length === 0 ? (
         <DataTablePlaceholder
           icon={Users}
-          title="No Customers Yet"
-          description="Get started by adding your first customer."
-          buttonLabel="Add Customer"
+          title="Nenhum Cliente Ainda"
+          description="Comece adicionando seu primeiro cliente."
+          buttonLabel="Adicionar Cliente"
           onButtonClick={() => openModal()}
         />
       ) : (
@@ -105,15 +105,15 @@ export function CustomerClientPage() {
               <CardContent className="flex-grow space-y-2 text-sm">
                 <p className="flex items-start"><MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> {customer.address}</p>
                 <p className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> {customer.email}</p>
-                {customer.preferredTechnician && <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> Preferred Tech: {customer.preferredTechnician}</p>}
-                {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Notes: {customer.notes}</p>}
+                {customer.preferredTechnician && <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> Técnico Pref.: {customer.preferredTechnician}</p>}
+                {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => openModal(customer)}>
-                  <Edit2 className="mr-2 h-4 w-4" /> Edit
+                  <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(customer.id)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
                 </Button>
               </CardFooter>
             </Card>
@@ -124,8 +124,8 @@ export function CustomerClientPage() {
       <FormModal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editingCustomer ? "Edit Customer" : "Add New Customer"}
-        description="Fill in the details for the customer."
+        title={editingCustomer ? "Editar Cliente" : "Adicionar Novo Cliente"}
+        description="Preencha os detalhes do cliente."
         formId="customer-form"
         isSubmitting={form.formState.isSubmitting}
         editingItem={editingCustomer}
@@ -137,8 +137,8 @@ export function CustomerClientPage() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl><Input placeholder="Customer's full name or company name" {...field} /></FormControl>
+                  <FormLabel>Nome</FormLabel>
+                  <FormControl><Input placeholder="Nome completo do cliente ou razão social" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -148,8 +148,8 @@ export function CustomerClientPage() {
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
-                  <FormControl><Input placeholder="Full address" {...field} /></FormControl>
+                  <FormLabel>Endereço</FormLabel>
+                  <FormControl><Input placeholder="Endereço completo" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -171,7 +171,7 @@ export function CustomerClientPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
-                  <FormControl><Input type="email" placeholder="contact@example.com" {...field} /></FormControl>
+                  <FormControl><Input type="email" placeholder="contato@exemplo.com" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -181,8 +181,8 @@ export function CustomerClientPage() {
               name="preferredTechnician"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Preferred Technician (Optional)</FormLabel>
-                  <FormControl><Input placeholder="Technician's name" {...field} /></FormControl>
+                  <FormLabel>Técnico Preferencial (Opcional)</FormLabel>
+                  <FormControl><Input placeholder="Nome do técnico" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -192,8 +192,8 @@ export function CustomerClientPage() {
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (Optional)</FormLabel>
-                  <FormControl><Textarea placeholder="Any relevant notes about the customer" {...field} /></FormControl>
+                  <FormLabel>Observações (Opcional)</FormLabel>
+                  <FormControl><Textarea placeholder="Quaisquer observações relevantes sobre o cliente" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}

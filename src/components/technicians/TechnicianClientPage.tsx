@@ -17,8 +17,8 @@ import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 
 const initialTechnicians: Technician[] = [
-  { id: "tech1", name: "Carlos Silva", employeeId: "EMP001", specialization: "Forklift Engines" },
-  { id: "tech2", name: "Mariana Costa", employeeId: "EMP002", specialization: "Hydraulics and Electrical Systems" },
+  { id: "tech1", name: "Carlos Silva", employeeId: "EMP001", specialization: "Motores de Empilhadeira" },
+  { id: "tech2", name: "Mariana Costa", employeeId: "EMP002", specialization: "Sistemas Hidráulicos e Elétricos" },
 ];
 
 export function TechnicianClientPage() {
@@ -52,26 +52,26 @@ export function TechnicianClientPage() {
   const onSubmit = (values: z.infer<typeof TechnicianSchema>) => {
     if (editingTechnician) {
       setTechnicians(technicians.map((t) => (t.id === editingTechnician.id ? { ...t, ...values } : t)));
-      toast({ title: "Technician Updated", description: `${values.name} has been updated.` });
+      toast({ title: "Técnico Atualizado", description: `${values.name} foi atualizado.` });
     } else {
       setTechnicians([...technicians, { id: String(Date.now()), ...values }]);
-      toast({ title: "Technician Added", description: `${values.name} has been added.` });
+      toast({ title: "Técnico Adicionado", description: `${values.name} foi adicionado.` });
     }
     closeModal();
   };
 
   const handleDelete = (technicianId: string) => {
     setTechnicians(technicians.filter(t => t.id !== technicianId));
-    toast({ title: "Technician Deleted", description: "The technician has been removed.", variant: "destructive" });
+    toast({ title: "Técnico Excluído", description: "O técnico foi removido.", variant: "destructive" });
   };
 
   return (
     <>
       <PageHeader 
-        title="Technician Registry"
+        title="Cadastro de Técnicos"
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Technician
+            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Técnico
           </Button>
         }
       />
@@ -79,9 +79,9 @@ export function TechnicianClientPage() {
       {technicians.length === 0 ? (
         <DataTablePlaceholder
           icon={HardHat}
-          title="No Technicians Registered"
-          description="Add your first technician to the registry."
-          buttonLabel="Add Technician"
+          title="Nenhum Técnico Cadastrado"
+          description="Adicione seu primeiro técnico ao cadastro."
+          buttonLabel="Adicionar Técnico"
           onButtonClick={() => openModal()}
         />
       ) : (
@@ -93,20 +93,20 @@ export function TechnicianClientPage() {
                   <UserCircle className="w-10 h-10 text-primary" />
                   <div>
                     <CardTitle className="font-headline text-xl">{tech.name}</CardTitle>
-                    <CardDescription>ID: {tech.employeeId}</CardDescription>
+                    <CardDescription>Matrícula: {tech.employeeId}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                {tech.specialization && <p className="flex items-center"><Wrench className="mr-2 h-4 w-4 text-primary" /> Specialization: {tech.specialization}</p>}
+                {tech.specialization && <p className="flex items-center"><Wrench className="mr-2 h-4 w-4 text-primary" /> Especialização: {tech.specialization}</p>}
                 {/* Add assignments display here if needed */}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => openModal(tech)}>
-                  <Edit2 className="mr-2 h-4 w-4" /> Edit
+                  <Edit2 className="mr-2 h-4 w-4" /> Editar
                 </Button>
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(tech.id)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
                 </Button>
               </CardFooter>
             </Card>
@@ -117,8 +117,8 @@ export function TechnicianClientPage() {
       <FormModal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editingTechnician ? "Edit Technician" : "Add New Technician"}
-        description="Enter the technician's details."
+        title={editingTechnician ? "Editar Técnico" : "Adicionar Novo Técnico"}
+        description="Insira os detalhes do técnico."
         formId="technician-form"
         isSubmitting={form.formState.isSubmitting}
         editingItem={editingTechnician}
@@ -126,13 +126,13 @@ export function TechnicianClientPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="technician-form" className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Name</FormLabel><FormControl><Input placeholder="Technician's full name" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome completo do técnico" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="employeeId" render={({ field }) => (
-              <FormItem><FormLabel>Employee ID</FormLabel><FormControl><Input placeholder="Unique employee identifier" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Matrícula</FormLabel><FormControl><Input placeholder="Identificador único do funcionário" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="specialization" render={({ field }) => (
-              <FormItem><FormLabel>Specialization (Optional)</FormLabel><FormControl><Input placeholder="e.g., Hydraulics, Electrical" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Especialização (Opcional)</FormLabel><FormControl><Input placeholder="ex: Hidráulica, Elétrica" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
         </Form>
