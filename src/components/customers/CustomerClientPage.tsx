@@ -25,6 +25,11 @@ import { Textarea } from "../ui/textarea";
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 const FIRESTORE_TECHNICIAN_COLLECTION_NAME = "tecnicos";
 
+// Constantes para os valores do SelectItem de técnico
+const NO_TECHNICIAN_FORM_VALUE = ""; // O valor que queremos no formulário para "Nenhum"
+const NO_TECHNICIAN_SELECT_ITEM_VALUE = "_NO_TECHNICIAN_SELECTED_"; // Valor interno para o SelectItem "Nenhum"
+const LOADING_TECHNICIANS_SELECT_ITEM_VALUE = "_LOADING_TECHS_"; // Valor interno para o SelectItem "Carregando..."
+
 async function fetchCustomers(): Promise<Customer[]> {
   const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
@@ -90,7 +95,7 @@ export function CustomerClientPage() {
       neighborhood: "",
       city: "",
       state: "",
-      preferredTechnician: "",
+      preferredTechnician: NO_TECHNICIAN_FORM_VALUE, // Default para string vazia
       notes: "",
     },
   });
@@ -199,7 +204,7 @@ export function CustomerClientPage() {
       form.reset({
         name: "", cnpj: "", email: "", phone: "", contactName: "", cep: "", street: "", number: "",
         complement: "", neighborhood: "", city: "", state: "",
-        preferredTechnician: "", notes: ""
+        preferredTechnician: NO_TECHNICIAN_FORM_VALUE, notes: ""
       });
     }
     setIsModalOpen(true);
@@ -230,7 +235,7 @@ export function CustomerClientPage() {
   const isMutating = addCustomerMutation.isPending || updateCustomerMutation.isPending;
   const isLoading = isLoadingCustomers || isLoadingTechnicians;
 
-  if (isLoading) {
+  if (isLoading && !isModalOpen) { // Evita piscar o loader global se o modal estiver aberto e carregando técnicos
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -292,11 +297,16 @@ export function CustomerClientPage() {
                   {formatAddressForDisplay(customer)}
                 </p>
                 {customer.cep && <p className="text-xs text-muted-foreground ml-6">CEP: {customer.cep}</p>}
-                {customer.preferredTechnician && <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> Técnico Pref.: {customer.preferredTechnician}</p>}
+                {customer.preferredTechnician && technicians.find(t => t.name === customer.preferredTechnician) && 
+                  <p className="flex items-center">
+                    <HardHat className="mr-2 h-4 w-4 text-primary" /> 
+                    Téc. Pref.: {technicians.find(t => t.name === customer.preferredTechnician)?.name}
+                  </p>
+                }
                 {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
               </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                {/* Botão Editar removido */}
+              <CardFooter className="border-t pt-4">
+                 {/* Botão Editar removido, ação de clique no card */}
               </CardFooter>
             </Card>
           ))}
@@ -394,7 +404,16 @@ export function CustomerClientPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Técnico Preferencial (Opcional)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value ?? ""}>
+                  <Select
+                    onValueChange={(selectedValue) => {
+                      if (selectedValue === NO_TECHNICIAN_SELECT_ITEM_VALUE) {
+                        field.onChange(NO_TECHNICIAN_FORM_VALUE);
+                      } else {
+                        field.onChange(selectedValue);
+                      }
+                    }}
+                    value={field.value} // Controlado por react-hook-form
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={isLoadingTechnicians ? "Carregando técnicos..." : "Selecione um técnico"} />
@@ -402,10 +421,10 @@ export function CustomerClientPage() {
                     </FormControl>
                     <SelectContent>
                       {isLoadingTechnicians ? (
-                        <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                        <SelectItem value={LOADING_TECHNICIANS_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
                       ) : (
                         <>
-                          <SelectItem value="">Nenhum</SelectItem>
+                          <SelectItem value={NO_TECHNICIAN_SELECT_ITEM_VALUE}>Nenhum</SelectItem>
                           {technicians.map((tech) => (
                             <SelectItem key={tech.id} value={tech.name}>
                               {tech.name}
@@ -428,3 +447,5 @@ export function CustomerClientPage() {
     </>
   );
 }
+
+    
