@@ -143,7 +143,11 @@ export function CompanyConfigClientPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {companies.map((company) => (
-              <Card key={company.id} className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
+              <Card 
+                key={company.id} 
+                className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col cursor-pointer"
+                onClick={() => openModal(company)}
+              >
                 <CardHeader>
                   <CardTitle className="font-headline text-xl flex items-center">
                     <Building className="mr-2 h-6 w-6 text-primary" /> {company.name}
@@ -158,7 +162,13 @@ export function CompanyConfigClientPage() {
                   {company.bankPixKey && <p className="flex items-center"><QrCode className="mr-2 h-4 w-4 text-primary" /> PIX: {company.bankPixKey}</p>}
                 </CardContent>
                 <CardFooter className="border-t pt-4">
-                  <Button variant="outline" size="sm" onClick={() => openModal(company)} className="w-full" disabled={updateCompanyMutation.isPending}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={(e) => { e.stopPropagation(); openModal(company); }} 
+                    className="w-full" 
+                    disabled={updateCompanyMutation.isPending}
+                  >
                     <Edit2 className="mr-2 h-4 w-4" /> Editar Informações
                   </Button>
                 </CardFooter>
