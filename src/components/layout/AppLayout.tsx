@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image"; // Importar o componente Image
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -12,7 +13,6 @@ import {
   HardHat,
   CarFront,
   SlidersHorizontal,
-  Package,
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -26,7 +26,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -56,9 +55,17 @@ function MainSidebar() {
       collapsible={open ? "icon" : "offcanvas"}
       className="shadow-lg"
     >
-      <SidebarHeader className="p-4 border-b border-sidebar-border">
+      <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center">
         <Link href="/" className="flex items-center gap-2">
-          {/* Logo component removed */}
+          {/* Adiciona o componente Image para o logo */}
+          <Image
+            src="/images/logo.png" // Caminho para o logo na pasta public
+            alt="Gold Maq Controle Logo"
+            width={open ? 120 : 30} // Ajusta o tamanho com base no estado da sidebar
+            height={open ? 30 : 30}
+            // priority // Opcional: para carregar o logo mais rapidamente
+            className="transition-all duration-300 ease-in-out"
+          />
         </Link>
       </SidebarHeader>
       <SidebarContent>
@@ -74,7 +81,7 @@ function MainSidebar() {
                       tooltip={{ children: item.label, side: "right" }}
                       className="justify-start"
                     >
-                      <item.icon className={cn("w-5 h-5", isActive && "text-primary")} />
+                      <item.icon className={cn("w-5 h-5", isActive && "text-sidebar-primary")} />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </Link>
@@ -90,13 +97,11 @@ function MainSidebar() {
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const currentPathname = usePathname();
-  // Attempt to find the current nav item for page title, fallback to a generic title if needed.
   const currentNavItem = navItems.find(item => {
     if (item.href === "/") return currentPathname === "/";
     return currentPathname.startsWith(item.href);
   });
   const pageTitle = currentNavItem?.label || "Painel";
-
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -108,7 +113,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
                <SidebarTrigger className="md:hidden"/>
             </div>
             <div className="font-heading text-lg font-semibold text-foreground">
-              {/* Display the dynamic page title, fallback if necessary */}
               {currentPathname === "/" ? "Painel Principal" : pageTitle}
             </div>
             <div>{/* User menu or other actions can go here */}</div>
