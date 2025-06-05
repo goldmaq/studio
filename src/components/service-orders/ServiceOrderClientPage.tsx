@@ -37,6 +37,10 @@ const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
 const FIRESTORE_TECHNICIAN_COLLECTION_NAME = "tecnicos";
 const FIRESTORE_VEHICLE_COLLECTION_NAME = "veiculos";
 
+const NO_VEHICLE_SELECTED_VALUE = "_NO_VEHICLE_SELECTED_";
+const LOADING_VEHICLES_SELECT_ITEM_VALUE = "_LOADING_VEHICLES_";
+
+
 const formatDateForInput = (date: any): string => {
   if (!date) return "";
   if (date instanceof Timestamp) {
@@ -114,7 +118,7 @@ export function ServiceOrderClientPage() {
     resolver: zodResolver(ServiceOrderSchema),
     defaultValues: {
       orderNumber: "", customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
-      natureOfService: "", vehicleId: "", estimatedLaborCost: 0, description: "", notes: "",
+      natureOfService: "", vehicleId: null, estimatedLaborCost: 0, description: "", notes: "",
       startDate: formatDateForInput(new Date().toISOString()), endDate: ""
     },
   });
@@ -215,14 +219,14 @@ export function ServiceOrderClientPage() {
         endDate: formatDateForInput(order.endDate),
         estimatedLaborCost: Number(order.estimatedLaborCost) || 0,
         actualLaborCost: order.actualLaborCost ? Number(order.actualLaborCost) : undefined,
-        vehicleId: order.vehicleId || "", 
+        vehicleId: order.vehicleId || null, 
       });
     } else {
       setEditingOrder(null);
       form.reset({
         orderNumber: `OS-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`, 
         customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
-        natureOfService: "", vehicleId: "", estimatedLaborCost: 0, description: "", notes: "",
+        natureOfService: "", vehicleId: null, estimatedLaborCost: 0, description: "", notes: "",
         startDate: formatDateForInput(new Date().toISOString()), endDate: ""
       });
     }
@@ -435,16 +439,19 @@ export function ServiceOrderClientPage() {
               <FormField control={form.control} name="vehicleId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Veículo (Opcional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <Select
+                    onValueChange={(selectedValue) => field.onChange(selectedValue === NO_VEHICLE_SELECTED_VALUE ? null : selectedValue)}
+                    value={field.value ?? NO_VEHICLE_SELECTED_VALUE}
+                  >
                     <FormControl><SelectTrigger>
                       <SelectValue placeholder={isLoadingVehicles ? "Carregando..." : "Selecione o Veículo"} />
                     </SelectTrigger></FormControl>
                     <SelectContent>
                       {isLoadingVehicles ? (
-                        <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                        <SelectItem value={LOADING_VEHICLES_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
                        ) : (
                         <>
-                          <SelectItem value="">Nenhum</SelectItem>
+                          <SelectItem value={NO_VEHICLE_SELECTED_VALUE}>Nenhum</SelectItem>
                           {vehicles.map(vehicle => (
                             <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.model} ({vehicle.licensePlate})</SelectItem>
                           ))}
@@ -481,3 +488,4 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
+
