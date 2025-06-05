@@ -124,12 +124,24 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const currentOperationalStatus = useWatch({ control: form.control, name: 'operationalStatus' });
 
   useEffect(() => {
-    if (customerIdValue && customerIdValue !== NO_CUSTOMER_FORM_VALUE) {
-      if (currentOperationalStatus !== 'Em Manutenção' && currentOperationalStatus !== 'Sucata') {
-        form.setValue('operationalStatus', 'Locada');
+    const hasClient = customerIdValue && customerIdValue !== NO_CUSTOMER_FORM_VALUE;
+
+    if (hasClient) {
+      // Se tem cliente E o status não é 'Em Manutenção' ou 'Sucata' E o status atual NÃO É 'Locada',
+      // então mude para 'Locada'.
+      if (
+        currentOperationalStatus !== 'Em Manutenção' &&
+        currentOperationalStatus !== 'Sucata' &&
+        currentOperationalStatus !== 'Locada'
+      ) {
+        form.setValue('operationalStatus', 'Locada', { shouldValidate: true });
       }
-    } else if (currentOperationalStatus === 'Locada') {
-      form.setValue('operationalStatus', 'Disponível');
+    } else {
+      // Se NÃO tem cliente E o status atual é 'Locada',
+      // então mude para 'Disponível'.
+      if (currentOperationalStatus === 'Locada') {
+        form.setValue('operationalStatus', 'Disponível', { shouldValidate: true });
+      }
     }
   }, [customerIdValue, currentOperationalStatus, form]);
 
@@ -161,6 +173,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         customEquipmentType: isEquipmentTypePredefined ? "" : equipment.equipmentType,
         customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
         manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
+        operationalStatus: equipment.operationalStatus,
         towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
         towerClosedHeightMm: equipment.towerClosedHeightMm ?? undefined,
         nominalCapacityKg: equipment.nominalCapacityKg ?? undefined,
@@ -381,7 +394,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                   {operationalStatusIcons[eq.operationalStatus]}
                   <span className={cn("ml-2", {
                     'text-success': eq.operationalStatus === 'Disponível',
-                    'text-blue-500': eq.operationalStatus === 'Locada',
+                    'text-blue-500': eq.operationalStatus === 'Locada', // ou outra cor para 'Locada' se desejar
                     'text-danger': eq.operationalStatus === 'Em Manutenção' || eq.operationalStatus === 'Sucata',
                   })}>
                     Status: {eq.operationalStatus}
