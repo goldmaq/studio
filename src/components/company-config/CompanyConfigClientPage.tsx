@@ -6,24 +6,23 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
 import { Building, Landmark, Hash, QrCode, MapPin, Contact, Loader2, AlertTriangle, Search } from "lucide-react";
-import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import type { Company, CompanyId } from "@/types";
-import { CompanySchema } from "@/types";
+import { CompanySchema, companyIds } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, updateDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const FIRESTORE_COLLECTION_NAME = "empresas";
-const companyIds: CompanyId[] = ["goldmaq", "goldcomercio", "goldjob"];
 
-// Dados iniciais atualizados com os novos CNPJs, nomes e endereço detalhado
+
 const initialCompanyDataFromCode: Record<CompanyId, Omit<Company, 'id'>> = {
   goldmaq: { 
     name: "Gold Maq", 
@@ -92,21 +91,6 @@ const formatAddressForDisplay = (company: Company): string => {
   return addressString || "Endereço não fornecido";
 };
 
-const generateGoogleMapsUrl = (company: Company): string => {
-  const addressParts = [
-    company.street,
-    company.number,
-    company.neighborhood,
-    company.city,
-    company.state,
-    company.cep,
-  ].filter(Boolean).join(', ');
-
-  if (!addressParts) return "#";
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressParts)}`;
-};
-
-
 async function fetchCompanyConfigs(): Promise<Company[]> {
   const fetchedCompanies: Company[] = [];
   for (const id of companyIds) {
@@ -114,7 +98,6 @@ async function fetchCompanyConfigs(): Promise<Company[]> {
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data();
-      // Garantir que os dados retornados correspondam à nova estrutura Company
       fetchedCompanies.push({ 
         id, 
         name: data.name || initialCompanyDataFromCode[id].name,
@@ -277,7 +260,6 @@ export function CompanyConfigClientPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {companies.map((company) => {
             const displayAddress = formatAddressForDisplay(company);
-            const googleMapsUrl = generateGoogleMapsUrl(company);
             return (
               <Card 
                 key={company.id} 
@@ -293,20 +275,7 @@ export function CompanyConfigClientPage() {
                 <CardContent className="flex-grow space-y-2 text-sm">
                   <div className="flex items-start">
                     <MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> 
-                    {googleMapsUrl !== "#" ? (
-                      <a
-                        href={googleMapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline text-primary"
-                        onClick={(e) => e.stopPropagation()}
-                        title="Abrir no Google Maps"
-                      >
-                        {displayAddress}
-                      </a>
-                    ) : (
-                      <span>{displayAddress}</span>
-                    )}
+                    <span>{displayAddress}</span>
                   </div>
                   {company.cep && displayAddress !== `CEP: ${company.cep}` && <p className="text-xs text-muted-foreground ml-6">CEP: {company.cep}</p>}
 

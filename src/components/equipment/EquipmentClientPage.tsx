@@ -5,22 +5,22 @@ import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import type { Equipment, Customer } from "@/types";
-import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions } from "@/types";
+import type { Equipment, Customer, CompanyId } from "@/types";
+import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, companyDisplayOptions } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-import { db, storage } from "@/lib/firebase"; // Import storage
+import { db, storage } from "@/lib/firebase"; 
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; // Firebase Storage functions
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,9 @@ const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 const NO_CUSTOMER_FORM_VALUE = "";
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
+const NO_COMPANY_FORM_VALUE = ""; // Para o select da empresa proprietária
+const LOADING_COMPANIES_SELECT_ITEM_VALUE = "_LOADING_COMPANIES_";
+
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
   Disponível: <CheckCircle className="h-4 w-4 text-success" />,
@@ -58,9 +61,7 @@ const getFileNameFromUrl = (url: string): string => {
     const pathAndQuery = decodedUrl.split('?')[0];
     const segments = pathAndQuery.split('/');
     const fileNameWithPossiblePrefix = segments.pop() || "arquivo";
-    // Remove query parameters like alt=media&token=...
     const fileNameCleaned = fileNameWithPossiblePrefix.split('?')[0];
-    // Remove potential prefix like "partsCatalog_" or "errorCodes_"
     const finalFileName = fileNameCleaned.substring(fileNameCleaned.indexOf('_') + 1);
     return finalFileName || "arquivo";
   } catch (e) {
@@ -69,7 +70,6 @@ const getFileNameFromUrl = (url: string): string => {
   }
 };
 
-// Helper function to upload a file and get its URL
 async function uploadFile(
   file: File,
   equipmentId: string,
@@ -81,20 +81,15 @@ async function uploadFile(
   return getDownloadURL(fileStorageRef);
 }
 
-// Helper function to delete a file from storage
 async function deleteFileFromStorage(fileUrl?: string | null) {
   if (fileUrl) {
     try {
-      // Firebase Storage URLs are typically not directly usable with storageRef(storage, fileUrl)
-      // if they are download URLs with tokens. We need to parse the GCS path.
-      // Assuming the URL is a standard Firebase download URL.
       const gcsPath = new URL(fileUrl).pathname.split('/o/')[1].split('?')[0];
       const decodedPath = decodeURIComponent(gcsPath);
       const fileStorageRef = storageRef(storage, decodedPath);
       await deleteObject(fileStorageRef);
     } catch (e) {
-      console.warn(`Failed to delete file from storage: ${fileUrl}`, e);
-      // Non-fatal, proceed
+      console.warn(`[DELETE FILE] Failed to delete file from storage: ${fileUrl}`, e);
     }
   }
 }
@@ -114,6 +109,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
       manufactureYear: parseNumericToNullOrNumber(data.manufactureYear),
       operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Disponível",
       customerId: data.customerId || null,
+      ownerCompanyId: data.ownerCompanyId || null, // Buscar ownerCompanyId
       towerOpenHeightMm: parseNumericToNullOrNumber(data.towerOpenHeightMm),
       towerClosedHeightMm: parseNumericToNullOrNumber(data.towerClosedHeightMm),
       nominalCapacityKg: parseNumericToNullOrNumber(data.nominalCapacityKg),
@@ -160,6 +156,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     defaultValues: {
       brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
       operationalStatus: "Disponível", customerId: NO_CUSTOMER_FORM_VALUE,
+      ownerCompanyId: undefined, // Valor padrão para ownerCompanyId
       manufactureYear: new Date().getFullYear(),
       customBrand: "", customEquipmentType: "",
       towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
@@ -218,6 +215,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         equipmentType: isEquipmentTypePredefined ? equipment.equipmentType : '_CUSTOM_',
         customEquipmentType: isEquipmentTypePredefined ? "" : equipment.equipmentType,
         customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
+        ownerCompanyId: equipment.ownerCompanyId || undefined,
         manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
         towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
         towerClosedHeightMm: equipment.towerClosedHeightMm ?? undefined,
@@ -237,6 +235,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
         operationalStatus: "Disponível", customerId: NO_CUSTOMER_FORM_VALUE,
+        ownerCompanyId: undefined,
         manufactureYear: new Date().getFullYear(),
         customBrand: "", customEquipmentType: "",
         towerOpenHeightMm: undefined, towerClosedHeightMm: undefined, nominalCapacityKg: undefined,
@@ -266,7 +265,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     newPartsCatalogUrl?: string | null,
     newErrorCodesUrl?: string | null
   ): Omit<Equipment, 'id' | 'customBrand' | 'customEquipmentType'> => {
-    const { customBrand, customEquipmentType, customerId: formCustomerId, ...restOfData } = formData;
+    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerCompanyId: formOwnerCompanyId, ...restOfData } = formData;
     const parsedData = {
       ...restOfData,
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
@@ -285,6 +284,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
       customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
+      ownerCompanyId: (formOwnerCompanyId === NO_COMPANY_FORM_VALUE || formOwnerCompanyId === null || formOwnerCompanyId === undefined) ? null : formOwnerCompanyId,
       notes: parsedData.notes || null,
       partsCatalogUrl: newPartsCatalogUrl === undefined ? formData.partsCatalogUrl : newPartsCatalogUrl,
       errorCodesUrl: newErrorCodesUrl === undefined ? formData.errorCodesUrl : newErrorCodesUrl,
@@ -330,18 +330,18 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       formData: z.infer<typeof EquipmentSchema>,
       catalogFile: File | null,
       codesFile: File | null,
-      currentEquipment: Equipment // Pass current equipment to access old URLs
+      currentEquipment: Equipment 
     }) => {
       setIsUploadingFiles(true);
       let newPartsCatalogUrl = data.currentEquipment.partsCatalogUrl;
       let newErrorCodesUrl = data.currentEquipment.errorCodesUrl;
 
-      if (data.catalogFile) { // New catalog file provided
-        await deleteFileFromStorage(data.currentEquipment.partsCatalogUrl); // Delete old one if exists
+      if (data.catalogFile) { 
+        await deleteFileFromStorage(data.currentEquipment.partsCatalogUrl); 
         newPartsCatalogUrl = await uploadFile(data.catalogFile, data.id, 'partsCatalog');
       }
-      if (data.codesFile) { // New error codes file provided
-        await deleteFileFromStorage(data.currentEquipment.errorCodesUrl); // Delete old one if exists
+      if (data.codesFile) { 
+        await deleteFileFromStorage(data.currentEquipment.errorCodesUrl); 
         newErrorCodesUrl = await uploadFile(data.codesFile, data.id, 'errorCodes');
       }
       
@@ -370,10 +370,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
-      // Update the editingEquipment state locally to reflect removed URL
       if(editingEquipment && editingEquipment.id === data.equipmentId){
         setEditingEquipment(prev => prev ? ({...prev, [data.fileType]: null}) : null);
-        form.setValue(data.fileType, null); // also update form value
+        form.setValue(data.fileType, null); 
       }
       toast({ title: "Arquivo Removido", description: "O arquivo foi removido com sucesso." });
     },
@@ -384,21 +383,29 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (equipmentToDelete: Equipment) => {
+      console.log("[DELETE] Attempting to delete equipment:", equipmentToDelete);
       if (!equipmentToDelete?.id) {
+        console.error("[DELETE] Error: Equipment ID is undefined or null in equipmentToDelete.", equipmentToDelete);
         throw new Error("ID do equipamento inválido fornecido para a função de mutação.");
       }
       const { id, partsCatalogUrl, errorCodesUrl } = equipmentToDelete;
+      console.log(`[DELETE] Deleting files for equipment ID: ${id}`);
       await deleteFileFromStorage(partsCatalogUrl);
       await deleteFileFromStorage(errorCodesUrl);
+      console.log(`[DELETE] Files deleted (or not found). Proceeding to delete Firestore document for ID: ${id}`);
       const equipmentRef = doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, id);
-      return deleteDoc(equipmentRef);
+      await deleteDoc(equipmentRef);
+      console.log(`[DELETE] Firestore document for ID: ${id} deleted successfully.`);
+      return id; // Return id for onSuccess
     },
-    onSuccess: () => {
+    onSuccess: (deletedEquipmentId) => {
+      console.log(`[DELETE] Mutation successful for equipment ID: ${deletedEquipmentId}`);
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
       toast({ title: "Equipamento Excluído", description: "O equipamento e seus arquivos foram removidos." });
       closeModal();
     },
-    onError: (error: Error) => {
+    onError: (error: Error, equipmentToDelete) => {
+       console.error(`[DELETE] Error in deleteEquipmentMutation for equipment:`, equipmentToDelete, error);
       toast({
         title: "Erro ao Excluir Equipamento",
         description: `Não foi possível excluir o equipamento. Detalhe: ${error.message || 'Erro desconhecido.'}`,
@@ -424,7 +431,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         formData: values, 
         catalogFile: partsCatalogFile, 
         codesFile: errorCodesFile,
-        currentEquipment: editingEquipment // Pass current state for old URL access
+        currentEquipment: editingEquipment 
       });
     } else {
       addEquipmentMutation.mutate({ formData: values, catalogFile: partsCatalogFile, codesFile: errorCodesFile });
@@ -433,14 +440,25 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const handleModalDeleteConfirm = () => {
     const equipmentToExclude = editingEquipment;
+    console.log("[DELETE] handleModalDeleteConfirm called. EditingEquipment:", equipmentToExclude);
+    
     if (!equipmentToExclude || !equipmentToExclude.id) {
+      console.error("[DELETE] Error: editingEquipment or editingEquipment.id is null/undefined in handleModalDeleteConfirm.");
       toast({ title: "Erro Interno", description: "Referência ao equipamento inválida para exclusão.", variant: "destructive" });
       return;
     }
-    if (window.confirm(`Tem certeza que deseja excluir o equipamento "${equipmentToExclude.brand} ${equipmentToExclude.model}" e seus arquivos associados? Esta ação não pode ser desfeita.`)) {
+
+    const confirmation = window.confirm(`Tem certeza que deseja excluir o equipamento "${equipmentToExclude.brand} ${equipmentToExclude.model}" e seus arquivos associados? Esta ação não pode ser desfeita.`);
+    console.log("[DELETE] window.confirm response:", confirmation);
+
+    if (confirmation) {
+      console.log("[DELETE] Confirmed. Calling deleteEquipmentMutation.mutate with:", equipmentToExclude);
       deleteEquipmentMutation.mutate(equipmentToExclude);
+    } else {
+      console.log("[DELETE] Deletion cancelled by user.");
     }
   };
+
 
   const handleFileRemove = (fileType: 'partsCatalogUrl' | 'errorCodesUrl') => {
     if (editingEquipment && editingEquipment.id) {
@@ -460,6 +478,12 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     if (value !== '_CUSTOM_') {
         form.setValue(field === 'brand' ? 'customBrand' : 'customEquipmentType', "");
     }
+  };
+
+  const getOwnerCompanyName = (ownerId?: CompanyId | null): string => {
+    if (!ownerId) return 'Não definida';
+    const company = companyDisplayOptions.find(c => c.id === ownerId);
+    return company ? company.name : 'Desconhecida';
   };
 
   const isLoadingPage = isLoadingEquipment || isLoadingCustomers;
@@ -508,6 +532,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {equipmentList.map((eq) => {
             const customer = eq.customerId ? customers.find(c => c.id === eq.customerId) : null;
+            const ownerCompanyName = getOwnerCompanyName(eq.ownerCompanyId);
             return (
             <Card
               key={eq.id}
@@ -523,6 +548,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
               <CardContent className="flex-grow space-y-2 text-sm">
                 <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Tipo: {eq.equipmentType}</p>
                 {eq.manufactureYear && <p className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> Ano: {eq.manufactureYear}</p>}
+                 <p className="flex items-center">
+                    <Building className="mr-2 h-4 w-4 text-primary" /> Proprietária: {ownerCompanyName}
+                  </p>
                 <p className="flex items-center">
                   {operationalStatusIcons[eq.operationalStatus]}
                   <span className={cn("ml-2", {
@@ -591,7 +619,6 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="equipment-form" className="space-y-4">
-            {/* Informações Básicas, Especificações, etc. - Campos existentes aqui... */}
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="brand" render={({ field }) => (
@@ -630,6 +657,36 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             <FormField control={form.control} name="chassisNumber" render={({ field }) => (
               <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+            
+            <FormField
+              control={form.control}
+              name="ownerCompanyId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Empresa Proprietária</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === NO_COMPANY_FORM_VALUE ? undefined : value as CompanyId)}
+                    value={field.value || NO_COMPANY_FORM_VALUE}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a empresa proprietária" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NO_COMPANY_FORM_VALUE}>Nenhuma (Próprio)</SelectItem>
+                      {companyDisplayOptions.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="equipmentType" render={({ field }) => (
@@ -670,7 +727,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
               )} />
               <FormField control={form.control} name="customerId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cliente Associado (Opcional)</FormLabel>
+                  <FormLabel>Cliente Associado (Locação)</FormLabel>
                   <Select
                     onValueChange={(selectedValue) => field.onChange(selectedValue === NO_CUSTOMER_SELECT_ITEM_VALUE ? null : selectedValue)}
                     value={field.value || NO_CUSTOMER_FORM_VALUE}
@@ -727,7 +784,6 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             </div>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
-            {/* Campo Catálogo de Peças */}
             <FormItem>
               <FormLabel>Catálogo de Peças (PDF)</FormLabel>
               {editingEquipment?.partsCatalogUrl && !partsCatalogFile && (
@@ -752,7 +808,6 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
               <FormMessage />
             </FormItem>
 
-            {/* Campo Códigos de Erro */}
             <FormItem>
               <FormLabel>Códigos de Erro (PDF)</FormLabel>
                {editingEquipment?.errorCodesUrl && !errorCodesFile && (

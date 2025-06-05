@@ -26,6 +26,17 @@ export const equipmentTypeOptions = [
 
 export const operationalStatusOptions = ['Disponível', 'Locada', 'Em Manutenção', 'Sucata'] as const;
 
+export type CompanyId = 'goldmaq' | 'goldcomercio' | 'goldjob';
+export const companyIds: CompanyId[] = ["goldmaq", "goldcomercio", "goldjob"];
+
+
+export const companyDisplayOptions: { id: CompanyId; name: string }[] = [
+  { id: "goldmaq", name: "Gold Maq" },
+  { id: "goldcomercio", name: "Gold Comércio" },
+  { id: "goldjob", name: "Gold Empilhadeiras" },
+];
+
+
 export interface Equipment {
   id:string;
   brand: string;
@@ -35,6 +46,7 @@ export interface Equipment {
   manufactureYear: number | null;
   operationalStatus: typeof operationalStatusOptions[number];
   customerId?: string | null;
+  ownerCompanyId?: CompanyId | null; // Novo campo para empresa proprietária
   customBrand?: string; 
   customEquipmentType?: string; 
 
@@ -49,8 +61,8 @@ export interface Equipment {
   monthlyRentalValue?: number | null;
   hourMeter?: number | null;
   notes?: string | null;
-  partsCatalogUrl?: string | null; // Novo campo
-  errorCodesUrl?: string | null;   // Novo campo
+  partsCatalogUrl?: string | null; 
+  errorCodesUrl?: string | null;   
 }
 
 export interface ServiceOrder {
@@ -76,8 +88,6 @@ export interface Technician {
   employeeId: string;
   specialization?: string;
 }
-
-export type CompanyId = 'goldmaq' | 'goldcomercio' | 'goldjob';
 
 export interface Company {
   id: CompanyId;
@@ -140,6 +150,7 @@ export const EquipmentSchema = z.object({
   manufactureYear: z.coerce.number().min(1900, "Ano inválido").max(new Date().getFullYear() + 1, "Ano inválido").nullable(),
   operationalStatus: z.enum(operationalStatusOptions),
   customerId: z.string().nullable().optional(), 
+  ownerCompanyId: z.enum(companyIds).nullable().optional(), // Novo campo
   customBrand: z.string().optional(),
   customEquipmentType: z.string().optional(),
 
@@ -154,8 +165,8 @@ export const EquipmentSchema = z.object({
   monthlyRentalValue: z.coerce.number().min(0, "Valor deve ser positivo ou zero").optional().nullable(),
   hourMeter: z.coerce.number().min(0, "Horímetro deve ser positivo ou zero").optional().nullable(),
   notes: z.string().optional().nullable(),
-  partsCatalogUrl: z.string().url("URL inválida para catálogo de peças").nullable().optional(), // Novo campo
-  errorCodesUrl: z.string().url("URL inválida para códigos de erro").nullable().optional(),   // Novo campo
+  partsCatalogUrl: z.string().url("URL inválida para catálogo de peças").nullable().optional(),
+  errorCodesUrl: z.string().url("URL inválida para códigos de erro").nullable().optional(),
 });
 
 export const TechnicianSchema = z.object({
