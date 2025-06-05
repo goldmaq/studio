@@ -76,23 +76,37 @@ const formatAddressForDisplay = (customer: Customer): string => {
   else if (customer.city) parts.push(customer.city);
   else if (customer.state) parts.push(customer.state);
   
-  return parts.join(', ').trim() || "Endereço não fornecido";
+  const addressString = parts.join(', ').trim();
+  if (!addressString && customer.cep) return `CEP: ${customer.cep}`;
+  return addressString || "Endereço não fornecido";
 };
+
+const generateGoogleMapsUrl = (customer: Customer): string => {
+  const addressParts = [
+    customer.street,
+    customer.number,
+    customer.neighborhood,
+    customer.city,
+    customer.state,
+    customer.cep,
+  ].filter(Boolean).join(', '); // Filtra partes vazias e junta com vírgula
+
+  if (!addressParts) return "#"; // Retorna link morto se não houver partes do endereço
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressParts)}`;
+};
+
 
 const getWhatsAppNumber = (phone?: string): string => {
   if (!phone) return "";
   let cleaned = phone.replace(/\D/g, ''); // Remove non-digits
 
-  // If it already starts with 55 (Brazil code) and has a valid BR length (DDD + number)
   if (cleaned.startsWith('55') && (cleaned.length === 12 || cleaned.length === 13)) {
     return cleaned;
   }
-  // If it's a BR number (DDD + number) without country code
   if (!cleaned.startsWith('55') && (cleaned.length === 10 || cleaned.length === 11)) {
     return `55${cleaned}`;
   }
-  // Fallback: return cleaned number; WhatsApp might not resolve it correctly if it's not a recognized format.
-  // This scenario occurs if the number is not a standard Brazilian format or is an international number without '55'.
   return cleaned;
 };
 
@@ -106,15 +120,14 @@ const formatPhoneNumberForInputDisplay = (value: string): string => {
   let ddd = cleaned.substring(0, 2);
   let numberPart = cleaned.substring(2);
 
-  if (len <= 2) return `(${cleaned}`; // (XX
-  if (len <= 6) return `(${ddd}) ${numberPart}`; // (XX) XXXX
+  if (len <= 2) return `(${cleaned}`; 
+  if (len <= 6) return `(${ddd}) ${numberPart}`; 
   
-  // (XX) XXXXX-XXXX (9-digit mobile) or (XX) XXXX-XXXX (8-digit landline)
-  if (numberPart.length <= 5) { // (XX) XXXXX or (XX) XXXX
+  if (numberPart.length <= 5) { 
     return `(${ddd}) ${numberPart}`;
   }
   
-  if (numberPart.length <= 9) { // covers both 8 and 9 digit numbers
+  if (numberPart.length <= 9) { 
     const firstPartLength = numberPart.length === 9 ? 5 : 4;
     const firstDigits = numberPart.substring(0, firstPartLength);
     const secondDigits = numberPart.substring(firstPartLength);
@@ -123,7 +136,6 @@ const formatPhoneNumberForInputDisplay = (value: string): string => {
     }
     return `(${ddd}) ${firstDigits}`;
   }
-  // If longer than 11 digits total (2 ddd + 9 number), cap it
   const firstDigits = numberPart.substring(0, 5);
   const secondDigits = numberPart.substring(5, 9);
   return `(${ddd}) ${firstDigits}-${secondDigits}`;
@@ -153,7 +165,7 @@ export function CustomerClientPage() {
       neighborhood: "",
       city: "",
       state: "",
-      preferredTechnician: NO_TECHNICIAN_FORM_VALUE, // Default para string vazia
+      preferredTechnician: NO_TECHNICIAN_FORM_VALUE, 
       notes: "",
     },
   });
@@ -283,8 +295,6 @@ export function CustomerClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof CustomerSchema>) => {
-    // The phone value from the form is already formatted for display,
-    // Firestore will store it as is. The getWhatsAppNumber function will clean it.
     if (editingCustomer && editingCustomer.id) {
       updateCustomerMutation.mutate({ ...values, id: editingCustomer.id });
     } else {
@@ -362,6 +372,8 @@ export function CustomerClientPage() {
             const whatsappLink = whatsappNumber 
               ? `https://wa.me/${whatsappNumber}?text=Olá%20${encodeURIComponent(customer.name)},%20entramos%20em%20contato%20referente%20a%20Gold%20Maq.`
               : "#";
+            const googleMapsUrl = generateGoogleMapsUrl(customer);
+            const displayAddress = formatAddressForDisplay(customer);
 
             return (
             <Card 
@@ -404,11 +416,25 @@ export function CustomerClientPage() {
                     </a>
                   </p>
                 )}
-                <p className="flex items-start">
+                <div className="flex items-start">
                   <MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> 
-                  {formatAddressForDisplay(customer)}
-                </p>
-                {customer.cep && <p className="text-xs text-muted-foreground ml-6">CEP: {customer.cep}</p>}
+                  {googleMapsUrl !== "#" ? (
+                    <a
+                      href={googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline text-primary"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Abrir no Google Maps"
+                    >
+                      {displayAddress}
+                    </a>
+                  ) : (
+                    <span>{displayAddress}</span>
+                  )}
+                </div>
+                {customer.cep && displayAddress !== `CEP: ${customer.cep}` && <p className="text-xs text-muted-foreground ml-6">CEP: {customer.cep}</p>}
+                
                 {customer.preferredTechnician && technicians.find(t => t.name === customer.preferredTechnician) && 
                   <p className="flex items-center">
                     <HardHat className="mr-2 h-4 w-4 text-primary" /> 
@@ -417,7 +443,6 @@ export function CustomerClientPage() {
                 }
                 {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
 
-                {/* Seção de Equipamentos Vinculados */}
                 <div className="pt-2 mt-2 border-t border-border">
                   {isLoadingEquipment ? (
                      <p className="flex items-center text-xs text-muted-foreground mt-2">
@@ -454,7 +479,6 @@ export function CustomerClientPage() {
                 </div>
               </CardContent>
               <CardFooter className="border-t pt-4">
-                 {/* Botão Editar removido, ação de clique no card */}
               </CardFooter>
             </Card>
           )})}
@@ -497,13 +521,13 @@ export function CustomerClientPage() {
                     value={field.value ?? ""}
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\D/g, "");
-                      if (rawValue.length <= 11) { // Max 11 digits (DDD + 9-digit number)
+                      if (rawValue.length <= 11) { 
                         field.onChange(formatPhoneNumberForInputDisplay(e.target.value));
                       } else {
                         field.onChange(formatPhoneNumberForInputDisplay(rawValue.substring(0,11)));
                       }
                     }}
-                    maxLength={15} // (XX) XXXXX-XXXX is 15 chars
+                    maxLength={15} 
                   />
                 </FormControl>
                 <FormMessage />
@@ -614,3 +638,4 @@ export function CustomerClientPage() {
     </>
   );
 }
+
