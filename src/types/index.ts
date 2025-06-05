@@ -14,7 +14,7 @@ export interface Customer {
   neighborhood: string;
   city: string;
   state: string; 
-  preferredTechnician?: string;
+  preferredTechnician?: string | null; // Alterado para permitir null
   notes?: string;
 }
 
@@ -118,7 +118,7 @@ export interface Vehicle {
   currentMileage: number;
   fuelConsumption: number;
   costPerKilometer: number;
-  fipeValue?: number | null; // Added FIPE value
+  fipeValue?: number | null; 
   registrationInfo?: string;
   status: 'Disponível' | 'Em Uso' | 'Manutenção';
 }
@@ -143,7 +143,7 @@ export const CustomerSchema = z.object({
   neighborhood: z.string().min(1, "Bairro é obrigatório"),
   city: z.string().min(1, "Cidade é obrigatória"),
   state: z.string().length(2, "UF deve ter 2 caracteres").min(2, "UF é obrigatória e deve ter 2 caracteres"),
-  preferredTechnician: z.string().optional(),
+  preferredTechnician: z.string().nullable().optional(), // Alterado para nullable
   notes: z.string().optional(),
 });
 
@@ -201,7 +201,7 @@ export const VehicleSchema = z.object({
   currentMileage: z.coerce.number().min(0, "Quilometragem deve ser positiva"),
   fuelConsumption: z.coerce.number().min(0, "Consumo de combustível deve ser positivo"),
   costPerKilometer: z.coerce.number().min(0, "Custo por quilômetro deve ser positivo"),
-  fipeValue: z.coerce.number().min(0, "Valor FIPE deve ser positivo ou zero").optional().nullable(), // Added FIPE value
+  fipeValue: z.coerce.number().min(0, "Valor FIPE deve ser positivo ou zero").optional().nullable(), 
   registrationInfo: z.string().optional(),
   status: z.enum(['Disponível', 'Em Uso', 'Manutenção']),
 });

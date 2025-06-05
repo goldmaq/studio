@@ -28,10 +28,8 @@ const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 const FIRESTORE_TECHNICIAN_COLLECTION_NAME = "tecnicos";
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
 
-// Constantes para os valores do SelectItem de técnico
-const NO_TECHNICIAN_FORM_VALUE = ""; // O valor que queremos no formulário para "Nenhum"
-const NO_TECHNICIAN_SELECT_ITEM_VALUE = "_NO_TECHNICIAN_SELECTED_"; // Valor interno para o SelectItem "Nenhum"
-const LOADING_TECHNICIANS_SELECT_ITEM_VALUE = "_LOADING_TECHS_"; // Valor interno para o SelectItem "Carregando..."
+const NO_TECHNICIAN_SELECT_ITEM_VALUE = "_NO_TECHNICIAN_SELECTED_"; 
+const LOADING_TECHNICIANS_SELECT_ITEM_VALUE = "_LOADING_TECHS_"; 
 
 async function fetchCustomers(): Promise<Customer[]> {
   const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
@@ -159,14 +157,14 @@ export function CustomerClientPage() {
       email: "",
       phone: "",
       contactName: "",
-      cep: "",
+      cep: null,
       street: "",
       number: "",
       complement: "",
       neighborhood: "",
       city: "",
       state: "",
-      preferredTechnician: NO_TECHNICIAN_FORM_VALUE, 
+      preferredTechnician: null, 
       notes: "",
     },
   });
@@ -277,13 +275,15 @@ export function CustomerClientPage() {
       form.reset({
         ...customer,
         phone: customer.phone ? formatPhoneNumberForInputDisplay(customer.phone) : "",
+        preferredTechnician: customer.preferredTechnician || null,
+        cep: customer.cep || null,
       });
     } else {
       setEditingCustomer(null);
       form.reset({
-        name: "", cnpj: "", email: "", phone: "", contactName: "", cep: "", street: "", number: "",
+        name: "", cnpj: "", email: "", phone: "", contactName: "", cep: null, street: "", number: "",
         complement: "", neighborhood: "", city: "", state: "",
-        preferredTechnician: NO_TECHNICIAN_FORM_VALUE, notes: ""
+        preferredTechnician: null, notes: ""
       });
     }
     setIsModalOpen(true);
@@ -296,10 +296,14 @@ export function CustomerClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof CustomerSchema>) => {
+    const dataToSave = {
+        ...values,
+        preferredTechnician: values.preferredTechnician || null,
+    };
     if (editingCustomer && editingCustomer.id) {
-      updateCustomerMutation.mutate({ ...values, id: editingCustomer.id });
+      updateCustomerMutation.mutate({ ...dataToSave, id: editingCustomer.id });
     } else {
-      addCustomerMutation.mutate(values);
+      addCustomerMutation.mutate(dataToSave);
     }
   };
   
@@ -375,6 +379,7 @@ export function CustomerClientPage() {
               : "#";
             const googleMapsUrl = generateGoogleMapsUrl(customer);
             const displayAddress = formatAddressForDisplay(customer);
+            const preferredTechnicianDetails = technicians.find(t => t.name === customer.preferredTechnician);
 
             return (
             <Card 
@@ -437,10 +442,10 @@ export function CustomerClientPage() {
                 </div>
                 {customer.cep && displayAddress !== `CEP: ${customer.cep}` && <p className="text-xs text-muted-foreground ml-6">CEP: {customer.cep}</p>}
                 
-                {customer.preferredTechnician && technicians.find(t => t.name === customer.preferredTechnician) && 
+                {preferredTechnicianDetails && 
                   <p className="flex items-center">
                     <HardHat className="mr-2 h-4 w-4 text-primary" /> 
-                    Téc. Pref.: {technicians.find(t => t.name === customer.preferredTechnician)?.name}
+                    Téc. Pref.: {preferredTechnicianDetails.name}
                   </p>
                 }
                 {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
@@ -599,13 +604,9 @@ export function CustomerClientPage() {
                   <FormLabel>Técnico Preferencial (Opcional)</FormLabel>
                   <Select
                     onValueChange={(selectedValue) => {
-                      if (selectedValue === NO_TECHNICIAN_SELECT_ITEM_VALUE) {
-                        field.onChange(NO_TECHNICIAN_FORM_VALUE);
-                      } else {
-                        field.onChange(selectedValue);
-                      }
+                        field.onChange(selectedValue === NO_TECHNICIAN_SELECT_ITEM_VALUE ? null : selectedValue);
                     }}
-                    value={field.value || NO_TECHNICIAN_FORM_VALUE} 
+                    value={field.value ?? NO_TECHNICIAN_SELECT_ITEM_VALUE} 
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -640,5 +641,4 @@ export function CustomerClientPage() {
     </>
   );
 }
-
 
