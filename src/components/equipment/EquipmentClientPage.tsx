@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
 import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, HandCoins, CalendarClock, History, PackageOpen, Car, ShieldAlert, Trash2, Package } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,9 +33,9 @@ const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
   Disponível: <CheckCircle className="h-4 w-4 text-green-500" />,
-  Locada: <Package className="h-4 w-4 text-blue-500" />, // Usando Package para Locada
-  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-red-500" />, // Vermelho para Manutenção
-  Sucata: <Trash2 className="h-4 w-4 text-red-500" />, // Vermelho para Sucata
+  Locada: <Package className="h-4 w-4 text-blue-500" />,
+  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-red-500" />,
+  Sucata: <Trash2 className="h-4 w-4 text-red-500" />,
 };
 
 const parseNumericToNullOrNumber = (value: any): number | null => {
@@ -44,8 +45,8 @@ const parseNumericToNullOrNumber = (value: any): number | null => {
 };
 
 const predefinedBrandOptionsList = [
-  "Toyota", "Hyster", "Yale", "Still", "Linde", "Clark", "Mitsubishi", "Nissan", 
-  "Komatsu", "Crown", "Raymond", "Doosan", "Hyundai", "Caterpillar", 
+  "Toyota", "Hyster", "Yale", "Still", "Linde", "Clark", "Mitsubishi", "Nissan",
+  "Komatsu", "Crown", "Raymond", "Doosan", "Hyundai", "Caterpillar",
   "Jungheinrich", "Hangcha", "Heli", "EP", "Outra"
 ];
 
@@ -55,7 +56,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data();
-    
+
     const equipmentData: Equipment = {
       id: docSnap.id,
       brand: data.brand || "Marca Desconhecida",
@@ -65,7 +66,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
       manufactureYear: parseNumericToNullOrNumber(data.manufactureYear),
       operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Disponível",
       customerId: data.customerId || null,
-      
+
       towerOpenHeightMm: parseNumericToNullOrNumber(data.towerOpenHeightMm),
       towerClosedHeightMm: parseNumericToNullOrNumber(data.towerClosedHeightMm),
       nominalCapacityKg: parseNumericToNullOrNumber(data.nominalCapacityKg),
@@ -73,7 +74,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
       batteryBoxWidthMm: parseNumericToNullOrNumber(data.batteryBoxWidthMm),
       batteryBoxHeightMm: parseNumericToNullOrNumber(data.batteryBoxHeightMm),
       batteryBoxDepthMm: parseNumericToNullOrNumber(data.batteryBoxDepthMm),
-      
+
       monthlyRentalValue: parseNumericToNullOrNumber(data.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(data.hourMeter),
       notes: data.notes || null,
@@ -207,7 +208,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id' | 'customBrand' | 'customEquipmentType'> => {
     const {
-      customBrand, customEquipmentType, 
+      customBrand, customEquipmentType,
       customerId: formCustomerId,
       ...restOfData
     } = formData;
@@ -358,7 +359,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {equipmentList.map((eq) => (
+          {equipmentList.map((eq) => {
+            const customer = eq.customerId ? customers.find(c => c.id === eq.customerId) : null;
+            return (
             <Card
               key={eq.id}
               className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
@@ -376,9 +379,22 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 <p className="flex items-center">
                   {operationalStatusIcons[eq.operationalStatus]} <span className="ml-2">Status: {eq.operationalStatus}</span>
                 </p>
-                {eq.customerId && customers.find(c => c.id === eq.customerId) &&
-                  <p className="flex items-center"><Users className="mr-2 h-4 w-4 text-primary" /> Cliente: {customers.find(c => c.id === eq.customerId)?.name}</p>
-                }
+                {customer ? (
+                  <p className="flex items-center">
+                    <Users className="mr-2 h-4 w-4 text-primary" /> Cliente:
+                    <Link
+                      href={`/customers?openCustomerId=${eq.customerId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="ml-1 text-primary hover:underline"
+                      title={`Ver detalhes de ${customer.name}`}
+                    >
+                      {customer.name}
+                    </Link>
+                  </p>
+                ) : eq.customerId ? (
+                     <p className="flex items-center"><Users className="mr-2 h-4 w-4 text-muted-foreground" /> Cliente: ID {eq.customerId} (Carregando...)</p>
+                ): null}
+
                  {eq.hourMeter !== null && eq.hourMeter !== undefined && <p className="flex items-center"><History className="mr-2 h-4 w-4 text-primary" /> Horímetro: {eq.hourMeter}h</p>}
                  {eq.monthlyRentalValue !== null && eq.monthlyRentalValue !== undefined && <p className="flex items-center"><Coins className="mr-2 h-4 w-4 text-primary" /> Aluguel Mensal: R$ {eq.monthlyRentalValue.toFixed(2)}</p>}
 
@@ -386,7 +402,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
               </CardFooter>
             </Card>
-          ))}
+          );
+        })}
         </div>
       )}
 
@@ -524,7 +541,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 <FormItem><FormLabel>Capacidade Nominal (kg)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
-            
+
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Dimensões Caixa de Bateria (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => (
@@ -557,5 +574,3 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
-
-    
