@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, HardHat, UserCircle, Wrench, Loader2, AlertTriangle, BadgeCheck } from "lucide-react"; // Added BadgeCheck for employeeId
+import { PlusCircle, HardHat, UserCircle, Wrench, Loader2, AlertTriangle, BadgeCheck, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,50 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const FIRESTORE_COLLECTION_NAME = "tecnicos";
 
+const getWhatsAppNumber = (phone?: string): string => {
+  if (!phone) return "";
+  let cleaned = phone.replace(/\D/g, ''); 
+
+  if (cleaned.startsWith('55') && (cleaned.length === 12 || cleaned.length === 13)) {
+    return cleaned;
+  }
+  if (!cleaned.startsWith('55') && (cleaned.length === 10 || cleaned.length === 11)) {
+    return `55${cleaned}`;
+  }
+  return cleaned;
+};
+
+const formatPhoneNumberForInputDisplay = (value: string): string => {
+  if (!value) return "";
+  const cleaned = value.replace(/\D/g, "");
+  const len = cleaned.length;
+
+  if (len === 0) return "";
+  
+  let ddd = cleaned.substring(0, 2);
+  let numberPart = cleaned.substring(2);
+
+  if (len <= 2) return `(${cleaned}`; 
+  if (len <= 6) return `(${ddd}) ${numberPart}`; 
+  
+  if (numberPart.length <= 5) { 
+    return `(${ddd}) ${numberPart}`;
+  }
+  
+  if (numberPart.length <= 9) { 
+    const firstPartLength = numberPart.length === 9 ? 5 : 4;
+    const firstDigits = numberPart.substring(0, firstPartLength);
+    const secondDigits = numberPart.substring(firstPartLength);
+    if (secondDigits) {
+      return `(${ddd}) ${firstDigits}-${secondDigits}`;
+    }
+    return `(${ddd}) ${firstDigits}`;
+  }
+  const firstDigits = numberPart.substring(0, 5);
+  const secondDigits = numberPart.substring(5, 9);
+  return `(${ddd}) ${firstDigits}-${secondDigits}`;
+};
+
 async function fetchTechnicians(): Promise<Technician[]> {
   const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
@@ -37,7 +81,7 @@ export function TechnicianClientPage() {
 
   const form = useForm<z.infer<typeof TechnicianSchema>>({
     resolver: zodResolver(TechnicianSchema),
-    defaultValues: { name: "", employeeId: "", specialization: "" },
+    defaultValues: { name: "", employeeId: "", specialization: "", phone: "" },
   });
 
   const { data: technicians = [], isLoading, isError, error } = useQuery<Technician[], Error>({
@@ -94,10 +138,13 @@ export function TechnicianClientPage() {
   const openModal = (technician?: Technician) => {
     if (technician) {
       setEditingTechnician(technician);
-      form.reset(technician);
+      form.reset({
+        ...technician,
+        phone: technician.phone ? formatPhoneNumberForInputDisplay(technician.phone) : "",
+      });
     } else {
       setEditingTechnician(null);
-      form.reset({ name: "", employeeId: "", specialization: "" });
+      form.reset({ name: "", employeeId: "", specialization: "", phone: "" });
     }
     setIsModalOpen(true);
   };
@@ -109,10 +156,14 @@ export function TechnicianClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof TechnicianSchema>) => {
+    const dataToSave = {
+      ...values,
+      phone: values.phone ? values.phone.replace(/\D/g, '') : undefined, // Salva apenas os dígitos
+    };
     if (editingTechnician && editingTechnician.id) {
-      updateTechnicianMutation.mutate({ ...values, id: editingTechnician.id });
+      updateTechnicianMutation.mutate({ ...dataToSave, id: editingTechnician.id });
     } else {
-      addTechnicianMutation.mutate(values);
+      addTechnicianMutation.mutate(dataToSave);
     }
   };
 
@@ -167,38 +218,60 @@ export function TechnicianClientPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {technicians.map((tech) => (
-            <Card 
-              key={tech.id} 
-              className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
-              onClick={() => openModal(tech)}
-            >
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <UserCircle className="w-10 h-10 text-primary flex-shrink-0" />
-                  <div>
-                    <CardTitle className="font-headline text-xl text-primary">{tech.name}</CardTitle>
+          {technicians.map((tech) => {
+            const whatsappNumber = getWhatsAppNumber(tech.phone);
+            const whatsappLink = whatsappNumber 
+              ? `https://wa.me/${whatsappNumber}?text=Ol%C3%A1%20${encodeURIComponent(tech.name)}`
+              : "#";
+            return (
+              <Card 
+                key={tech.id} 
+                className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+                onClick={() => openModal(tech)}
+              >
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <UserCircle className="w-10 h-10 text-primary flex-shrink-0" />
+                    <div>
+                      <CardTitle className="font-headline text-xl text-primary">{tech.name}</CardTitle>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-grow space-y-2 text-sm">
-                <p className="flex items-center text-sm">
-                  <BadgeCheck className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
-                  <span className="font-medium text-muted-foreground mr-1">Matrícula:</span>
-                  <span>{tech.employeeId}</span>
-                </p>
-                {tech.specialization && (
+                </CardHeader>
+                <CardContent className="flex-grow space-y-2 text-sm">
                   <p className="flex items-center text-sm">
-                    <Wrench className="mr-2 h-4 w-4 text-primary" /> 
-                    <span className="font-medium text-muted-foreground mr-1">Especialização:</span> 
-                    <span>{tech.specialization}</span>
+                    <BadgeCheck className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="font-medium text-muted-foreground mr-1">Matrícula:</span>
+                    <span>{tech.employeeId}</span>
                   </p>
-                )}
-              </CardContent>
-              <CardFooter className="border-t pt-4 flex justify-end gap-2">
-              </CardFooter>
-            </Card>
-          ))}
+                  {tech.specialization && (
+                    <p className="flex items-center text-sm">
+                      <Wrench className="mr-2 h-4 w-4 text-primary" /> 
+                      <span className="font-medium text-muted-foreground mr-1">Especialização:</span> 
+                      <span>{tech.specialization}</span>
+                    </p>
+                  )}
+                  {tech.phone && (
+                    <p className="flex items-center text-sm">
+                      <Phone className="mr-2 h-4 w-4 text-primary" />
+                      <span className="font-medium text-muted-foreground mr-1">{whatsappNumber ? "WhatsApp:" : "Telefone:"}</span>
+                      <a 
+                         href={whatsappLink}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="hover:underline text-primary"
+                         onClick={(e) => e.stopPropagation()}
+                         title={whatsappNumber ? "Abrir no WhatsApp" : "Número de telefone"}
+                      >
+                        {formatPhoneNumberForInputDisplay(tech.phone)}
+                      </a>
+                    </p>
+                  )}
+                </CardContent>
+                <CardFooter className="border-t pt-4 flex justify-end gap-2">
+                </CardFooter>
+              </Card>
+            )
+          })}
         </div>
       )}
 
@@ -224,6 +297,28 @@ export function TechnicianClientPage() {
             )} />
             <FormField control={form.control} name="specialization" render={({ field }) => (
               <FormItem><FormLabel>Especialização (Opcional)</FormLabel><FormControl><Input placeholder="ex: Hidráulica, Elétrica" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="phone" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Telefone/WhatsApp (Opcional)</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="(00) 00000-0000" 
+                    {...field} 
+                    value={field.value ?? ""}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\D/g, "");
+                      if (rawValue.length <= 11) { 
+                        field.onChange(formatPhoneNumberForInputDisplay(e.target.value));
+                      } else {
+                        field.onChange(formatPhoneNumberForInputDisplay(rawValue.substring(0,11)));
+                      }
+                    }}
+                    maxLength={15} 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )} />
           </form>
         </Form>

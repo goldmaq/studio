@@ -101,6 +101,7 @@ export interface Technician {
   name: string;
   employeeId: string;
   specialization?: string;
+  phone?: string; 
 }
 
 export interface Company {
@@ -217,6 +218,7 @@ export const TechnicianSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   employeeId: z.string().min(1, "Matrícula é obrigatória"),
   specialization: z.string().optional(),
+  phone: z.string().optional(),
 });
 
 export const VehicleSchema = z.object({
