@@ -25,6 +25,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "fi
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { LucideIcon } from "lucide-react";
 
 
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
@@ -475,15 +476,20 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const getOwnerDisplayString = (ownerRef?: OwnerReferenceType | null, customerId?: string | null, customersList?: Customer[]): string => {
     if (ownerRef === OWNER_REF_CUSTOMER) {
       const customer = customersList?.find(c => c.id === customerId);
-      return customer ? `Cliente: ${customer.name}` : 'Cliente (Não Vinculado)';
+      return customer ? `Cliente: ${customer.name}` : 'Propriedade: Cliente (Não Vinculado)';
     }
     if (companyIds.includes(ownerRef as CompanyId)) {
       const company = companyDisplayOptions.find(c => c.id === ownerRef);
-      return company ? `Empresa: ${company.name}` : 'Empresa Desconhecida';
+      return company ? `Empresa: ${company.name}` : 'Propriedade: Empresa Desconhecida';
     }
-    return 'Não Especificado';
+    return 'Propriedade: Não Especificado';
   };
   
+  const getOwnerIcon = (ownerRef?: OwnerReferenceType | null): LucideIcon => {
+    if (ownerRef === OWNER_REF_CUSTOMER) return UserCog;
+    if (companyIds.includes(ownerRef as CompanyId)) return Building;
+    return Construction; // Fallback icon or choose another appropriate one
+  };
 
   const isLoadingPage = isLoadingEquipment || isLoadingCustomers;
   const isMutating = addEquipmentMutation.isPending || updateEquipmentMutation.isPending || deleteEquipmentMutation.isPending || removeFileMutation.isPending || isUploadingFiles;
@@ -532,7 +538,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
           {equipmentList.map((eq) => {
             const customer = eq.customerId ? customers.find(c => c.id === eq.customerId) : null;
             const ownerDisplay = getOwnerDisplayString(eq.ownerReference, eq.customerId, customers);
-            const ownerIcon = eq.ownerReference === OWNER_REF_CUSTOMER ? UserCog : Building;
+            const OwnerIcon = getOwnerIcon(eq.ownerReference); // Ensure PascalCase for component usage
             return (
             <Card
               key={eq.id}
@@ -549,7 +555,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Tipo: {eq.equipmentType}</p>
                 {eq.manufactureYear && <p className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> Ano: {eq.manufactureYear}</p>}
                  <p className="flex items-center">
-                    <ownerIcon className="mr-2 h-4 w-4 text-primary" /> {ownerDisplay}
+                    <OwnerIcon className="mr-2 h-4 w-4 text-primary" /> {ownerDisplay}
                   </p>
                 <p className="flex items-center">
                   {operationalStatusIcons[eq.operationalStatus]}
