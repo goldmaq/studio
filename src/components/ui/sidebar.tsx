@@ -11,7 +11,11 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle, // Added SheetTitle import
+} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -81,7 +85,9 @@ const SidebarProvider = React.forwardRef<
         } else {
           _setOpen(openState)
         }
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        if (typeof document !== 'undefined') {
+          document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        }
       },
       [setOpenProp, open]
     )
@@ -102,9 +108,10 @@ const SidebarProvider = React.forwardRef<
           toggleSidebar()
         }
       }
-
-      window.addEventListener("keydown", handleKeyDown)
-      return () => window.removeEventListener("keydown", handleKeyDown)
+      if (typeof window !== 'undefined') {
+        window.addEventListener("keydown", handleKeyDown)
+        return () => window.removeEventListener("keydown", handleKeyDown)
+      }
     }, [toggleSidebar])
 
     const state = open ? "expanded" : "collapsed"
@@ -199,7 +206,11 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
-            <div className="flex h-full w-full flex-col">{children}</div>
+            <div className="flex h-full w-full flex-col">
+              {/* Visually hidden title for accessibility */}
+              <SheetTitle className="sr-only">Navegação Principal</SheetTitle>
+              {children}
+            </div>
           </SheetContent>
         </Sheet>
       )
@@ -547,19 +558,18 @@ const SidebarMenuButton = React.forwardRef<
     const Comp = ownAsChildProp ? Slot : "button";
     const { isMobile, state } = useSidebar();
 
-    let propsForElement = { ...otherPropsFromParent };
+    // Create a mutable copy of otherPropsFromParent to safely delete 'asChild' if needed
+    const finalPropsToSpread = { ...otherPropsFromParent };
 
-    if (!ownAsChildProp) {
-      // If SidebarMenuButton is rendering a native DOM element (e.g., "button"),
-      // and it received an 'asChild' prop from its parent (e.g., Link),
-      // that 'asChild' prop from the parent must be removed before spreading.
-      if ('asChild' in propsForElement) {
-        delete propsForElement.asChild;
-      }
+    // If SidebarMenuButton is rendering a native DOM element (e.g., "button"),
+    // and it received an 'asChild' prop from its parent (e.g., Link),
+    // that 'asChild' prop from the parent must be removed before spreading.
+    if (!ownAsChildProp && 'asChild' in finalPropsToSpread) {
+      delete finalPropsToSpread.asChild;
     }
     // If ownAsChildProp is true, Comp is Slot. Slot can handle an 'asChild' prop
     // if it's passed down from a grandparent (e.g., Link -> SidebarMenuButton (asChild) -> Slot).
-    // In this case, propsForElement correctly retains the 'asChild' from otherPropsFromParent.
+    // In this case, finalPropsToSpread correctly retains the 'asChild' from otherPropsFromParent.
 
     const buttonElement = (
       <Comp
@@ -568,7 +578,7 @@ const SidebarMenuButton = React.forwardRef<
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-        {...propsForElement} 
+        {...finalPropsToSpread} 
       >
         {children} 
       </Comp>
@@ -767,4 +777,3 @@ export {
   SidebarTrigger,
   useSidebar,
 }
-
