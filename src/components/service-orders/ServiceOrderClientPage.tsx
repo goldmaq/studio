@@ -133,24 +133,24 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
   const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("startDate", "desc"), orderBy("orderNumber", "desc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
-    const data = docSnap.data() as DocumentData; // Keep DocumentData for flexibility initially
+    const data = docSnap.data() as DocumentData;
     return {
       id: docSnap.id,
       orderNumber: data.orderNumber || "N/A",
-      customerId: data.customerId || "N/A", // Default if missing
-      equipmentId: data.equipmentId || "N/A", // Default if missing
+      customerId: data.customerId || "N/A",
+      equipmentId: data.equipmentId || "N/A",
       phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'],
-      technicianId: data.technicianId || null, // Default to null if missing
-      serviceType: data.serviceType || "Não especificado", // Default if missing
+      technicianId: data.technicianId || null,
+      serviceType: data.serviceType || "Não especificado",
       customServiceType: data.customServiceType || "",
       vehicleId: data.vehicleId || null,
       startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
       endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
-      description: data.description || "N/A", // Default if missing
+      description: data.description || "N/A",
       notes: data.notes || "",
       mediaUrl: data.mediaUrl || null,
       technicalConclusion: data.technicalConclusion || null,
-    } as ServiceOrder; // Assert as ServiceOrder after explicit mapping
+    } as ServiceOrder;
   });
 }
 
@@ -179,7 +179,7 @@ async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 const getNextOrderNumber = (currentOrders: ServiceOrder[]): string => {
-  let maxOrderNum = 3999; // Start check from one less than desired start
+  let maxOrderNum = 3999;
   currentOrders.forEach(order => {
     if (order.orderNumber) {
         const num = parseInt(order.orderNumber, 10);
@@ -290,21 +290,20 @@ export function ServiceOrderClientPage() {
   }, [equipmentList, selectedCustomerId, isLoadingEquipment]);
 
   useEffect(() => {
-    if (!editingOrder) { // Only for new orders or when form is reset for a new order
+    if (!editingOrder) {
         if (selectedCustomerId) {
             const customer = customers.find(c => c.id === selectedCustomerId);
             if (customer?.preferredTechnician) {
                 const preferredTech = technicians.find(t => t.name === customer.preferredTechnician);
                 form.setValue('technicianId', preferredTech ? preferredTech.id : null, { shouldValidate: true });
             } else {
-                form.setValue('technicianId', null, { shouldValidate: true }); // No preferred tech
+                form.setValue('technicianId', null, { shouldValidate: true });
             }
         } else {
-             form.setValue('technicianId', null, { shouldValidate: true }); // No customer
+             form.setValue('technicianId', null, { shouldValidate: true });
         }
     }
 
-    // Existing equipment filtering logic
     if (selectedCustomerId) {
       if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
         form.setValue('equipmentId', NO_EQUIPMENT_SELECTED_VALUE, { shouldValidate: true });
@@ -320,16 +319,23 @@ export function ServiceOrderClientPage() {
   const prepareDataForFirestore = (
     formData: z.infer<typeof ServiceOrderSchema>,
     newMediaUrl?: string | null
-  ): Omit<ServiceOrder, 'id' | 'customServiceType'> => {
+  ): Omit<ServiceOrder, 'id' | 'customServiceType' | 'startDate' | 'endDate'> & { startDate: Timestamp | null; endDate: Timestamp | null; } => {
     const { customServiceType, ...restOfData } = formData;
 
     let finalServiceType = restOfData.serviceType;
     if (restOfData.serviceType === CUSTOM_SERVICE_TYPE_VALUE) {
       finalServiceType = customServiceType || "Não especificado";
     }
-
+    
+    // Explicitly construct the object to be sent to Firestore
+    // This ensures all necessary fields from ServiceOrder (minus those excluded) are present
+    // and startDate/endDate are correctly typed as Timestamp | null.
     return {
-      ...restOfData,
+      orderNumber: restOfData.orderNumber,
+      customerId: restOfData.customerId,
+      equipmentId: restOfData.equipmentId,
+      phase: restOfData.phase,
+      description: restOfData.description,
       serviceType: finalServiceType,
       startDate: convertToTimestamp(restOfData.startDate),
       endDate: convertToTimestamp(restOfData.endDate),
@@ -354,6 +360,9 @@ export function ServiceOrderClientPage() {
 
       const orderDataForFirestore = prepareDataForFirestore(data.formData, uploadedMediaUrl);
       await setDoc(doc(db, FIRESTORE_COLLECTION_NAME, newOrderId), orderDataForFirestore);
+      // For the return, we need to re-format dates if the calling code expects string dates from ServiceOrder type.
+      // However, if this is just for optimistic updates or toast, the Timestamp might be fine.
+      // Let's return what was sent to Firestore for now, as the query will refetch with string dates.
       return { ...orderDataForFirestore, id: newOrderId };
     },
     onSuccess: (data) => {
@@ -379,7 +388,7 @@ export function ServiceOrderClientPage() {
 
       const orderDataForFirestore = prepareDataForFirestore(data.formData, newMediaUrl);
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.id);
-      await updateDoc(orderRef, orderDataForFirestore as { [x: string]: any }); // Type assertion for updateDoc
+      await updateDoc(orderRef, orderDataForFirestore as { [x: string]: any });
       return { ...orderDataForFirestore, id: data.id };
     },
     onSuccess: (data) => {
@@ -973,5 +982,3 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
-
-    
