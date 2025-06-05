@@ -171,33 +171,38 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const customerIdValue = useWatch({ control: form.control, name: 'customerId' });
   const currentOperationalStatus = useWatch({ control: form.control, name: 'operationalStatus' });
   const ownerReferenceValue = useWatch({ control: form.control, name: 'ownerReference' });
-  const { setValue } = form; // Destructure setValue for use in useEffect dependency array
+  const { setValue } = form;
 
   useEffect(() => {
     if (customerIdValue && customerIdValue !== NO_CUSTOMER_FORM_VALUE) {
+      // Cliente está vinculado
       if (ownerReferenceValue === OWNER_REF_CUSTOMER) {
+        // Máquina é do cliente
         if (currentOperationalStatus === 'Locada') {
           setValue('operationalStatus', 'Em Manutenção', { shouldValidate: true });
         }
+        // Não altera outros status automaticamente, permite ao usuário definir
       } else {
+        // Máquina é da Gold Maq e está locada para este cliente
         if (
           currentOperationalStatus !== 'Em Manutenção' &&
           currentOperationalStatus !== 'Sucata' &&
-          currentOperationalStatus !== 'Locada'
+          currentOperationalStatus !== 'Locada' // Evita loop se já estiver Locada
         ) {
           setValue('operationalStatus', 'Locada', { shouldValidate: true });
         }
       }
     } else {
+      // Nenhum cliente vinculado
       if (currentOperationalStatus === 'Locada') {
-        if (ownerReferenceValue !== OWNER_REF_CUSTOMER) {
-          setValue('operationalStatus', 'Disponível', { shouldValidate: true });
-        } else {
-          setValue('operationalStatus', 'Em Manutenção', { shouldValidate: true });
-        }
+         if (ownerReferenceValue !== OWNER_REF_CUSTOMER) { // Máquina da Gold Maq que foi desvinculada
+            setValue('operationalStatus', 'Disponível', { shouldValidate: true });
+         } else { // Máquina de cliente que foi desvinculada (raro, mas tratar)
+            setValue('operationalStatus', 'Em Manutenção', {shouldValidate: true});
+         }
       }
     }
-  }, [customerIdValue, currentOperationalStatus, ownerReferenceValue, setValue]);
+  }, [customerIdValue, currentOperationalStatus, ownerReferenceValue, setValue, NO_CUSTOMER_FORM_VALUE, OWNER_REF_CUSTOMER]);
 
 
   const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
@@ -295,7 +300,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
       customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
-      ownerReference: (formOwnerReference === NO_OWNER_REFERENCE_VALUE || formOwnerReference === null || formOwnerReference === undefined) ? null : formOwnerReference,
+      ownerReference: (formOwnerReference === NO_OWNER_REFERENCE_VALUE || formOwnerReference === null || formOwnerReference === undefined) ? null : formOwnerReference as OwnerReferenceType,
       notes: parsedData.notes || null,
       partsCatalogUrl: newPartsCatalogUrl === undefined ? formData.partsCatalogUrl : newPartsCatalogUrl,
       errorCodesUrl: newErrorCodesUrl === undefined ? formData.errorCodesUrl : newErrorCodesUrl,
