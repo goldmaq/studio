@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+// import { useRouter, useSearchParams } from "next/navigation"; // useSearchParams removed, useRouter might be needed if re-added
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
@@ -76,11 +76,14 @@ async function fetchCustomers(): Promise<Customer[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
 }
 
-export function EquipmentClientPage() {
+interface EquipmentClientPageProps {
+  equipmentIdFromUrl?: string | null;
+}
+
+export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const router = useRouter(); // Keep router if used elsewhere, but not for this specific replace
-  const searchParams = useSearchParams();
+  // const router = useRouter(); // Only needed if programmatically navigating
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
@@ -168,19 +171,19 @@ export function EquipmentClientPage() {
   }, [form]); 
 
   useEffect(() => {
-    const equipmentIdToOpen = searchParams.get('openEquipmentId');
-    if (equipmentIdToOpen) { 
+    if (equipmentIdFromUrl) { 
       if (!isLoadingEquipment && equipmentList.length > 0) {
-        const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdToOpen);
+        const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdFromUrl);
         if (equipmentToEdit) {
           openModal(equipmentToEdit);
           if (typeof window !== "undefined") {
-            window.history.replaceState(null, '', '/equipment');
+            // Clear the URL parameter after opening the modal
+            window.history.replaceState(null, '', '/equipment'); 
           }
         }
       }
     }
-  }, [searchParams, equipmentList, isLoadingEquipment, openModal]);
+  }, [equipmentIdFromUrl, equipmentList, isLoadingEquipment, openModal]);
 
 
   const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id'> => {
