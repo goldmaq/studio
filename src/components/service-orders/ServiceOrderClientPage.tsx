@@ -81,6 +81,10 @@ async function uploadServiceOrderFile(
   file: File,
   orderId: string
 ): Promise<string> {
+  if (!storage) {
+    console.error("uploadServiceOrderFile: Firebase Storage is not available.");
+    throw new Error("Firebase Storage is not available");
+  }
   const filePath = `service_order_media/${orderId}/${Date.now()}_${file.name}`;
   const fileStorageRef = storageRef(storage, filePath);
   await uploadBytes(fileStorageRef, file);
@@ -89,6 +93,11 @@ async function uploadServiceOrderFile(
 
 async function deleteServiceOrderFileFromStorage(fileUrl?: string | null) {
   if (fileUrl) {
+    if (!storage) {
+      console.warn("deleteServiceOrderFileFromStorage: Firebase Storage is not available. Skipping deletion.");
+      // Decide if this should throw an error or just warn. For deletion, warning might be acceptable.
+      return;
+    }
     try {
       const gcsPath = new URL(fileUrl).pathname.split('/o/')[1].split('?')[0];
       const decodedPath = decodeURIComponent(gcsPath);
@@ -130,6 +139,10 @@ const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
 };
 
 async function fetchServiceOrders(): Promise<ServiceOrder[]> {
+  if (!db) {
+    console.error("fetchServiceOrders: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("startDate", "desc"), orderBy("orderNumber", "desc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
@@ -154,24 +167,40 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
 }
 
 async function fetchCustomers(): Promise<Customer[]> {
+  if (!db) {
+    console.error("fetchCustomers: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
 }
 
 async function fetchEquipment(): Promise<Equipment[]> {
+  if (!db) {
+    console.error("fetchEquipment: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
 }
 
 async function fetchTechnicians(): Promise<Technician[]> {
+  if (!db) {
+    console.error("fetchTechnicians: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_TECHNICIAN_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
 }
 
 async function fetchVehicles(): Promise<Vehicle[]> {
+  if (!db) {
+    console.error("fetchVehicles: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_VEHICLE_COLLECTION_NAME), orderBy("model", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Vehicle));
@@ -253,27 +282,49 @@ export function ServiceOrderClientPage() {
   const { data: serviceOrders = [], isLoading: isLoadingServiceOrders, isError: isErrorServiceOrders, error: errorServiceOrders } = useQuery<ServiceOrder[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchServiceOrders,
+    enabled: !!db, // Only run query if db is available
   });
 
   const { data: customers = [], isLoading: isLoadingCustomers } = useQuery<Customer[], Error>({
     queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME],
     queryFn: fetchCustomers,
+    enabled: !!db,
   });
 
   const { data: equipmentList = [], isLoading: isLoadingEquipment } = useQuery<Equipment[], Error>({
     queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
     queryFn: fetchEquipment,
+    enabled: !!db,
   });
 
   const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery<Technician[], Error>({
     queryKey: [FIRESTORE_TECHNICIAN_COLLECTION_NAME],
     queryFn: fetchTechnicians,
+    enabled: !!db,
   });
 
   const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[], Error>({
     queryKey: [FIRESTORE_VEHICLE_COLLECTION_NAME],
     queryFn: fetchVehicles,
+    enabled: !!db,
   });
+
+  if (!db || !storage) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar aos serviços do Firebase.
+          <br />
+          Verifique a configuração das variáveis de ambiente e sua conexão com a internet.
+        </p>
+        <p className="text-sm text-center text-muted-foreground mt-2">
+          Se o problema persistir, contate o suporte técnico.
+        </p>
+      </div>
+    );
+  }
 
   const filteredEquipmentList = useMemo(() => {
     if (isLoadingEquipment) return [];
@@ -346,6 +397,7 @@ export function ServiceOrderClientPage() {
 
   const addServiceOrderMutation = useMutation({
     mutationFn: async (data: { formData: z.infer<typeof ServiceOrderSchema>, file: File | null }) => {
+      if (!db) throw new Error("Firebase DB is not available for adding service order.");
       setIsUploadingFile(true);
       const newOrderId = doc(collection(db, FIRESTORE_COLLECTION_NAME)).id;
       let uploadedMediaUrl: string | null = null;
@@ -371,6 +423,7 @@ export function ServiceOrderClientPage() {
 
   const updateServiceOrderMutation = useMutation({
     mutationFn: async (data: { id: string, formData: z.infer<typeof ServiceOrderSchema>, file: File | null, currentOrder: ServiceOrder }) => {
+      if (!db) throw new Error("Firebase DB is not available for updating service order.");
       setIsUploadingFile(true);
       let newMediaUrl = data.currentOrder.mediaUrl;
 
@@ -397,6 +450,7 @@ export function ServiceOrderClientPage() {
 
   const concludeServiceOrderMutation = useMutation({
     mutationFn: async (data: { orderId: string; conclusionText: string; currentEndDate?: string | null }) => {
+      if (!db) throw new Error("Firebase DB is not available for concluding service order.");
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.orderId);
       let finalEndDate = convertToTimestamp(data.currentEndDate);
       if (!finalEndDate) {
@@ -423,7 +477,8 @@ export function ServiceOrderClientPage() {
 
   const removeMediaFileMutation = useMutation({
     mutationFn: async (data: { orderId: string; fileUrl: string }) => {
-      await deleteServiceOrderFileFromStorage(data.fileUrl);
+      if (!db) throw new Error("Firebase DB is not available for removing media.");
+      await deleteServiceOrderFileFromStorage(data.fileUrl); // storage check is inside this helper
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.orderId);
       await updateDoc(orderRef, { mediaUrl: null });
       return { orderId: data.orderId };
@@ -444,8 +499,9 @@ export function ServiceOrderClientPage() {
 
   const deleteServiceOrderMutation = useMutation({
     mutationFn: async (orderToDelete: ServiceOrder) => {
+      if (!db) throw new Error("Firebase DB is not available for deleting service order.");
       if (!orderToDelete?.id) throw new Error("ID da OS é necessário para exclusão.");
-      await deleteServiceOrderFileFromStorage(orderToDelete.mediaUrl);
+      await deleteServiceOrderFileFromStorage(orderToDelete.mediaUrl); // storage check is inside
       return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderToDelete.id));
     },
     onSuccess: () => {
@@ -502,11 +558,6 @@ export function ServiceOrderClientPage() {
 
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
     if (editingOrder?.phase === 'Concluída' && editingOrder?.id) {
-        // Se a OS já está concluída, apenas permita salvar 'notes'.
-        // A mutação de updateServiceOrderMutation já lida com todos os campos.
-        // Se quisermos restringir mais, podemos criar uma nova mutação ou ajustar 'prepareDataForFirestore'
-        // para apenas incluir 'notes' e o ID quando a fase for 'Concluída'.
-        // Por simplicidade, deixaremos a mutação de update tratar, e o fieldset desabilitado impede a maioria das edições.
         updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, file: mediaFile, currentOrder: editingOrder });
         return;
     }
@@ -544,7 +595,7 @@ export function ServiceOrderClientPage() {
 
   const handleOpenConclusionModal = () => {
     if (editingOrder) {
-      setTechnicalConclusionText(editingOrder.technicalConclusion || ""); // Preenche com a conclusão existente se houver
+      setTechnicalConclusionText(editingOrder.technicalConclusion || ""); 
       setIsConclusionModalOpen(true);
     }
   };
@@ -558,7 +609,7 @@ export function ServiceOrderClientPage() {
       concludeServiceOrderMutation.mutate({
         orderId: editingOrder.id,
         conclusionText: technicalConclusionText,
-        currentEndDate: form.getValues("endDate"), // Pega a data de conclusão do formulário, se preenchida
+        currentEndDate: form.getValues("endDate"), 
       });
     }
   };
@@ -897,7 +948,6 @@ export function ServiceOrderClientPage() {
               </FormItem>
             </fieldset>
             
-            {/* Botão Concluir OS - Visível apenas se editando e OS não concluída/cancelada */}
             {editingOrder && !isOrderConcludedOrCancelled && editingOrder.phase !== 'Cancelada' && (
               <div className="pt-4">
                 <Button type="button" variant="outline" onClick={handleOpenConclusionModal} disabled={isMutating} className="w-full sm:w-auto">
@@ -906,7 +956,6 @@ export function ServiceOrderClientPage() {
               </div>
             )}
 
-            {/* Campo Conclusão Técnica - Visível apenas se OS concluída/cancelada e somente leitura */}
             {editingOrder && isOrderConcludedOrCancelled && (
               <FormField control={form.control} name="technicalConclusion" render={({ field }) => (
                 <FormItem>
@@ -925,7 +974,6 @@ export function ServiceOrderClientPage() {
               )} />
             )}
             
-            {/* Campo Observações - Editável mesmo se OS concluída/cancelada */}
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais, peças utilizadas, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
@@ -972,4 +1020,3 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
-
