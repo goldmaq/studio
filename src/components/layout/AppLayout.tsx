@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
   { href: "/service-orders", icon: ClipboardList, label: "Ordens de Serviço" },
   { href: "/technicians", icon: HardHat, label: "Técnicos" },
   { href: "/vehicles", icon: CarFront, label: "Veículos" },
-  { href: "/company-config", icon: SlidersHorizontal, label: "Config. Empresa" },
+  { href: "/company-config", icon: SlidersHorizontal, label: "Config. das Empresas" },
 ];
 
 function MainSidebar() {
