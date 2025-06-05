@@ -1,10 +1,10 @@
 
-"use client";
+"use client"; // Explicitly make this a client component
 
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { useState, useEffect } from 'react';
+// Removed useState and useEffect for isClient state here
 
 // Create a client
 const queryClient = new QueryClient({
@@ -17,18 +17,14 @@ const queryClient = new QueryClient({
 });
 
 export function AppQueryProvider({ children }: { children: ReactNode }) {
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    // This effect runs only on the client, after initial hydration
-    setIsClient(true);
-  }, []);
-
   return (
     // Provide the client to your App
     <QueryClientProvider client={queryClient}>
       {children}
-      {isClient && <ReactQueryDevtools initialIsOpen={false} />}
+      {/* Conditionally render Devtools only on the client and in development */}
+      {typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
     </QueryClientProvider>
   );
 }

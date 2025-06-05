@@ -1,6 +1,6 @@
 
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firestore";
+import { getFirestore, type Firestore } from "firebase/firestore"; // Caminho corrigido
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 interface FirebaseConfig {
@@ -21,8 +21,11 @@ const firebaseConfigValues: Partial<FirebaseConfig> = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const missingEnvVarKeys: string[] = (Object.keys(firebaseConfigValues) as Array<keyof FirebaseConfig>)
-  .filter(key => !firebaseConfigValues[key]);
+const requiredKeys: Array<keyof FirebaseConfig> = [
+  'apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'
+];
+
+const missingEnvVarKeys: string[] = requiredKeys.filter(key => !firebaseConfigValues[key]);
 
 let app: FirebaseApp;
 let db: Firestore;
