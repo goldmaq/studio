@@ -5,15 +5,15 @@ import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer } from "lucide-react"; // Added tower and timer icons
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import type { Equipment, Customer, CompanyId, OwnerReferenceType } from "@/types";
-import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, companyDisplayOptions, OWNER_REF_CUSTOMER, companyIds } from "@/types";
+import type { Maquina, Customer, CompanyId, OwnerReferenceType } from "@/types";
+import { MaquinaSchema, maquinaTypeOptions, maquinaOperationalStatusOptions, companyDisplayOptions, OWNER_REF_CUSTOMER, companyIds } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -28,7 +28,7 @@ import type { LucideIcon } from "lucide-react";
 import React from 'react';
 
 
-const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
+const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; // Mantido, conforme plano
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
@@ -36,11 +36,11 @@ const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
 
 
-const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
-  Disponível: <CheckCircle className="h-4 w-4 text-green-500" />, // Use green-500 for Disponível
+const operationalStatusIcons: Record<typeof maquinaOperationalStatusOptions[number], JSX.Element> = {
+  Disponível: <CheckCircle className="h-4 w-4 text-green-500" />,
   Locada: <Package className="h-4 w-4 text-blue-500" />,
-  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-yellow-500" />, // Use yellow-500 for Em Manutenção
-  Sucata: <Trash2 className="h-4 w-4 text-red-500" />, // Use red-500 for Sucata
+  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-yellow-500" />,
+  Sucata: <Trash2 className="h-4 w-4 text-red-500" />,
 };
 
 const parseNumericToNullOrNumber = (value: any): number | null => {
@@ -72,27 +72,28 @@ const getFileNameFromUrl = (url: string): string => {
 
 async function uploadFile(
   file: File,
-  equipmentId: string,
+  maquinaId: string,
   fileTypePrefix: 'partsCatalog' | 'errorCodes'
 ): Promise<string> {
   if (!storage) {
     throw new Error("Firebase Storage connection not available.");
   }
-  const filePath = `equipment_files/${equipmentId}/${fileTypePrefix}_${file.name}`;
-  const fileStorageRef = storageRef(storage, filePath);
+  const filePath = `equipment_files/${maquinaId}/${fileTypePrefix}_${file.name}`; // path can remain equipment_files for now
+  const fileStorageRef = storageRef(storage!, filePath);
   await uploadBytes(fileStorageRef, file);
   return getDownloadURL(fileStorageRef);
 }
 
 async function deleteFileFromStorage(fileUrl?: string | null) {
   if (fileUrl) {
- if (!storage) {
- throw new Error("Firebase Storage connection not available for deletion.");
- }
+    if (!storage) {
+      console.warn("deleteFileFromStorage: Firebase Storage connection not available. Skipping deletion.");
+      return;
+    }
     try {
       const gcsPath = new URL(fileUrl).pathname.split('/o/')[1].split('?')[0];
       const decodedPath = decodeURIComponent(gcsPath);
-      const fileStorageRef = storageRef(storage, decodedPath);
+      const fileStorageRef = storageRef(storage!, decodedPath);
       await deleteObject(fileStorageRef);
     } catch (e) {
       console.warn(`[DELETE FILE] Failed to delete file from storage: ${fileUrl}`, e);
@@ -101,11 +102,11 @@ async function deleteFileFromStorage(fileUrl?: string | null) {
 }
 
 
-async function fetchEquipment(): Promise<Equipment[]> {
+async function fetchMaquinas(): Promise<Maquina[]> {
   if (!db) {
     throw new Error("Firebase Firestore connection not available.");
   }
-  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
+  const q = query(collection(db!, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data();
@@ -114,9 +115,9 @@ async function fetchEquipment(): Promise<Equipment[]> {
       brand: data.brand || "Marca Desconhecida",
       model: data.model || "Modelo Desconhecido",
       chassisNumber: data.chassisNumber || "N/A",
-      equipmentType: (equipmentTypeOptions.includes(data.equipmentType as any) || typeof data.equipmentType === 'string') ? data.equipmentType : "Empilhadeira Contrabalançada GLP",
+      equipmentType: (maquinaTypeOptions.includes(data.equipmentType as any) || typeof data.equipmentType === 'string') ? data.equipmentType : "Empilhadeira Contrabalançada GLP",
       manufactureYear: parseNumericToNullOrNumber(data.manufactureYear),
-      operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Disponível",
+      operationalStatus: maquinaOperationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Disponível",
       customerId: data.customerId || null,
       ownerReference: data.ownerReference || null,
       towerOpenHeightMm: parseNumericToNullOrNumber(data.towerOpenHeightMm),
@@ -130,7 +131,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
       notes: data.notes || null,
       partsCatalogUrl: data.partsCatalogUrl || null,
       errorCodesUrl: data.errorCodesUrl || null,
-    } as Equipment;
+    } as Maquina;
   });
 }
 
@@ -138,21 +139,21 @@ async function fetchCustomers(): Promise<Customer[]> {
   if (!db) {
     throw new Error("Firebase Firestore connection not available.");
   }
-  const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
+  const q = query(collection(db!, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
 }
 
-interface EquipmentClientPageProps {
-  equipmentIdFromUrl?: string | null;
+interface EquipmentClientPageProps { // Name will be changed later
+  equipmentIdFromUrl?: string | null; // Name will be changed later
 }
 
-export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageProps) {
+export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageProps) { // Name will be changed later
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [editingMaquina, setEditingMaquina] = useState<Maquina | null>(null);
   const [partsCatalogFile, setPartsCatalogFile] = useState<File | null>(null);
   const [errorCodesFile, setErrorCodesFile] = useState<File | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
@@ -163,8 +164,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     equipmentType: false,
   });
 
-  const form = useForm<z.infer<typeof EquipmentSchema>>({
-    resolver: zodResolver(EquipmentSchema),
+  const form = useForm<z.infer<typeof MaquinaSchema>>({
+    resolver: zodResolver(MaquinaSchema),
     defaultValues: {
       brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
       operationalStatus: "Disponível", customerId: null, 
@@ -179,50 +180,65 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     },
   });
 
-
-  const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
-    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
-    queryFn: fetchEquipment,
+  const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({
+    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME], // Query key based on collection name
+    queryFn: fetchMaquinas,
+    enabled: !!db,
   });
 
   const { data: customers = [], isLoading: isLoadingCustomers } = useQuery<Customer[], Error>({
     queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME],
     queryFn: fetchCustomers,
+    enabled: !!db,
   });
+  
+  if (!db || !storage) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertIconLI className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar aos serviços do Firebase.
+          <br />
+          Verifique a configuração e sua conexão com a internet.
+        </p>
+      </div>
+    );
+  }
 
-  const openModal = useCallback((equipment?: Equipment) => {
+  const openModal = useCallback((maquina?: Maquina) => {
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
-    if (equipment) {
-      setEditingEquipment(equipment);
-      const isBrandPredefined = predefinedBrandOptionsList.includes(equipment.brand) && equipment.brand !== "Outra";
-      const isEquipmentTypePredefined = equipmentTypeOptions.includes(equipment.equipmentType as any);
+    if (maquina) {
+      setEditingMaquina(maquina);
+      const isBrandPredefined = predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra";
+      const isEquipmentTypePredefined = maquinaTypeOptions.includes(maquina.equipmentType as any);
 
       form.reset({
-        ...equipment,
-        model: equipment.model || "",
-        brand: isBrandPredefined ? equipment.brand : '_CUSTOM_',
-        customBrand: isBrandPredefined ? "" : (equipment.brand === "Outra" || equipment.brand === "_CUSTOM_" ? "" : equipment.brand),
-        equipmentType: isEquipmentTypePredefined ? equipment.equipmentType : '_CUSTOM_',
-        customEquipmentType: isEquipmentTypePredefined ? "" : equipment.equipmentType,
-        customerId: equipment.customerId || null, 
-        ownerReference: equipment.ownerReference || null,
-        manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
-        towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
-        towerClosedHeightMm: equipment.towerClosedHeightMm ?? undefined,
-        nominalCapacityKg: equipment.nominalCapacityKg ?? undefined,
-        batteryBoxWidthMm: equipment.batteryBoxWidthMm ?? undefined,
-        batteryBoxHeightMm: equipment.batteryBoxHeightMm ?? undefined,
-        batteryBoxDepthMm: equipment.batteryBoxDepthMm ?? undefined,
-        monthlyRentalValue: equipment.monthlyRentalValue ?? undefined,
-        hourMeter: equipment.hourMeter ?? undefined,
-        notes: equipment.notes || "",
-        partsCatalogUrl: equipment.partsCatalogUrl || null,
-        errorCodesUrl: equipment.errorCodesUrl || null,
+        ...maquina,
+        model: maquina.model || "",
+        brand: isBrandPredefined ? maquina.brand : '_CUSTOM_',
+        customBrand: isBrandPredefined ? "" : (maquina.brand === "Outra" || maquina.brand === "_CUSTOM_" ? "" : maquina.brand),
+        equipmentType: isEquipmentTypePredefined ? maquina.equipmentType : '_CUSTOM_',
+        customEquipmentType: isEquipmentTypePredefined ? "" : maquina.equipmentType,
+        customerId: maquina.customerId || null, 
+        ownerReference: maquina.ownerReference || null,
+        manufactureYear: maquina.manufactureYear ?? new Date().getFullYear(),
+        towerOpenHeightMm: maquina.towerOpenHeightMm ?? undefined,
+        towerClosedHeightMm: maquina.towerClosedHeightMm ?? undefined,
+        nominalCapacityKg: maquina.nominalCapacityKg ?? undefined,
+        batteryBoxWidthMm: maquina.batteryBoxWidthMm ?? undefined,
+        batteryBoxHeightMm: maquina.batteryBoxHeightMm ?? undefined,
+        batteryBoxDepthMm: maquina.batteryBoxDepthMm ?? undefined,
+        monthlyRentalValue: maquina.monthlyRentalValue ?? undefined,
+        hourMeter: maquina.hourMeter ?? undefined,
+        notes: maquina.notes || "",
+        partsCatalogUrl: maquina.partsCatalogUrl || null,
+        errorCodesUrl: maquina.errorCodesUrl || null,
       });
       setShowCustomFields({ brand: !isBrandPredefined, equipmentType: !isEquipmentTypePredefined });
     } else {
-      setEditingEquipment(null);
+      setEditingMaquina(null);
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
         operationalStatus: "Disponível", customerId: null, 
@@ -240,22 +256,22 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   }, [form]);
 
   useEffect(() => {
-    if (equipmentIdFromUrl && !isLoadingEquipment && equipmentList.length > 0 && !isModalOpen) {
-      const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdFromUrl);
-      if (equipmentToEdit) {
-        openModal(equipmentToEdit);
+    if (equipmentIdFromUrl && !isLoadingMaquinas && maquinaList.length > 0 && !isModalOpen) {
+      const maquinaToEdit = maquinaList.find(eq => eq.id === equipmentIdFromUrl);
+      if (maquinaToEdit) {
+        openModal(maquinaToEdit);
         if (typeof window !== "undefined") {
-           window.history.replaceState(null, '', '/equipment');
+           window.history.replaceState(null, '', '/equipment'); // Path will be changed later
         }
       }
     }
-  }, [equipmentIdFromUrl, equipmentList, isLoadingEquipment, openModal, isModalOpen]);
+  }, [equipmentIdFromUrl, maquinaList, isLoadingMaquinas, openModal, isModalOpen]);
 
   const prepareDataForFirestore = (
-    formData: z.infer<typeof EquipmentSchema>,
+    formData: z.infer<typeof MaquinaSchema>,
     newPartsCatalogUrl?: string | null,
     newErrorCodesUrl?: string | null
-  ): Omit<Equipment, 'id' | 'customBrand' | 'customEquipmentType'> => {
+  ): Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType'> => {
     const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, ...restOfData } = formData;
     const parsedData = {
       ...restOfData,
@@ -285,34 +301,34 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     };
   };
 
-  const addEquipmentMutation = useMutation({
+  const addMaquinaMutation = useMutation({
     mutationFn: async (data: {
-      formData: z.infer<typeof EquipmentSchema>,
+      formData: z.infer<typeof MaquinaSchema>,
       catalogFile: File | null,
       codesFile: File | null
     }) => {
-      if (!db) {
-        throw new Error("Firebase Firestore connection not available.");
+      if (!db || !storage) {
+        throw new Error("Firebase Firestore ou Storage connection not available.");
       }
       setIsUploadingFiles(true);
-      const newEquipmentId = doc(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME)).id;
+      const newMaquinaId = doc(collection(db!, FIRESTORE_EQUIPMENT_COLLECTION_NAME)).id;
       let partsCatalogUrl: string | null = null;
       let errorCodesUrl: string | null = null;
 
       if (data.catalogFile) {
-        partsCatalogUrl = await uploadFile(data.catalogFile, newEquipmentId, 'partsCatalog');
+        partsCatalogUrl = await uploadFile(data.catalogFile, newMaquinaId, 'partsCatalog');
       }
       if (data.codesFile) {
-        errorCodesUrl = await uploadFile(data.codesFile, newEquipmentId, 'errorCodes');
+        errorCodesUrl = await uploadFile(data.codesFile, newMaquinaId, 'errorCodes');
       }
 
-      const equipmentDataForFirestore = prepareDataForFirestore(data.formData, partsCatalogUrl, errorCodesUrl);
-      await setDoc(doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, newEquipmentId), equipmentDataForFirestore);
-      return { ...equipmentDataForFirestore, id: newEquipmentId };
+      const maquinaDataForFirestore = prepareDataForFirestore(data.formData, partsCatalogUrl, errorCodesUrl);
+      await setDoc(doc(db!, FIRESTORE_EQUIPMENT_COLLECTION_NAME, newMaquinaId), maquinaDataForFirestore);
+      return { ...maquinaDataForFirestore, id: newMaquinaId };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
-      toast({ title: "Equipamento Criado", description: `${data.brand} ${data.model} adicionado.` });
+      toast({ title: "Máquina Criada", description: `${data.brand} ${data.model} adicionada.` });
       closeModal();
     },
     onError: (err: Error, variables) => {
@@ -320,43 +336,43 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       if (err.message.includes("Um cliente deve ser selecionado")) {
         message = err.message;
       }
-      toast({ title: "Erro ao Criar", description: message, variant: "destructive" });
+      toast({ title: "Erro ao Criar Máquina", description: message, variant: "destructive" });
     },
     onSettled: () => setIsUploadingFiles(false)
   });
 
-  const updateEquipmentMutation = useMutation({
+  const updateMaquinaMutation = useMutation({
     mutationFn: async (data: {
       id: string,
-      formData: z.infer<typeof EquipmentSchema>,
+      formData: z.infer<typeof MaquinaSchema>,
       catalogFile: File | null,
       codesFile: File | null,
-      currentEquipment: Equipment
+      currentMaquina: Maquina
     }) => {
-      if (!db) {
-        throw new Error("Firebase Firestore connection not available.");
+      if (!db || !storage) {
+        throw new Error("Firebase Firestore ou Storage connection not available.");
       }
       setIsUploadingFiles(true);
-      let newPartsCatalogUrl = data.currentEquipment.partsCatalogUrl;
-      let newErrorCodesUrl = data.currentEquipment.errorCodesUrl;
+      let newPartsCatalogUrl = data.currentMaquina.partsCatalogUrl;
+      let newErrorCodesUrl = data.currentMaquina.errorCodesUrl;
 
       if (data.catalogFile) {
-        await deleteFileFromStorage(data.currentEquipment.partsCatalogUrl);
+        await deleteFileFromStorage(data.currentMaquina.partsCatalogUrl);
         newPartsCatalogUrl = await uploadFile(data.catalogFile, data.id, 'partsCatalog');
       }
       if (data.codesFile) {
-        await deleteFileFromStorage(data.currentEquipment.errorCodesUrl);
+        await deleteFileFromStorage(data.currentMaquina.errorCodesUrl);
         newErrorCodesUrl = await uploadFile(data.codesFile, data.id, 'errorCodes');
       }
 
-      const equipmentDataForFirestore = prepareDataForFirestore(data.formData, newPartsCatalogUrl, newErrorCodesUrl);
-      const equipmentRef = doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, data.id);
-      await updateDoc(equipmentRef, equipmentDataForFirestore);
-      return { ...equipmentDataForFirestore, id: data.id };
+      const maquinaDataForFirestore = prepareDataForFirestore(data.formData, newPartsCatalogUrl, newErrorCodesUrl);
+      const maquinaRef = doc(db!, FIRESTORE_EQUIPMENT_COLLECTION_NAME, data.id);
+      await updateDoc(maquinaRef, maquinaDataForFirestore);
+      return { ...maquinaDataForFirestore, id: data.id };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
-      toast({ title: "Equipamento Atualizado", description: `${data.brand} ${data.model} atualizado.` });
+      toast({ title: "Máquina Atualizada", description: `${data.brand} ${data.model} atualizada.` });
       closeModal();
     },
     onError: (err: Error, variables) => {
@@ -364,25 +380,25 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       if (err.message.includes("Um cliente deve ser selecionado")) {
         message = err.message;
       }
-      toast({ title: "Erro ao Atualizar", description: message, variant: "destructive" });
+      toast({ title: "Erro ao Atualizar Máquina", description: message, variant: "destructive" });
     },
     onSettled: () => setIsUploadingFiles(false)
   });
 
   const removeFileMutation = useMutation({
-    mutationFn: async (data: { equipmentId: string; fileType: 'partsCatalogUrl' | 'errorCodesUrl'; fileUrl: string }) => {
-      if (!db) {
-        throw new Error("Firebase Firestore connection not available.");
+    mutationFn: async (data: { maquinaId: string; fileType: 'partsCatalogUrl' | 'errorCodesUrl'; fileUrl: string }) => {
+      if (!db || !storage) {
+        throw new Error("Firebase Firestore ou Storage connection not available.");
       }
       await deleteFileFromStorage(data.fileUrl);
-      const equipmentRef = doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, data.equipmentId);
-      await updateDoc(equipmentRef, { [data.fileType]: null });
-      return { equipmentId: data.equipmentId, fileType: data.fileType };
+      const maquinaRef = doc(db!, FIRESTORE_EQUIPMENT_COLLECTION_NAME, data.maquinaId);
+      await updateDoc(maquinaRef, { [data.fileType]: null });
+      return { maquinaId: data.maquinaId, fileType: data.fileType };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
-      if(editingEquipment && editingEquipment.id === data.equipmentId){
-        setEditingEquipment(prev => prev ? ({...prev, [data.fileType]: null}) : null);
+      if(editingMaquina && editingMaquina.id === data.maquinaId){
+        setEditingMaquina(prev => prev ? ({...prev, [data.fileType]: null}) : null);
         form.setValue(data.fileType, null);
       }
       toast({ title: "Arquivo Removido", description: "O arquivo foi removido com sucesso." });
@@ -392,31 +408,31 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     }
   });
 
-  const deleteEquipmentMutation = useMutation({
-    mutationFn: async (equipmentToDelete: Equipment) => {
-      if (!db) {
-        throw new Error("Firebase Firestore connection not available.");
+  const deleteMaquinaMutation = useMutation({
+    mutationFn: async (maquinaToDelete: Maquina) => {
+      if (!db || !storage) {
+        throw new Error("Firebase Firestore ou Storage connection not available.");
       }
-      if (!equipmentToDelete?.id) {
-        throw new Error("ID do equipamento inválido fornecido para a função de mutação.");
+      if (!maquinaToDelete?.id) {
+        throw new Error("ID da máquina inválido fornecido para a função de mutação.");
       }
-      const { id, partsCatalogUrl, errorCodesUrl } = equipmentToDelete;
+      const { id, partsCatalogUrl, errorCodesUrl } = maquinaToDelete;
       await deleteFileFromStorage(partsCatalogUrl);
       await deleteFileFromStorage(errorCodesUrl);
-      const equipmentRef = doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, id);
-      await deleteDoc(equipmentRef);
+      const maquinaRef = doc(db!, FIRESTORE_EQUIPMENT_COLLECTION_NAME, id);
+      await deleteDoc(maquinaRef);
       return id;
     },
-    onSuccess: (deletedEquipmentId) => {
+    onSuccess: (deletedMaquinaId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
-      toast({ title: "Equipamento Excluído", description: "O equipamento e seus arquivos foram removidos." });
+      toast({ title: "Máquina Excluída", description: "A máquina e seus arquivos foram removidos." });
       closeModal();
     },
-    onError: (error: Error, equipmentToDelete) => {
+    onError: (error: Error, maquinaToDelete) => {
       toast({
-        title: "Erro ao Excluir Equipamento",
-        description: `Não foi possível excluir o equipamento. Detalhe: ${error.message || 'Erro desconhecido.'}`,
-        variant: "destructive",
+        title: "Erro ao Excluir Máquina",
+        description: `Não foi possível excluir a máquina. Detalhe: ${error.message || 'Erro desconhecido.'}`,
+        variant: "destructive"
       });
     },
   });
@@ -424,46 +440,46 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setEditingEquipment(null);
+    setEditingMaquina(null);
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
     form.reset();
     setShowCustomFields({ brand: false, equipmentType: false });
   };
 
-  const onSubmit = async (values: z.infer<typeof EquipmentSchema>) => {
-    if (editingEquipment && editingEquipment.id) {
-      updateEquipmentMutation.mutate({
-        id: editingEquipment.id,
+  const onSubmit = async (values: z.infer<typeof MaquinaSchema>) => {
+    if (editingMaquina && editingMaquina.id) {
+      updateMaquinaMutation.mutate({
+        id: editingMaquina.id,
         formData: values,
         catalogFile: partsCatalogFile,
         codesFile: errorCodesFile,
-        currentEquipment: editingEquipment
+        currentMaquina: editingMaquina
       });
     } else {
-      addEquipmentMutation.mutate({ formData: values, catalogFile: partsCatalogFile, codesFile: errorCodesFile });
+      addMaquinaMutation.mutate({ formData: values, catalogFile: partsCatalogFile, codesFile: errorCodesFile });
     }
   };
 
   const handleModalDeleteConfirm = () => {
-    const equipmentToExclude = editingEquipment;
-    if (!equipmentToExclude || !equipmentToExclude.id) {
-      toast({ title: "Erro Interno", description: "Referência ao equipamento inválida para exclusão.", variant: "destructive" });
+    const maquinaToExclude = editingMaquina;
+    if (!maquinaToExclude || !maquinaToExclude.id) {
+      toast({ title: "Erro Interno", description: "Referência à máquina inválida para exclusão.", variant: "destructive" });
       return;
     }
-    const confirmation = window.confirm(`Tem certeza que deseja excluir o equipamento "${equipmentToExclude.brand} ${equipmentToExclude.model}" e seus arquivos associados? Esta ação não pode ser desfeita.`);
+    const confirmation = window.confirm(`Tem certeza que deseja excluir a máquina "${maquinaToExclude.brand} ${maquinaToExclude.model}" e seus arquivos associados? Esta ação não pode ser desfeita.`);
     if (confirmation) {
-      deleteEquipmentMutation.mutate(equipmentToExclude);
+      deleteMaquinaMutation.mutate(maquinaToExclude);
     }
   };
 
 
   const handleFileRemove = (fileType: 'partsCatalogUrl' | 'errorCodesUrl') => {
-    if (editingEquipment && editingEquipment.id) {
-      const fileUrlToRemove = editingEquipment[fileType];
+    if (editingMaquina && editingMaquina.id) {
+      const fileUrlToRemove = editingMaquina[fileType];
       if (fileUrlToRemove) {
         if (window.confirm(`Tem certeza que deseja remover este ${fileType === 'partsCatalogUrl' ? 'catálogo de peças' : 'arquivo de códigos de erro'}?`)) {
-          removeFileMutation.mutate({ equipmentId: editingEquipment.id, fileType, fileUrl: fileUrlToRemove });
+          removeFileMutation.mutate({ maquinaId: editingMaquina.id, fileType, fileUrl: fileUrlToRemove });
         }
       }
     }
@@ -496,8 +512,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     return Construction;
   };
 
-  const isLoadingPage = isLoadingEquipment || isLoadingCustomers;
-  const isMutating = addEquipmentMutation.isPending || updateEquipmentMutation.isPending || deleteEquipmentMutation.isPending || removeFileMutation.isPending || isUploadingFiles;
+  const isLoadingPage = isLoadingMaquinas || isLoadingCustomers;
+  const isMutating = addMaquinaMutation.isPending || updateMaquinaMutation.isPending || deleteMaquinaMutation.isPending || removeFileMutation.isPending || isUploadingFiles;
 
   if (isLoadingPage && !isModalOpen) {
     return (
@@ -508,13 +524,13 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     );
   }
 
-  if (isErrorEquipment) {
+  if (isErrorMaquinas) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
         <AlertIconLI className="h-12 w-12 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Equipamentos</h2>
+        <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Máquinas</h2>
         <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
-        <p className="text-sm mt-2">Detalhe: {errorEquipment?.message}</p>
+        <p className="text-sm mt-2">Detalhe: {errorMaquinas?.message}</p>
       </div>
     );
   }
@@ -522,65 +538,65 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   return (
     <>
       <PageHeader
-        title="Rastreamento de Equipamentos"
+        title="Rastreamento de Máquinas"
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Equipamento
+            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Máquina
           </Button>
         }
       />
 
-      {equipmentList.length === 0 && !isLoadingEquipment ? (
+      {maquinaList.length === 0 && !isLoadingMaquinas ? (
         <DataTablePlaceholder
           icon={Construction}
-          title="Nenhum Equipamento Registrado"
-          description="Adicione seu primeiro equipamento para começar a rastrear."
-          buttonLabel="Adicionar Equipamento"
+          title="Nenhuma Máquina Registrada"
+          description="Adicione sua primeira máquina para começar a rastrear."
+          buttonLabel="Adicionar Máquina"
           onButtonClick={() => openModal()}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {equipmentList.map((eq) => {
-            const customer = eq.customerId ? customers.find(c => c.id === eq.customerId) : null;
-            const ownerDisplay = getOwnerDisplayString(eq.ownerReference, eq.customerId, customers);
-            const OwnerIconComponent = getOwnerIcon(eq.ownerReference);
+          {maquinaList.map((maq) => {
+            const customer = maq.customerId ? customers.find(c => c.id === maq.customerId) : null;
+            const ownerDisplay = getOwnerDisplayString(maq.ownerReference, maq.customerId, customers);
+            const OwnerIconComponent = getOwnerIcon(maq.ownerReference);
             return (
             <Card
-              key={eq.id}
+              key={maq.id}
               className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
-              onClick={() => openModal(eq)}
+              onClick={() => openModal(maq)}
             >
               <CardHeader>
-                <CardTitle className="font-headline text-xl text-primary">{eq.brand} {eq.model}</CardTitle>
+                <CardTitle className="font-headline text-xl text-primary">{maq.brand} {maq.model}</CardTitle>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
                  <p className="flex items-center text-sm">
                     <Tag className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
                     <span className="font-medium text-muted-foreground mr-1">Chassi:</span>
-                    <span>{eq.chassisNumber}</span>
+                    <span>{maq.chassisNumber}</span>
                   </p>
-                <p className="flex items-center text-sm"><Layers className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Tipo:</span> {eq.equipmentType}</p>
-                {eq.manufactureYear && <p className="flex items-center text-sm"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Ano:</span> {eq.manufactureYear}</p>}
+                <p className="flex items-center text-sm"><Layers className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Tipo:</span> {maq.equipmentType}</p>
+                {maq.manufactureYear && <p className="flex items-center text-sm"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Ano:</span> {maq.manufactureYear}</p>}
                 <p className="flex items-center text-sm">
                     <OwnerIconComponent className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Propriedade:</span> {ownerDisplay}
                 </p>
                 <p className="flex items-center text-sm">
-                  {operationalStatusIcons[eq.operationalStatus]}
+                  {operationalStatusIcons[maq.operationalStatus]}
                   <span className="font-medium text-muted-foreground mr-1 ml-2">Status:</span>
                   <span className={cn({
-                    'text-green-600': eq.operationalStatus === 'Disponível', // Adjusted for better visibility
-                    'text-blue-500': eq.operationalStatus === 'Locada',
-                    'text-yellow-600': eq.operationalStatus === 'Em Manutenção', // Adjusted for better visibility
-                    'text-red-600': eq.operationalStatus === 'Sucata', // Adjusted for better visibility
+                    'text-green-600': maq.operationalStatus === 'Disponível',
+                    'text-blue-500': maq.operationalStatus === 'Locada',
+                    'text-yellow-600': maq.operationalStatus === 'Em Manutenção',
+                    'text-red-600': maq.operationalStatus === 'Sucata',
                   })}>
-                    {eq.operationalStatus}
+                    {maq.operationalStatus}
                   </span>
                 </p>
                 {customer ? (
                   <p className="flex items-center text-sm">
                     <Users className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span>
                     <Link
-                      href={`/customers?openCustomerId=${eq.customerId}`}
+                      href={`/customers?openCustomerId=${maq.customerId}`}
                       onClick={(e) => e.stopPropagation()}
                       className="ml-1 text-primary hover:underline truncate"
                       title={`Ver detalhes de ${customer.name}`}
@@ -588,56 +604,56 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                       {customer.name}
                     </Link>
                   </p>
-                ) : eq.customerId ? (
-                     <p className="flex items-center text-sm"><Users className="mr-2 h-4 w-4 text-muted-foreground" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span> ID {eq.customerId} (Carregando...)</p>
+                ) : maq.customerId ? (
+                     <p className="flex items-center text-sm"><Users className="mr-2 h-4 w-4 text-muted-foreground" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span> ID {maq.customerId} (Carregando...)</p>
                 ): null}
 
-                {eq.towerOpenHeightMm !== null && eq.towerOpenHeightMm !== undefined && (
-                  <p className="flex items-center text-sm"><ArrowUpFromLine className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Torre Aberta:</span> {eq.towerOpenHeightMm} mm</p>
+                {maq.towerOpenHeightMm !== null && maq.towerOpenHeightMm !== undefined && (
+                  <p className="flex items-center text-sm"><ArrowUpFromLine className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Torre Aberta:</span> {maq.towerOpenHeightMm} mm</p>
                 )}
-                {eq.towerClosedHeightMm !== null && eq.towerClosedHeightMm !== undefined && (
-                  <p className="flex items-center text-sm"><ArrowDownToLine className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Torre Fechada:</span> {eq.towerClosedHeightMm} mm</p>
+                {maq.towerClosedHeightMm !== null && maq.towerClosedHeightMm !== undefined && (
+                  <p className="flex items-center text-sm"><ArrowDownToLine className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Torre Fechada:</span> {maq.towerClosedHeightMm} mm</p>
                 )}
-                 {eq.hourMeter !== null && eq.hourMeter !== undefined && <p className="flex items-center text-sm"><Timer className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Horímetro:</span> {eq.hourMeter}h</p>}
-                 {eq.monthlyRentalValue !== null && eq.monthlyRentalValue !== undefined && <p className="flex items-center text-sm"><Coins className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Aluguel Mensal:</span> R$ {eq.monthlyRentalValue.toFixed(2)}</p>}
+                 {maq.hourMeter !== null && maq.hourMeter !== undefined && <p className="flex items-center text-sm"><Timer className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Horímetro:</span> {maq.hourMeter}h</p>}
+                 {maq.monthlyRentalValue !== null && maq.monthlyRentalValue !== undefined && <p className="flex items-center text-sm"><Coins className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Aluguel Mensal:</span> R$ {maq.monthlyRentalValue.toFixed(2)}</p>}
 
-                 {eq.partsCatalogUrl && (
+                 {maq.partsCatalogUrl && (
                     <p className="flex items-center text-sm">
                         <BookOpen className="mr-2 h-4 w-4 text-primary" />
                         <span className="font-medium text-muted-foreground mr-1">Catálogo Peças:</span>
                         <a
-                          href={eq.partsCatalogUrl}
+                          href={maq.partsCatalogUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
                           className="text-primary hover:underline hover:text-primary/80 transition-colors truncate"
-                          title={`Ver Catálogo de Peças: ${getFileNameFromUrl(eq.partsCatalogUrl)}`}
+                          title={`Ver Catálogo de Peças: ${getFileNameFromUrl(maq.partsCatalogUrl)}`}
                         >
-                            {getFileNameFromUrl(eq.partsCatalogUrl)}
+                            {getFileNameFromUrl(maq.partsCatalogUrl)}
                         </a>
                     </p>
                  )}
-                 {eq.errorCodesUrl && (
+                 {maq.errorCodesUrl && (
                     <p className="flex items-center text-sm">
                         <AlertCircle className="mr-2 h-4 w-4 text-primary" />
                         <span className="font-medium text-muted-foreground mr-1">Códigos Erro:</span>
                         <a
-                          href={eq.errorCodesUrl}
+                          href={maq.errorCodesUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
                           className="text-primary hover:underline hover:text-primary/80 transition-colors truncate"
-                          title={`Ver Códigos de Erro: ${getFileNameFromUrl(eq.errorCodesUrl)}`}
+                          title={`Ver Códigos de Erro: ${getFileNameFromUrl(maq.errorCodesUrl)}`}
                         >
-                            {getFileNameFromUrl(eq.errorCodesUrl)}
+                            {getFileNameFromUrl(maq.errorCodesUrl)}
                         </a>
                     </p>
                  )}
-                 {eq.notes && (
+                 {maq.notes && (
                   <p className="flex items-start text-sm">
                     <FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" />
                     <span className="font-medium text-muted-foreground mr-1">Obs.:</span>
-                    <span className="whitespace-pre-wrap break-words">{eq.notes}</span>
+                    <span className="whitespace-pre-wrap break-words">{maq.notes}</span>
                   </p>
                 )}
               </CardContent>
@@ -652,17 +668,17 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       <FormModal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editingEquipment ? "Editar Equipamento" : "Adicionar Novo Equipamento"}
-        description="Forneça os detalhes do equipamento, incluindo arquivos PDF se necessário."
-        formId="equipment-form"
+        title={editingMaquina ? "Editar Máquina" : "Adicionar Nova Máquina"}
+        description="Forneça os detalhes da máquina, incluindo arquivos PDF se necessário."
+        formId="maquina-form" // Updated formId
         isSubmitting={isMutating}
-        editingItem={editingEquipment}
+        editingItem={editingMaquina}
         onDeleteConfirm={handleModalDeleteConfirm}
-        isDeleting={deleteEquipmentMutation.isPending}
-        deleteButtonLabel="Excluir Equipamento"
+        isDeleting={deleteMaquinaMutation.isPending}
+        deleteButtonLabel="Excluir Máquina"
       >
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} id="equipment-form" className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> {/* Updated id */}
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="brand" render={({ field }) => (
@@ -768,13 +784,13 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="equipmentType" render={({ field }) => (
+              <FormField control={form.control} name="equipmentType" render={({ field }) => ( // Name will be changed later
                 <FormItem>
-                  <FormLabel>Tipo de Equipamento</FormLabel>
+                  <FormLabel>Tipo de Máquina</FormLabel>
                   <Select onValueChange={(value) => handleSelectChange('equipmentType', value)} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      {equipmentTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      {maquinaTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
                       <SelectItem value="_CUSTOM_">Digitar Tipo...</SelectItem>
                     </SelectContent>
                   </Select>
@@ -798,7 +814,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
                   <SelectContent>
-                    {operationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                    {maquinaOperationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
                   </SelectContent>
                 </Select><FormMessage />
               </FormItem>
@@ -834,10 +850,10 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
             <FormItem>
               <FormLabel>Catálogo de Peças (PDF)</FormLabel>
-              {editingEquipment?.partsCatalogUrl && !partsCatalogFile && (
+              {editingMaquina?.partsCatalogUrl && !partsCatalogFile && (
                 <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                  <a href={editingEquipment.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                    <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingEquipment.partsCatalogUrl)}
+                  <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                    <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
                   </a>
                   <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('partsCatalogUrl')} className="text-destructive hover:text-destructive">
                     <XCircle className="h-4 w-4 mr-1"/> Remover
@@ -858,10 +874,10 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
             <FormItem>
               <FormLabel>Códigos de Erro (PDF)</FormLabel>
-               {editingEquipment?.errorCodesUrl && !errorCodesFile && (
+               {editingMaquina?.errorCodesUrl && !errorCodesFile && (
                 <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                  <a href={editingEquipment.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                    <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingEquipment.errorCodesUrl)}
+                  <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                    <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
                   </a>
                    <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('errorCodesUrl')} className="text-destructive hover:text-destructive">
                     <XCircle className="h-4 w-4 mr-1"/> Remover
@@ -899,3 +915,5 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
+
+    

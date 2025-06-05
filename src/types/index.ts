@@ -17,14 +17,14 @@ export interface Customer {
   notes?: string;
 }
 
-export const equipmentTypeOptions = [
+export const maquinaTypeOptions = [
   'Empilhadeira Contrabalançada GLP', 
   'Empilhadeira Contrabalançada Elétrica', 
   'Empilhadeira Retrátil', 
   'Transpaleteira Elétrica', 
 ] as const;
 
-export const operationalStatusOptions = ['Disponível', 'Locada', 'Em Manutenção', 'Sucata'] as const;
+export const maquinaOperationalStatusOptions = ['Disponível', 'Locada', 'Em Manutenção', 'Sucata'] as const;
 
 export type CompanyId = 'goldmaq' | 'goldcomercio' | 'goldjob';
 export const companyIds = ["goldmaq", "goldcomercio", "goldjob"] as const;
@@ -40,14 +40,14 @@ export type OwnerReferenceType = CompanyId | 'CUSTOMER_OWNED';
 export const OWNER_REF_CUSTOMER: OwnerReferenceType = 'CUSTOMER_OWNED';
 
 
-export interface Equipment {
+export interface Maquina {
   id:string;
   brand: string;
   model: string;
   chassisNumber: string;
-  equipmentType: typeof equipmentTypeOptions[number] | string; 
+  equipmentType: typeof maquinaTypeOptions[number] | string; 
   manufactureYear: number | null;
-  operationalStatus: typeof operationalStatusOptions[number];
+  operationalStatus: typeof maquinaOperationalStatusOptions[number];
   customerId?: string | null;
   ownerReference?: OwnerReferenceType | null; 
   customBrand?: string; 
@@ -82,7 +82,7 @@ export interface ServiceOrder {
   id: string;
   orderNumber: string;
   customerId: string;
-  equipmentId: string;
+  equipmentId: string; // This ID still refers to a 'Maquina' entity
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
   technicianId?: string | null;
   serviceType: string; 
@@ -144,7 +144,7 @@ export interface AuxiliaryEquipment {
   customType?: string; // Se type for "Outro"
   serialNumber?: string | null;
   status: typeof auxiliaryEquipmentStatusOptions[number];
-  linkedEquipmentId?: string | null; // ID do equipamento principal (empilhadeira)
+  linkedEquipmentId?: string | null; // ID da máquina principal
   notes?: string | null;
 }
 
@@ -178,13 +178,13 @@ const ownerReferenceSchema = z.union([
   z.literal(OWNER_REF_CUSTOMER),
 ]);
 
-export const EquipmentSchema = z.object({
+export const MaquinaSchema = z.object({
   brand: z.string().min(1, "Marca é obrigatória"),
   model: z.string().min(1, "Modelo é obrigatório"),
   chassisNumber: z.string().min(1, "Número do chassi é obrigatório"),
-  equipmentType: z.string().min(1, "Tipo de equipamento é obrigatório"), 
+  equipmentType: z.string().min(1, "Tipo de máquina é obrigatório"), 
   manufactureYear: z.coerce.number().min(1900, "Ano inválido").max(new Date().getFullYear() + 1, "Ano inválido").nullable(),
-  operationalStatus: z.enum(operationalStatusOptions),
+  operationalStatus: z.enum(maquinaOperationalStatusOptions),
   customerId: z.string().nullable().optional(), 
   ownerReference: ownerReferenceSchema.nullable().optional(),
   customBrand: z.string().optional(),
@@ -236,7 +236,7 @@ export const VehicleSchema = z.object({
 export const ServiceOrderSchema = z.object({
   orderNumber: z.string().min(1, "Número da ordem é obrigatório"),
   customerId: z.string().min(1, "Cliente é obrigatório"),
-  equipmentId: z.string().min(1, "Equipamento é obrigatório"),
+  equipmentId: z.string().min(1, "Máquina é obrigatória"), // Updated message
   phase: z.enum(['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada']),
   technicianId: z.string().nullable().optional(),
   serviceType: z.string().min(1, "Tipo de serviço é obrigatório"),
@@ -281,7 +281,7 @@ export const AuxiliaryEquipmentSchema = z.object({
   customType: z.string().optional(),
   serialNumber: z.string().optional().nullable(),
   status: z.enum(auxiliaryEquipmentStatusOptions, { required_error: "Status é obrigatório" }),
-  linkedEquipmentId: z.string().nullable().optional(),
+  linkedEquipmentId: z.string().nullable().optional(), // This ID now refers to a 'Maquina'
   notes: z.string().optional().nullable(),
 }).refine(data => {
   if (data.type === '_CUSTOM_' && (!data.customType || data.customType.trim() === "")) {
