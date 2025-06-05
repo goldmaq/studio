@@ -2,18 +2,18 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image"; // Import next/image
+// import Image from "next/image"; // Remove next/image import
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   LayoutDashboard,
   Users,
-  Construction, 
+  Construction,
   ClipboardList,
   HardHat,
   CarFront,
   SlidersHorizontal,
-  Settings, 
+  Settings,
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/icons/Logo"; // Import the SVG Logo component
 
 interface NavItem {
   href: string;
@@ -59,14 +60,7 @@ function MainSidebar() {
       <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center h-16">
         <Link href="/" className="flex items-center gap-2">
           {open ? (
-            <Image 
-              src="/images/logo.png" // Assuming your logo is at public/images/logo.png
-              alt="Gold Maq Controle Logo" 
-              width={120} 
-              height={30} 
-              className="transition-all duration-300 ease-in-out"
-              priority // Add priority if it's LCP
-            />
+            <Logo className="transition-all duration-300 ease-in-out" />
           ) : (
             <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />
           )}

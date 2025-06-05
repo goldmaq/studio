@@ -19,7 +19,7 @@ import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db, storage } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy, setDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy, setDoc, DocumentData } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isBefore, isToday, addDays, parseISO, isValid, format } from 'date-fns';
@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Label } from "@/components/ui/label";
 
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
@@ -79,7 +80,7 @@ async function uploadServiceOrderFile(
 ): Promise<string> {
   const filePath = `service_order_media/${orderId}/${Date.now()}_${file.name}`;
   const fileStorageRef = storageRef(storage, filePath);
-  await uploadBytes(fileStorageRef, file);
+  await uploadBytes(fileStorageRef, fileStorageRef);
   return getDownloadURL(fileStorageRef);
 }
 
@@ -129,18 +130,24 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
   const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("startDate", "desc"), orderBy("orderNumber", "desc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
-    const data = docSnap.data();
+    const data = docSnap.data() as DocumentData; // Cast to DocumentData for explicit access
     return {
       id: docSnap.id,
-      ...data,
-      startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
-      endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
-      vehicleId: data.vehicleId || null,
-      mediaUrl: data.mediaUrl || null,
+      orderNumber: data.orderNumber || "", // Provide default or ensure it's always there
+      customerId: data.customerId || "",   // Provide default
+      equipmentId: data.equipmentId || "", // Provide default
+      phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'], // Validate and provide default
+      technicianId: data.technicianId || "", // Provide default
+      description: data.description || "", // Provide default
       serviceType: data.serviceType || "Não especificado",
       customServiceType: data.customServiceType || "",
+      vehicleId: data.vehicleId || null,
+      startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
+      endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
+      notes: data.notes || "",
+      mediaUrl: data.mediaUrl || null,
       technicalConclusion: data.technicalConclusion || null,
-    } as ServiceOrder;
+    } as ServiceOrder; // Assert as ServiceOrder after explicit mapping
   });
 }
 
@@ -169,7 +176,7 @@ async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 const getNextOrderNumber = (currentOrders: ServiceOrder[]): string => {
-  let maxOrderNum = 3999;
+  let maxOrderNum = 3999; // Start check from one less than desired start
   currentOrders.forEach(order => {
     if (order.orderNumber) {
         const num = parseInt(order.orderNumber, 10);
@@ -619,8 +626,8 @@ export function ServiceOrderClientPage() {
                 <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Técnico:</span> {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
                 {order.vehicleId && <p className="flex items-center"><VehicleIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Veículo:</span> {isLoadingVehicles ? 'Carregando...' : getVehicleIdentifier(order.vehicleId)}</p>}
                 <p className="flex items-center"><Settings2 className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Tipo Serviço:</span> {order.serviceType}</p>
-                {order.startDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {formatDateForInput(order.startDate)}</p>}
-                {order.endDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Prev.:</span> {formatDateForInput(order.endDate)}</p>}
+                {order.startDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {format(parseISO(order.startDate), 'dd/MM/yyyy')}</p>}
+                {order.endDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Prev.:</span> {format(parseISO(order.endDate), 'dd/MM/yyyy')}</p>}
                 <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Problema Relatado:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
                 {order.technicalConclusion && <p className="flex items-start"><Check className="mr-2 mt-0.5 h-4 w-4 text-green-500 flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Técnica:</span> <span className="whitespace-pre-wrap break-words">{order.technicalConclusion}</span></p>}
                 {order.notes && <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Obs.:</span> <span className="whitespace-pre-wrap break-words">{order.notes}</span></p>}
@@ -854,13 +861,15 @@ export function ServiceOrderClientPage() {
                 <FormLabel>Conclusão Técnica</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder={isOrderConcludedOrCancelled ? "Conclusão técnica registrada." : "Será preenchido ao concluir a OS."}
+                    placeholder={isOrderConcludedOrCancelled ? (field.value ? "" : "Nenhuma conclusão técnica registrada.") : "Será preenchido ao concluir a OS."}
                     {...field}
                     value={field.value ?? ""}
-                    readOnly={!isOrderConcludedOrCancelled} // Editável apenas se já concluída
+                    readOnly={!isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada'} 
+                    disabled={!isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada'}
                     rows={3}
                   />
                 </FormControl>
+                 {!isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada' && <FormDescription>Este campo será habilitado ao concluir a OS.</FormDescription>}
                 <FormMessage />
               </FormItem>
             )} />
@@ -868,29 +877,38 @@ export function ServiceOrderClientPage() {
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais, peças utilizadas, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
-
-            {/* Botões de Ação no Rodapé do FormModal */}
-            <div className="flex justify-between items-center pt-4 border-t">
-                <div>
-                    {editingOrder && !isOrderConcludedOrCancelled && (
-                        <Button type="button" variant="outline" onClick={handleOpenConclusionModal} disabled={isMutating}>
-                            <Check className="mr-2 h-4 w-4" /> Concluir OS
-                        </Button>
-                    )}
-                </div>
-                <div className="flex gap-2">
-                     <Button type="button" variant="ghost" onClick={closeModal} disabled={isMutating}>
-                        Cancelar
-                    </Button>
-                    <Button type="submit" form="service-order-form" disabled={isMutating} className="bg-primary hover:bg-primary/90">
-                        {isMutating ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />}
-                        {editingOrder ? "Salvar Alterações" : "Criar OS"}
-                    </Button>
-                </div>
+            
+            {/* Botões de Ação no Rodapé do FormModal são gerenciados pelo FormModal */}
+            {/* A lógica de submit está no form e o FormModal provê os botões */}
+            {/* O botão de concluir OS precisa ser adicionado aqui dentro do form para ter acesso ao contexto ou ter sua lógica separada */}
+             <div className="hidden">
+                <Button type="submit" form="service-order-form" id="hidden-submit-button" />
             </div>
-             {/* Botão de Excluir será gerenciado pelo FormModal */}
           </form>
         </Form>
+         <DialogFooter className="gap-2 sm:justify-between pt-4 border-t mt-4">
+            <div>
+                {editingOrder && !isOrderConcludedOrCancelled && editingOrder.phase !== 'Cancelada' && (
+                    <Button type="button" variant="outline" onClick={handleOpenConclusionModal} disabled={isMutating}>
+                        <Check className="mr-2 h-4 w-4" /> Concluir OS
+                    </Button>
+                )}
+            </div>
+            <div className="flex gap-2 justify-end">
+                 <Button variant="ghost" onClick={closeModal} disabled={isMutating}>
+                    Cancelar
+                </Button>
+                <Button 
+                    type="button" 
+                    onClick={() => document.getElementById('hidden-submit-button')?.click()} 
+                    disabled={isMutating} 
+                    className="bg-primary hover:bg-primary/90"
+                >
+                    {isMutating ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                    {editingOrder ? "Salvar Alterações" : "Criar OS"}
+                </Button>
+            </div>
+        </DialogFooter>
       </FormModal>
 
       {/* AlertDialog para Conclusão Técnica */}
@@ -932,3 +950,5 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
+
+    
