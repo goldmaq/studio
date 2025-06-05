@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image"; // Import next/image
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -14,6 +14,7 @@ import {
   CarFront,
   SlidersHorizontal,
   Settings,
+  PackageSearch, // Ícone para Equipamentos Auxiliares
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -29,7 +30,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-// import { Logo } from "@/components/icons/Logo"; // No longer needed if using Image
+import { Logo } from "@/components/icons/Logo";
 
 interface NavItem {
   href: string;
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { href: "/", icon: LayoutDashboard, label: "Painel" },
   { href: "/customers", icon: Users, label: "Clientes" },
   { href: "/equipment", icon: Construction, label: "Equipamentos" },
+  { href: "/auxiliary-equipment", icon: PackageSearch, label: "Equip. Auxiliares" },
   { href: "/service-orders", icon: ClipboardList, label: "Ordens de Serviço" },
   { href: "/technicians", icon: HardHat, label: "Técnicos" },
   { href: "/vehicles", icon: CarFront, label: "Veículos" },
@@ -60,13 +62,13 @@ function MainSidebar() {
       <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center h-16">
         <Link href="/" className="flex items-center gap-2">
           {open ? (
-            <Image 
+             <Image 
               src="/images/logo.png" 
               alt="Gold Maq Controle Logo" 
               width={120} 
               height={30} 
               className="transition-all duration-300 ease-in-out" 
-              priority // Add priority if it's LCP
+              priority 
             />
           ) : (
             <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />

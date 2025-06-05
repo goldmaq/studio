@@ -84,16 +84,16 @@ export interface ServiceOrder {
   customerId: string;
   equipmentId: string;
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
-  technicianId?: string | null; // Tornou-se opcional/nulável
+  technicianId?: string | null;
   serviceType: string; 
   customServiceType?: string; 
   vehicleId?: string | null; 
   startDate?: string; 
   endDate?: string;   
   description: string; 
-  notes?: string;
+  notes?: string | undefined;
   mediaUrl?: string | null;
-  technicalConclusion?: string | null; // Adicionado para consistência com o formulário
+  technicalConclusion?: string | null;
 }
 
 export interface Technician {
@@ -132,6 +132,21 @@ export interface Vehicle {
   registrationInfo?: string;
   status: 'Disponível' | 'Em Uso' | 'Manutenção';
 }
+
+export const auxiliaryEquipmentTypeOptions = ["Bateria", "Carregador", "Berço", "Cabo"] as const;
+export const auxiliaryEquipmentStatusOptions = ['Disponível', 'Locado', 'Em Manutenção', 'Sucata'] as const;
+
+export interface AuxiliaryEquipment {
+  id: string;
+  name: string; // Ex: "Bateria Tracionária 80V Modelo X"
+  type: typeof auxiliaryEquipmentTypeOptions[number] | string; // "Bateria", "Carregador", "Berço", "Outro"
+  customType?: string; // Se type for "Outro"
+  serialNumber?: string | null;
+  status: typeof auxiliaryEquipmentStatusOptions[number];
+  linkedEquipmentId?: string | null; // ID do equipamento principal (empilhadeira)
+  notes?: string | null;
+}
+
 
 import { z } from 'zod';
 
@@ -221,16 +236,16 @@ export const ServiceOrderSchema = z.object({
   customerId: z.string().min(1, "Cliente é obrigatório"),
   equipmentId: z.string().min(1, "Equipamento é obrigatório"),
   phase: z.enum(['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada']),
-  technicianId: z.string().nullable().optional(), // Tornou-se opcional/nulável
+  technicianId: z.string().nullable().optional(),
   serviceType: z.string().min(1, "Tipo de serviço é obrigatório"),
   customServiceType: z.string().optional(),
   vehicleId: z.string().nullable().optional(), 
-  startDate: z.string().optional(), // Considerar z.date() se for objeto Date
-  endDate: z.string().optional(),   // Considerar z.date() se for objeto Date
+  startDate: z.string().optional(), 
+  endDate: z.string().optional(),   
   description: z.string().min(1, "Problema relatado é obrigatório"), 
-  notes: z.string().optional().nullable(), // Permitir explicitamente null
+  notes: z.string().optional().nullable(),
   mediaUrl: z.string().url("URL de mídia inválida").nullable().optional(),
-  technicalConclusion: z.string().nullable().optional(), // Adicionado para consistência
+  technicalConclusion: z.string().nullable().optional(),
 }).refine(data => {
   if (data.serviceType === '_CUSTOM_' && (!data.customServiceType || data.customServiceType.trim() === "")) {
     return false;
@@ -258,4 +273,21 @@ export const CompanySchema = z.object({
   bankPixKey: z.string().optional(),
 });
 
+export const AuxiliaryEquipmentSchema = z.object({
+  name: z.string().min(1, "Nome do equipamento é obrigatório"),
+  type: z.string().min(1, "Tipo é obrigatório"),
+  customType: z.string().optional(),
+  serialNumber: z.string().optional().nullable(),
+  status: z.enum(auxiliaryEquipmentStatusOptions, { required_error: "Status é obrigatório" }),
+  linkedEquipmentId: z.string().nullable().optional(),
+  notes: z.string().optional().nullable(),
+}).refine(data => {
+  if (data.type === '_CUSTOM_' && (!data.customType || data.customType.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Por favor, especifique o tipo customizado.",
+  path: ["customType"],
+});
     
