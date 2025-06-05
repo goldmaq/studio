@@ -67,7 +67,11 @@ const formatPhoneNumberForInputDisplay = (value: string): string => {
 };
 
 async function fetchTechnicians(): Promise<Technician[]> {
-  const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("name", "asc"));
+  if (!db) {
+    console.error("fetchTechnicians: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
+  const q = query(collection(db!, FIRESTORE_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
 }
@@ -87,11 +91,27 @@ export function TechnicianClientPage() {
   const { data: technicians = [], isLoading, isError, error } = useQuery<Technician[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchTechnicians,
+    enabled: !!db,
   });
+
+  if (!db) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão com Firebase" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar ao banco de dados.
+          <br />
+          Verifique a configuração do Firebase e sua conexão com a internet.
+        </p>
+      </div>
+    );
+  }
 
   const addTechnicianMutation = useMutation({
     mutationFn: async (newTechnicianData: z.infer<typeof TechnicianSchema>) => {
-      return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newTechnicianData);
+      if (!db) throw new Error("Conexão com Firebase não disponível para adicionar técnico.");
+      return addDoc(collection(db!, FIRESTORE_COLLECTION_NAME), newTechnicianData);
     },
     onSuccess: (docRef, variables) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -105,9 +125,10 @@ export function TechnicianClientPage() {
 
   const updateTechnicianMutation = useMutation({
     mutationFn: async (technicianData: Technician) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível para atualizar técnico.");
       const { id, ...dataToUpdate } = technicianData;
       if (!id) throw new Error("ID do técnico é necessário para atualização.");
-      const techRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
+      const techRef = doc(db!, FIRESTORE_COLLECTION_NAME, id);
       return updateDoc(techRef, dataToUpdate);
     },
     onSuccess: (_, variables) => {
@@ -122,8 +143,9 @@ export function TechnicianClientPage() {
 
   const deleteTechnicianMutation = useMutation({
     mutationFn: async (technicianId: string) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível para excluir técnico.");
       if (!technicianId) throw new Error("ID do técnico é necessário para exclusão.");
-      return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, technicianId));
+      return deleteDoc(doc(db!, FIRESTORE_COLLECTION_NAME, technicianId));
     },
     onSuccess: (_, technicianId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -326,4 +348,3 @@ export function TechnicianClientPage() {
     </>
   );
 }
-
