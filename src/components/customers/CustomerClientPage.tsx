@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState } from "react";
@@ -28,22 +27,34 @@ const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 const FIRESTORE_TECHNICIAN_COLLECTION_NAME = "tecnicos";
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
 
-const NO_TECHNICIAN_SELECT_ITEM_VALUE = "_NO_TECHNICIAN_SELECTED_"; 
-const LOADING_TECHNICIANS_SELECT_ITEM_VALUE = "_LOADING_TECHS_"; 
+const NO_TECHNICIAN_SELECT_ITEM_VALUE = "_NO_TECHNICIAN_SELECTED_";
+const LOADING_TECHNICIANS_SELECT_ITEM_VALUE = "_LOADING_TECHS_";
 
 async function fetchCustomers(): Promise<Customer[]> {
+  if (!db) {
+    console.error("fetchCustomers: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
 }
 
 async function fetchTechnicians(): Promise<Technician[]> {
+  if (!db) {
+    console.error("fetchTechnicians: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_TECHNICIAN_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
 }
 
 async function fetchEquipment(): Promise<Equipment[]> {
+  if (!db) {
+    console.error("fetchEquipment: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
@@ -74,7 +85,7 @@ const formatAddressForDisplay = (customer: Customer): string => {
   if (customer.city && customer.state) parts.push(`${customer.city} - ${customer.state}`);
   else if (customer.city) parts.push(customer.city);
   else if (customer.state) parts.push(customer.state);
-  
+
   const addressString = parts.join(', ').trim();
   if (!addressString && customer.cep) return `${customer.cep}`; // CEP only
   return addressString || "Não fornecido";
@@ -88,9 +99,9 @@ const generateGoogleMapsUrl = (customer: Customer): string => {
     customer.city,
     customer.state,
     customer.cep,
-  ].filter(Boolean).join(', '); 
+  ].filter(Boolean).join(', ');
 
-  if (!addressParts) return "#"; 
+  if (!addressParts) return "#";
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressParts)}`;
 };
@@ -98,7 +109,7 @@ const generateGoogleMapsUrl = (customer: Customer): string => {
 
 const getWhatsAppNumber = (phone?: string): string => {
   if (!phone) return "";
-  let cleaned = phone.replace(/\D/g, ''); 
+  let cleaned = phone.replace(/\D/g, '');
 
   if (cleaned.startsWith('55') && (cleaned.length === 12 || cleaned.length === 13)) {
     return cleaned;
@@ -115,18 +126,18 @@ const formatPhoneNumberForInputDisplay = (value: string): string => {
   const len = cleaned.length;
 
   if (len === 0) return "";
-  
+
   let ddd = cleaned.substring(0, 2);
   let numberPart = cleaned.substring(2);
 
-  if (len <= 2) return `(${cleaned}`; 
-  if (len <= 6) return `(${ddd}) ${numberPart}`; 
-  
-  if (numberPart.length <= 5) { 
+  if (len <= 2) return `(${cleaned}`;
+  if (len <= 6) return `(${ddd}) ${numberPart}`;
+
+  if (numberPart.length <= 5) {
     return `(${ddd}) ${numberPart}`;
   }
-  
-  if (numberPart.length <= 9) { 
+
+  if (numberPart.length <= 9) {
     const firstPartLength = numberPart.length === 9 ? 5 : 4;
     const firstDigits = numberPart.substring(0, firstPartLength);
     const secondDigits = numberPart.substring(firstPartLength);
@@ -164,7 +175,7 @@ export function CustomerClientPage() {
       neighborhood: "",
       city: "",
       state: "",
-      preferredTechnician: null, 
+      preferredTechnician: null,
       notes: "",
     },
   });
@@ -172,20 +183,38 @@ export function CustomerClientPage() {
   const { data: customers = [], isLoading: isLoadingCustomers, isError: isErrorCustomers, error: errorCustomers } = useQuery<Customer[], Error>({
     queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME],
     queryFn: fetchCustomers,
+    enabled: !!db,
   });
 
   const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery<Technician[], Error>({
     queryKey: [FIRESTORE_TECHNICIAN_COLLECTION_NAME],
     queryFn: fetchTechnicians,
+    enabled: !!db,
   });
 
   const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
     queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
     queryFn: fetchEquipment,
+    enabled: !!db,
   });
+
+  if (!db) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão com Firebase" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar ao banco de dados.
+          <br />
+          Verifique a configuração do Firebase e sua conexão com a internet.
+        </p>
+      </div>
+    );
+  }
 
   const addCustomerMutation = useMutation({
     mutationFn: async (newCustomerData: z.infer<typeof CustomerSchema>) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível.");
       const docRef = await addDoc(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), newCustomerData);
       return docRef;
     },
@@ -201,6 +230,7 @@ export function CustomerClientPage() {
 
   const updateCustomerMutation = useMutation({
     mutationFn: async (customerData: Customer) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível.");
       const { id, ...dataToUpdate } = customerData;
       if (!id) throw new Error("ID do cliente é necessário para atualização.");
       const customerRef = doc(db, FIRESTORE_CUSTOMER_COLLECTION_NAME, id);
@@ -218,13 +248,14 @@ export function CustomerClientPage() {
 
   const deleteCustomerMutation = useMutation({
     mutationFn: async (customerId: string) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível.");
       if (!customerId) throw new Error("ID do cliente é necessário para exclusão.");
       await deleteDoc(doc(db, FIRESTORE_CUSTOMER_COLLECTION_NAME, customerId));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME] });
       toast({ title: "Cliente Excluído", description: `O cliente foi excluído.` });
-      closeModal(); 
+      closeModal();
     },
     onError: (err: Error) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o cliente. Detalhe: ${err.message}`, variant: "destructive" });
@@ -306,7 +337,7 @@ export function CustomerClientPage() {
       addCustomerMutation.mutate(dataToSave);
     }
   };
-  
+
   const handleModalDeleteConfirm = () => {
     if (editingCustomer && editingCustomer.id) {
        if (window.confirm(`Tem certeza que deseja excluir o cliente "${editingCustomer.name}"?`)) {
@@ -314,11 +345,11 @@ export function CustomerClientPage() {
       }
     }
   };
-  
+
   const isMutating = addCustomerMutation.isPending || updateCustomerMutation.isPending;
   const isLoadingPageData = isLoadingCustomers || isLoadingTechnicians || isLoadingEquipment;
 
-  if (isLoadingPageData && !isModalOpen) { 
+  if (isLoadingPageData && !isModalOpen) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -352,13 +383,13 @@ export function CustomerClientPage() {
 
   return (
     <>
-      <PageHeader 
-        title="Clientes" 
+      <PageHeader
+        title="Clientes"
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || deleteCustomerMutation.isPending}>
             <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Cliente
           </Button>
-        } 
+        }
       />
 
       {customers.length === 0 && !isLoadingCustomers ? (
@@ -374,7 +405,7 @@ export function CustomerClientPage() {
           {customers.map((customer) => {
             const linkedEquipment = equipmentList.filter(eq => eq.customerId === customer.id);
             const whatsappNumber = getWhatsAppNumber(customer.phone);
-            const whatsappLink = whatsappNumber 
+            const whatsappLink = whatsappNumber
               ? `https://wa.me/${whatsappNumber}?text=Ol%C3%A1%20${encodeURIComponent(customer.name)}`
               : "#";
             const googleMapsUrl = generateGoogleMapsUrl(customer);
@@ -382,8 +413,8 @@ export function CustomerClientPage() {
             const preferredTechnicianDetails = technicians.find(t => t.name === customer.preferredTechnician);
 
             return (
-            <Card 
-              key={customer.id} 
+            <Card
+              key={customer.id}
               className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
               onClick={() => openModal(customer)}
             >
@@ -398,7 +429,7 @@ export function CustomerClientPage() {
                 </p>
                 {customer.contactName && !customer.phone && (
                   <p className="flex items-center text-sm">
-                    <User className="mr-2 h-4 w-4 text-primary" /> 
+                    <User className="mr-2 h-4 w-4 text-primary" />
                     <span className="font-medium text-muted-foreground mr-1">Contato:</span>
                     <span>{customer.contactName}</span>
                   </p>
@@ -406,9 +437,9 @@ export function CustomerClientPage() {
                 <p className="flex items-center text-sm">
                   <Mail className="mr-2 h-4 w-4 text-primary" />
                   <span className="font-medium text-muted-foreground mr-1">Email:</span>
-                  <a 
-                    href={`mailto:${customer.email}`} 
-                    target="_blank" 
+                  <a
+                    href={`mailto:${customer.email}`}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="hover:underline text-primary truncate"
                     onClick={(e) => e.stopPropagation()}
@@ -421,7 +452,7 @@ export function CustomerClientPage() {
                   <p className="flex items-center text-sm">
                     <Phone className="mr-2 h-4 w-4 text-primary" />
                     <span className="font-medium text-muted-foreground mr-1">{whatsappNumber ? "WhatsApp:" : "Telefone:"}</span>
-                    <a 
+                    <a
                        href={whatsappLink}
                        target="_blank"
                        rel="noopener noreferrer"
@@ -435,7 +466,7 @@ export function CustomerClientPage() {
                   </p>
                 )}
                 <div className="flex items-start text-sm">
-                  <MapPin className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> 
+                  <MapPin className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" />
                   <div>
                     <span className="font-medium text-muted-foreground mr-1">Endereço:</span>
                     {googleMapsUrl !== "#" ? (
@@ -455,10 +486,10 @@ export function CustomerClientPage() {
                     {customer.cep && displayAddress !== customer.cep && <span className="block text-xs text-muted-foreground/80">CEP: {customer.cep}</span>}
                   </div>
                 </div>
-                
-                {preferredTechnicianDetails && 
+
+                {preferredTechnicianDetails &&
                   <p className="flex items-center text-sm">
-                    <HardHat className="mr-2 h-4 w-4 text-primary" /> 
+                    <HardHat className="mr-2 h-4 w-4 text-primary" />
                     <span className="font-medium text-muted-foreground mr-1">Téc. Pref.:</span>
                     <span>{preferredTechnicianDetails.name}</span>
                   </p>
@@ -483,10 +514,10 @@ export function CustomerClientPage() {
                         <span className="font-medium text-muted-foreground mr-1">Equipamentos:</span>
                       </h4>
                       <ul className="list-none pl-1 space-y-0.5">
-                        {linkedEquipment.slice(0, 3).map(eq => ( 
+                        {linkedEquipment.slice(0, 3).map(eq => (
                           <li key={eq.id} className="text-xs text-muted-foreground">
-                            <Link 
-                              href={`/equipment?openEquipmentId=${eq.id}`} 
+                            <Link
+                              href={`/equipment?openEquipmentId=${eq.id}`}
                               onClick={(e) => e.stopPropagation()}
                               className="hover:underline hover:text-primary transition-colors"
                               title={`Ver detalhes de ${eq.brand} ${eq.model}`}
@@ -546,19 +577,19 @@ export function CustomerClientPage() {
               <FormItem>
                 <FormLabel>Telefone Principal (Opcional)</FormLabel>
                 <FormControl>
-                  <Input 
-                    placeholder="(00) 00000-0000" 
-                    {...field} 
+                  <Input
+                    placeholder="(00) 00000-0000"
+                    {...field}
                     value={field.value ?? ""}
                     onChange={(e) => {
                       const rawValue = e.target.value.replace(/\D/g, "");
-                      if (rawValue.length <= 11) { 
+                      if (rawValue.length <= 11) {
                         field.onChange(formatPhoneNumberForInputDisplay(e.target.value));
                       } else {
                         field.onChange(formatPhoneNumberForInputDisplay(rawValue.substring(0,11)));
                       }
                     }}
-                    maxLength={15} 
+                    maxLength={15}
                   />
                 </FormControl>
                 <FormMessage />
@@ -566,7 +597,7 @@ export function CustomerClientPage() {
             )} />
 
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Endereço</h3>
-            
+
             <FormField control={form.control} name="cep" render={({ field }) => (
               <FormItem>
                 <FormLabel>CEP</FormLabel>
@@ -618,7 +649,7 @@ export function CustomerClientPage() {
                 <FormItem className="md:col-span-1"><FormLabel>Estado (UF)</FormLabel><FormControl><Input placeholder="Ex: SP" maxLength={2} {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
-            
+
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Outras Informações</h3>
             <FormField
               control={form.control}
@@ -630,7 +661,7 @@ export function CustomerClientPage() {
                     onValueChange={(selectedValue) => {
                         field.onChange(selectedValue === NO_TECHNICIAN_SELECT_ITEM_VALUE ? null : selectedValue);
                     }}
-                    value={field.value ?? NO_TECHNICIAN_SELECT_ITEM_VALUE} 
+                    value={field.value ?? NO_TECHNICIAN_SELECT_ITEM_VALUE}
                   >
                     <FormControl>
                       <SelectTrigger>
