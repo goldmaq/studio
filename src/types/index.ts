@@ -82,7 +82,7 @@ export interface ServiceOrder {
   id: string;
   orderNumber: string;
   customerId: string;
-  equipmentId: string; // This ID still refers to a 'Maquina' entity
+  equipmentId: string; // This ID refers to a 'Maquina' entity
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
   technicianId?: string | null;
   serviceType: string; 
@@ -144,7 +144,7 @@ export interface AuxiliaryEquipment {
   customType?: string; // Se type for "Outro"
   serialNumber?: string | null;
   status: typeof auxiliaryEquipmentStatusOptions[number];
-  linkedEquipmentId?: string | null; // ID da máquina principal
+  linkedEquipmentId?: string | null; // ID da máquina principal (Maquina)
   notes?: string | null;
 }
 
@@ -236,7 +236,7 @@ export const VehicleSchema = z.object({
 export const ServiceOrderSchema = z.object({
   orderNumber: z.string().min(1, "Número da ordem é obrigatório"),
   customerId: z.string().min(1, "Cliente é obrigatório"),
-  equipmentId: z.string().min(1, "Máquina é obrigatória"), // Updated message
+  equipmentId: z.string().min(1, "Máquina é obrigatória"), // Refere-se a uma Máquina
   phase: z.enum(['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada']),
   technicianId: z.string().nullable().optional(),
   serviceType: z.string().min(1, "Tipo de serviço é obrigatório"),
@@ -276,12 +276,12 @@ export const CompanySchema = z.object({
 });
 
 export const AuxiliaryEquipmentSchema = z.object({
-  name: z.string().min(1, "Nome do equipamento é obrigatório"),
+  name: z.string().min(1, "Nome do equipamento auxiliar é obrigatório"),
   type: z.string().min(1, "Tipo é obrigatório"),
   customType: z.string().optional(),
   serialNumber: z.string().optional().nullable(),
   status: z.enum(auxiliaryEquipmentStatusOptions, { required_error: "Status é obrigatório" }),
-  linkedEquipmentId: z.string().nullable().optional(), // This ID now refers to a 'Maquina'
+  linkedEquipmentId: z.string().nullable().optional(), // ID da máquina principal (Maquina)
   notes: z.string().optional().nullable(),
 }).refine(data => {
   if (data.type === '_CUSTOM_' && (!data.customType || data.customType.trim() === "")) {
