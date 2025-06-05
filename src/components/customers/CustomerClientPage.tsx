@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
 import { PlusCircle, Users, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Search, Phone, User, Construction } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -330,7 +331,7 @@ export function CustomerClientPage() {
                   <p className="flex items-center">
                     <Phone className="mr-2 h-4 w-4 text-primary" />
                     <a 
-                       href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`}
+                       href={`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=Olá%20${customer.name},%20entramos%20em%20contato%20referente%20a%20Gold%20Maq.`}
                        target="_blank"
                        rel="noopener noreferrer"
                        className="hover:underline text-primary"
@@ -365,9 +366,16 @@ export function CustomerClientPage() {
                         <Construction className="mr-1.5 h-3.5 w-3.5 text-primary" /> Equipamentos Vinculados:
                       </h4>
                       <ul className="list-none pl-1 space-y-0.5">
-                        {linkedEquipment.slice(0, 3).map(eq => ( // Limitar a 3 para não poluir muito o card
+                        {linkedEquipment.slice(0, 3).map(eq => ( 
                           <li key={eq.id} className="text-xs text-muted-foreground">
-                            {eq.brand} {eq.model} <span className="text-gray-400">(Chassi: {eq.chassisNumber})</span>
+                            <Link 
+                              href={`/equipment?openEquipmentId=${eq.id}`} 
+                              onClick={(e) => e.stopPropagation()}
+                              className="hover:underline hover:text-primary transition-colors"
+                              title={`Ver detalhes de ${eq.brand} ${eq.model}`}
+                            >
+                              {eq.brand} {eq.model} <span className="text-gray-400">(Chassi: {eq.chassisNumber})</span>
+                            </Link>
                           </li>
                         ))}
                         {linkedEquipment.length > 3 && (
@@ -489,7 +497,7 @@ export function CustomerClientPage() {
                         field.onChange(selectedValue);
                       }
                     }}
-                    value={field.value} // Controlado por react-hook-form
+                    value={field.value || NO_TECHNICIAN_FORM_VALUE} 
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -524,5 +532,7 @@ export function CustomerClientPage() {
     </>
   );
 }
+
+    
 
     

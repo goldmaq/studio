@@ -1,18 +1,19 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIcon, User, Loader2, Users, DraftingCompass, Warehouse, Brick, FileText, Palette, Thermometer, Weight, Ruler, TowerControl, Power, Fuel, Coins, HandCoins, CalendarClock, History } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, DraftingCompass, Warehouse, Brick, FileText, Palette, Thermometer, Weight, Ruler, TowerControl, Power, Fuel, Coins, HandCoins, CalendarClock, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import type { Equipment, Customer } from "@/types"; 
-import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, fuelTypeOptions } from "@/types"; // Import options from types
+import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, fuelTypeOptions } from "@/types"; 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -32,7 +33,7 @@ const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
   Operacional: <CheckCircle className="h-4 w-4 text-green-500" />,
-  'Precisa de Reparo': <AlertIcon className="h-4 w-4 text-yellow-500" />, 
+  'Precisa de Reparo': <AlertIconLI className="h-4 w-4 text-yellow-500" />, 
   'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
 };
 
@@ -46,10 +47,10 @@ const parseNumericToNullOrNumber = (value: any): number | null => {
 async function fetchEquipment(): Promise<Equipment[]> {
   const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
+  return querySnapshot.docs.map(docSnap => {
+    const data = docSnap.data();
     return { 
-      id: doc.id, 
+      id: docSnap.id, 
       ...data,
       manufactureYear: data.manufactureYear === undefined ? null : data.manufactureYear,
       towerOpenHeightMm: data.towerOpenHeightMm === undefined ? null : data.towerOpenHeightMm,
@@ -78,6 +79,8 @@ async function fetchCustomers(): Promise<Customer[]> {
 export function EquipmentClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
@@ -113,6 +116,20 @@ export function EquipmentClientPage() {
     queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME],
     queryFn: fetchCustomers,
   });
+
+  useEffect(() => {
+    const equipmentIdToOpen = searchParams.get('openEquipmentId');
+    if (equipmentIdToOpen && equipmentList.length > 0 && !isLoadingEquipment) {
+      const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdToOpen);
+      if (equipmentToEdit) {
+        openModal(equipmentToEdit);
+        // Remove the query parameter from the URL without reloading the page
+        router.replace('/equipment', { shallow: true });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, equipmentList, isLoadingEquipment, router]);
+
 
   const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id'> => {
     const { 
@@ -276,7 +293,7 @@ export function EquipmentClientPage() {
   const isLoading = isLoadingEquipment || isLoadingCustomers;
   const isMutating = addEquipmentMutation.isPending || updateEquipmentMutation.isPending;
 
-  if (isLoading && !isModalOpen) {
+  if (isLoading && !isModalOpen) { // Apenas mostrar loader se não houver modal aberto
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -288,7 +305,7 @@ export function EquipmentClientPage() {
   if (isErrorEquipment) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
-        <AlertIcon className="h-12 w-12 mb-4" />
+        <AlertIconLI className="h-12 w-12 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Equipamentos</h2>
         <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
         <p className="text-sm mt-2">Detalhe: {errorEquipment?.message}</p>
@@ -586,3 +603,6 @@ export function EquipmentClientPage() {
     </>
   );
 }
+
+
+    
