@@ -5,11 +5,12 @@ import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { Building, Landmark, Hash, QrCode, MapPin, Contact, Loader2, AlertTriangle } from "lucide-react";
+import { Building, Landmark, Hash, QrCode, MapPin, Contact, Loader2, AlertTriangle, Search } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import type { Company, CompanyId } from "@/types";
 import { CompanySchema } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -22,10 +23,87 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 const FIRESTORE_COLLECTION_NAME = "empresas";
 const companyIds: CompanyId[] = ["goldmaq", "goldcomercio", "goldjob"];
 
+// Dados iniciais atualizados com os novos CNPJs, nomes e endereço detalhado
 const initialCompanyDataFromCode: Record<CompanyId, Omit<Company, 'id'>> = {
-  goldmaq: { name: "Goldmaq Empilhadeiras", cnpj: "00.000.000/0001-00", address: "Rua Goldmaq, 10, São Paulo, SP", bankName: "Banco Alpha", bankAgency: "0001", bankAccount: "12345-6", bankPixKey: "cnpj@goldmaq.com.br" },
-  goldcomercio: { name: "Gold Comércio de Peças", cnpj: "11.111.111/0001-11", address: "Av. Comércio, 20, São Paulo, SP", bankName: "Banco Beta", bankAgency: "0002", bankAccount: "65432-1" },
-  goldjob: { name: "Gold Job Locações", cnpj: "22.222.222/0001-22", address: "Praça Job, 30, São Paulo, SP" },
+  goldmaq: { 
+    name: "Gold Maq", 
+    cnpj: "04.325.000/0001-12", 
+    street: "RUA ARISTIDES MARIOTTI", 
+    number: "290", 
+    neighborhood: "RECANTO QUARTO CENTENARIO", 
+    city: "Jundiai", 
+    state: "SP", 
+    cep: "13211-740",
+    bankName: "Banco Alpha", 
+    bankAgency: "0001", 
+    bankAccount: "12345-6", 
+    bankPixKey: "cnpj@goldmaq.com.br" 
+  },
+  goldcomercio: { 
+    name: "Gold Comércio", 
+    cnpj: "33.521.128/0001-50", 
+    street: "RUA ARISTIDES MARIOTTI", 
+    number: "290", 
+    neighborhood: "RECANTO QUARTO CENTENARIO", 
+    city: "Jundiai", 
+    state: "SP", 
+    cep: "13211-740",
+    bankName: "Banco Beta", 
+    bankAgency: "0002", 
+    bankAccount: "65432-1" 
+  },
+  goldjob: { 
+    name: "Gold Empilhadeiras", 
+    cnpj: "13.311.149/0001-33", 
+    street: "RUA ARISTIDES MARIOTTI", 
+    number: "290", 
+    neighborhood: "RECANTO QUARTO CENTENARIO", 
+    city: "Jundiai", 
+    state: "SP", 
+    cep: "13211-740" 
+  },
+};
+
+interface ViaCepResponse {
+  cep: string;
+  logradouro: string;
+  complemento: string;
+  bairro: string;
+  localidade: string;
+  uf: string;
+  erro?: boolean;
+}
+
+const formatAddressForDisplay = (company: Company): string => {
+  const parts: string[] = [];
+  if (company.street) {
+    let line = company.street;
+    if (company.number) line += `, ${company.number}`;
+    if (company.complement) line += ` - ${company.complement}`;
+    parts.push(line);
+  }
+  if (company.neighborhood) parts.push(company.neighborhood);
+  if (company.city && company.state) parts.push(`${company.city} - ${company.state}`);
+  else if (company.city) parts.push(company.city);
+  else if (company.state) parts.push(company.state);
+  
+  const addressString = parts.join(', ').trim();
+  if (!addressString && company.cep) return `CEP: ${company.cep}`;
+  return addressString || "Endereço não fornecido";
+};
+
+const generateGoogleMapsUrl = (company: Company): string => {
+  const addressParts = [
+    company.street,
+    company.number,
+    company.neighborhood,
+    company.city,
+    company.state,
+    company.cep,
+  ].filter(Boolean).join(', ');
+
+  if (!addressParts) return "#";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressParts)}`;
 };
 
 
@@ -35,9 +113,25 @@ async function fetchCompanyConfigs(): Promise<Company[]> {
     const docRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      fetchedCompanies.push({ id, ...docSnap.data() } as Company);
+      const data = docSnap.data();
+      // Garantir que os dados retornados correspondam à nova estrutura Company
+      fetchedCompanies.push({ 
+        id, 
+        name: data.name || initialCompanyDataFromCode[id].name,
+        cnpj: data.cnpj || initialCompanyDataFromCode[id].cnpj,
+        street: data.street || initialCompanyDataFromCode[id].street,
+        number: data.number || initialCompanyDataFromCode[id].number,
+        complement: data.complement || initialCompanyDataFromCode[id].complement,
+        neighborhood: data.neighborhood || initialCompanyDataFromCode[id].neighborhood,
+        city: data.city || initialCompanyDataFromCode[id].city,
+        state: data.state || initialCompanyDataFromCode[id].state,
+        cep: data.cep || initialCompanyDataFromCode[id].cep,
+        bankName: data.bankName,
+        bankAgency: data.bankAgency,
+        bankAccount: data.bankAccount,
+        bankPixKey: data.bankPixKey,
+      } as Company);
     } else {
-      
       const initialData = initialCompanyDataFromCode[id];
       if (initialData) {
         await setDoc(docRef, initialData); 
@@ -45,7 +139,6 @@ async function fetchCompanyConfigs(): Promise<Company[]> {
       }
     }
   }
-  
   return fetchedCompanies;
 }
 
@@ -56,19 +149,20 @@ export function CompanyConfigClientPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [isCepLoading, setIsCepLoading] = useState(false);
 
   const form = useForm<z.infer<typeof CompanySchema>>({
     resolver: zodResolver(CompanySchema),
     defaultValues: {
-      name: "", cnpj: "", address: "", bankName: "",
-      bankAgency: "", bankAccount: "", bankPixKey: "",
+      name: "", cnpj: "", 
+      street: "", number: "", complement: "", neighborhood: "", city: "", state: "", cep: "",
+      bankName: "", bankAgency: "", bankAccount: "", bankPixKey: "",
     },
   });
 
   const { data: companies = [], isLoading, isError, error } = useQuery<Company[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchCompanyConfigs,
-     
   });
 
   const updateCompanyMutation = useMutation({
@@ -99,7 +193,11 @@ export function CompanyConfigClientPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingCompany(null);
-    form.reset({ name: "", cnpj: "", address: "", bankName: "", bankAgency: "", bankAccount: "", bankPixKey: ""});
+    form.reset({ 
+      name: "", cnpj: "", 
+      street: "", number: "", complement: "", neighborhood: "", city: "", state: "", cep: "",
+      bankName: "", bankAgency: "", bankAccount: "", bankPixKey: ""
+    });
   };
 
   const onSubmit = async (values: z.infer<typeof CompanySchema>) => {
@@ -107,6 +205,44 @@ export function CompanyConfigClientPage() {
     updateCompanyMutation.mutate({ ...values, id: editingCompany.id });
   };
   
+  const handleSearchCep = async () => {
+    const cepValue = form.getValues("cep");
+    if (!cepValue) {
+        toast({ title: "CEP Vazio", description: "Por favor, insira um CEP.", variant: "default" });
+        return;
+    }
+    const cleanedCep = cepValue.replace(/\D/g, "");
+    if (cleanedCep.length !== 8) {
+      toast({ title: "CEP Inválido", description: "CEP deve conter 8 dígitos.", variant: "destructive" });
+      return;
+    }
+
+    setIsCepLoading(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanedCep}/json/`);
+      const data: ViaCepResponse = await response.json();
+      if (data.erro) {
+        toast({ title: "CEP Não Encontrado", description: "O CEP informado não foi encontrado.", variant: "destructive" });
+        form.setValue("street", "");
+        form.setValue("neighborhood", "");
+        form.setValue("city", "");
+        form.setValue("state", "");
+        form.setValue("complement", "");
+      } else {
+        form.setValue("street", data.logradouro || "");
+        form.setValue("neighborhood", data.bairro || "");
+        form.setValue("city", data.localidade || "");
+        form.setValue("state", data.uf || "");
+        form.setValue("complement", data.complemento || "");
+        toast({ title: "Endereço Encontrado", description: "Os campos de endereço foram preenchidos." });
+      }
+    } catch (error) {
+      toast({ title: "Erro ao Buscar CEP", description: "Não foi possível buscar o endereço. Verifique sua conexão.", variant: "destructive" });
+    } finally {
+      setIsCepLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -139,7 +275,10 @@ export function CompanyConfigClientPage() {
          </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {companies.map((company) => (
+          {companies.map((company) => {
+            const displayAddress = formatAddressForDisplay(company);
+            const googleMapsUrl = generateGoogleMapsUrl(company);
+            return (
               <Card 
                 key={company.id} 
                 className="shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col cursor-pointer"
@@ -152,17 +291,35 @@ export function CompanyConfigClientPage() {
                   <CardDescription>CNPJ: {company.cnpj}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow space-y-2 text-sm">
-                  <p className="flex items-start"><MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> {company.address}</p>
+                  <div className="flex items-start">
+                    <MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> 
+                    {googleMapsUrl !== "#" ? (
+                      <a
+                        href={googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-primary"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Abrir no Google Maps"
+                      >
+                        {displayAddress}
+                      </a>
+                    ) : (
+                      <span>{displayAddress}</span>
+                    )}
+                  </div>
+                  {company.cep && displayAddress !== `CEP: ${company.cep}` && <p className="text-xs text-muted-foreground ml-6">CEP: {company.cep}</p>}
+
                   {company.bankName && <p className="flex items-center"><Landmark className="mr-2 h-4 w-4 text-primary" /> {company.bankName}</p>}
                   {company.bankAgency && <p className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" /> Agência: {company.bankAgency}</p>}
                   {company.bankAccount && <p className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" /> Conta: {company.bankAccount}</p>}
                   {company.bankPixKey && <p className="flex items-center"><QrCode className="mr-2 h-4 w-4 text-primary" /> PIX: {company.bankPixKey}</p>}
                 </CardContent>
                 <CardFooter className="border-t pt-4">
-                  {/* Botão Editar removido, ação de clique no card */}
                 </CardFooter>
               </Card>
-            ))}
+            )
+          })}
         </div>
       )}
 
@@ -183,9 +340,60 @@ export function CompanyConfigClientPage() {
             <FormField control={form.control} name="cnpj" render={({ field }) => (
               <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
-            <FormField control={form.control} name="address" render={({ field }) => (
-              <FormItem><FormLabel>Endereço</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+            
+            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Endereço</h3>
+            <FormField control={form.control} name="cep" render={({ field }) => (
+              <FormItem>
+                <FormLabel>CEP</FormLabel>
+                <div className="flex items-center gap-2">
+                  <FormControl>
+                    <Input placeholder="00000-000" {...field} value={field.value ?? ""} onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, "");
+                      if (value.length <= 5) {
+                        field.onChange(value);
+                      } else if (value.length <= 8) {
+                        field.onChange(`${value.slice(0,5)}-${value.slice(5)}`);
+                      } else {
+                        field.onChange(`${value.slice(0,5)}-${value.slice(5,8)}`);
+                      }
+                    }}/>
+                  </FormControl>
+                  <Button type="button" variant="outline" onClick={handleSearchCep} disabled={isCepLoading}>
+                    {isCepLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    <span className="ml-2 sm:inline hidden">Buscar</span>
+                  </Button>
+                </div>
+                <FormDescription>Digite o CEP para buscar o endereço automaticamente.</FormDescription>
+                <FormMessage />
+              </FormItem>
             )} />
+
+            <FormField control={form.control} name="street" render={({ field }) => (
+              <FormItem><FormLabel>Rua / Logradouro</FormLabel><FormControl><Input placeholder="Ex: Av. Paulista" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+            )} />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField control={form.control} name="number" render={({ field }) => (
+                <FormItem className="md:col-span-1"><FormLabel>Número</FormLabel><FormControl><Input placeholder="Ex: 123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="complement" render={({ field }) => (
+                <FormItem className="md:col-span-2"><FormLabel>Complemento (Opcional)</FormLabel><FormControl><Input placeholder="Ex: Apto 10, Bloco B" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+
+            <FormField control={form.control} name="neighborhood" render={({ field }) => (
+              <FormItem><FormLabel>Bairro</FormLabel><FormControl><Input placeholder="Ex: Bela Vista" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+            )} />
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField control={form.control} name="city" render={({ field }) => (
+                <FormItem className="md:col-span-2"><FormLabel>Cidade</FormLabel><FormControl><Input placeholder="Ex: São Paulo" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="state" render={({ field }) => (
+                <FormItem className="md:col-span-1"><FormLabel>Estado (UF)</FormLabel><FormControl><Input placeholder="Ex: SP" maxLength={2} {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Bancárias (Opcional)</h3>
             <FormField control={form.control} name="bankName" render={({ field }) => (
               <FormItem><FormLabel>Nome do Banco</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
