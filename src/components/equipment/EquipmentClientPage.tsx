@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -172,34 +171,33 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const customerIdValue = useWatch({ control: form.control, name: 'customerId' });
   const currentOperationalStatus = useWatch({ control: form.control, name: 'operationalStatus' });
   const ownerReferenceValue = useWatch({ control: form.control, name: 'ownerReference' });
+  const { setValue } = form; // Destructure setValue for use in useEffect dependency array
 
- useEffect(() => {
+  useEffect(() => {
     if (customerIdValue && customerIdValue !== NO_CUSTOMER_FORM_VALUE) {
-      // Customer is linked
       if (ownerReferenceValue === OWNER_REF_CUSTOMER) {
-        // Equipment is owned by the linked customer
         if (currentOperationalStatus === 'Locada') {
-          form.setValue('operationalStatus', 'Em Manutenção', { shouldValidate: true });
+          setValue('operationalStatus', 'Em Manutenção', { shouldValidate: true });
         }
-        // If status is 'Disponível', 'Em Manutenção', etc., do not change automatically.
       } else {
-        // Equipment is owned by Gold Maq (or other company) and linked to a customer (i.e., rented)
         if (
           currentOperationalStatus !== 'Em Manutenção' &&
           currentOperationalStatus !== 'Sucata' &&
           currentOperationalStatus !== 'Locada'
         ) {
-          form.setValue('operationalStatus', 'Locada', { shouldValidate: true });
+          setValue('operationalStatus', 'Locada', { shouldValidate: true });
         }
       }
     } else {
-      // No customer is linked
       if (currentOperationalStatus === 'Locada') {
-        // Equipment was rented and now customer is unlinked, so it becomes available
-        form.setValue('operationalStatus', 'Disponível', { shouldValidate: true });
+        if (ownerReferenceValue !== OWNER_REF_CUSTOMER) {
+          setValue('operationalStatus', 'Disponível', { shouldValidate: true });
+        } else {
+          setValue('operationalStatus', 'Em Manutenção', { shouldValidate: true });
+        }
       }
     }
-  }, [customerIdValue, currentOperationalStatus, ownerReferenceValue, form]);
+  }, [customerIdValue, currentOperationalStatus, ownerReferenceValue, setValue]);
 
 
   const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
@@ -889,6 +887,4 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   );
 }
 
-
-
-
+    
