@@ -12,8 +12,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import type { Maquina, Customer, CompanyId, OwnerReferenceType } from "@/types"; // Changed Equipment to Maquina
-import { MaquinaSchema, maquinaTypeOptions, maquinaOperationalStatusOptions, companyDisplayOptions, OWNER_REF_CUSTOMER, companyIds } from "@/types"; // Changed EquipmentSchema, equipmentTypeOptions, operationalStatusOptions
+import type { Maquina, Customer, CompanyId, OwnerReferenceType } from "@/types"; 
+import { MaquinaSchema, maquinaTypeOptions, maquinaOperationalStatusOptions, companyDisplayOptions, OWNER_REF_CUSTOMER, companyIds } from "@/types"; 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -102,7 +102,7 @@ async function deleteFileFromStorage(fileUrl?: string | null) {
 }
 
 
-async function fetchMaquinas(): Promise<Maquina[]> { // Renamed from fetchEquipment
+async function fetchMaquinas(): Promise<Maquina[]> { 
   if (!db) {
     throw new Error("Firebase Firestore connection not available.");
   }
@@ -148,12 +148,12 @@ interface MaquinasClientPageProps {
   maquinaIdFromUrl?: string | null; 
 }
 
-export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps) { // Renamed component and prop
+export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps) { 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingMaquina, setEditingMaquina] = useState<Maquina | null>(null); // Renamed from editingEquipment
+  const [editingMaquina, setEditingMaquina] = useState<Maquina | null>(null); 
   const [partsCatalogFile, setPartsCatalogFile] = useState<File | null>(null);
   const [errorCodesFile, setErrorCodesFile] = useState<File | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
@@ -164,8 +164,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     equipmentType: false,
   });
 
-  const form = useForm<z.infer<typeof MaquinaSchema>>({ // Using MaquinaSchema
-    resolver: zodResolver(MaquinaSchema), // Using MaquinaSchema
+  const form = useForm<z.infer<typeof MaquinaSchema>>({ 
+    resolver: zodResolver(MaquinaSchema), 
     defaultValues: {
       brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
       operationalStatus: "Disponível", customerId: null, 
@@ -180,9 +180,9 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     },
   });
 
-  const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({ // Renamed from equipmentList
+  const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({ 
     queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME], 
-    queryFn: fetchMaquinas, // Renamed from fetchEquipment
+    queryFn: fetchMaquinas, 
     enabled: !!db,
   });
 
@@ -206,13 +206,13 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     );
   }
 
-  const openModal = useCallback((maquina?: Maquina) => { // Parameter renamed to maquina
+  const openModal = useCallback((maquina?: Maquina) => { 
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
     if (maquina) {
-      setEditingMaquina(maquina); // Renamed from setEditingEquipment
+      setEditingMaquina(maquina); 
       const isBrandPredefined = predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra";
-      const isEquipmentTypePredefined = maquinaTypeOptions.includes(maquina.equipmentType as any); // Using maquinaTypeOptions
+      const isEquipmentTypePredefined = maquinaTypeOptions.includes(maquina.equipmentType as any); 
 
       form.reset({
         ...maquina,
@@ -238,7 +238,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       });
       setShowCustomFields({ brand: !isBrandPredefined, equipmentType: !isEquipmentTypePredefined });
     } else {
-      setEditingMaquina(null); // Renamed from setEditingEquipment
+      setEditingMaquina(null); 
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
         operationalStatus: "Disponível", customerId: null, 
@@ -256,22 +256,22 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   }, [form]);
 
   useEffect(() => {
-    if (maquinaIdFromUrl && !isLoadingMaquinas && maquinaList.length > 0 && !isModalOpen) { // Using maquinaIdFromUrl
-      const maquinaToEdit = maquinaList.find(eq => eq.id === maquinaIdFromUrl); // Using maquinaIdFromUrl
+    if (maquinaIdFromUrl && !isLoadingMaquinas && maquinaList.length > 0 && !isModalOpen) { 
+      const maquinaToEdit = maquinaList.find(eq => eq.id === maquinaIdFromUrl); 
       if (maquinaToEdit) {
         openModal(maquinaToEdit);
         if (typeof window !== "undefined") {
-           window.history.replaceState(null, '', '/maquinas'); // Updated path
+           window.history.replaceState(null, '', '/maquinas'); 
         }
       }
     }
-  }, [maquinaIdFromUrl, maquinaList, isLoadingMaquinas, openModal, isModalOpen]); // Using maquinaIdFromUrl
+  }, [maquinaIdFromUrl, maquinaList, isLoadingMaquinas, openModal, isModalOpen]); 
 
   const prepareDataForFirestore = (
-    formData: z.infer<typeof MaquinaSchema>, // Using MaquinaSchema
+    formData: z.infer<typeof MaquinaSchema>, 
     newPartsCatalogUrl?: string | null,
     newErrorCodesUrl?: string | null
-  ): Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType'> => { // Return type Maquina
+  ): Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType'> => { 
     const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, ...restOfData } = formData;
     const parsedData = {
       ...restOfData,
@@ -301,9 +301,9 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     };
   };
 
-  const addMaquinaMutation = useMutation({ // Renamed from addEquipmentMutation
+  const addMaquinaMutation = useMutation({ 
     mutationFn: async (data: {
-      formData: z.infer<typeof MaquinaSchema>, // Using MaquinaSchema
+      formData: z.infer<typeof MaquinaSchema>, 
       catalogFile: File | null,
       codesFile: File | null
     }) => {
@@ -341,13 +341,13 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     onSettled: () => setIsUploadingFiles(false)
   });
 
-  const updateMaquinaMutation = useMutation({ // Renamed from updateEquipmentMutation
+  const updateMaquinaMutation = useMutation({ 
     mutationFn: async (data: {
       id: string,
-      formData: z.infer<typeof MaquinaSchema>, // Using MaquinaSchema
+      formData: z.infer<typeof MaquinaSchema>, 
       catalogFile: File | null,
       codesFile: File | null,
-      currentMaquina: Maquina // Parameter renamed
+      currentMaquina: Maquina 
     }) => {
       if (!db || !storage) {
         throw new Error("Firebase Firestore ou Storage connection not available.");
@@ -397,8 +397,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
-      if(editingMaquina && editingMaquina.id === data.maquinaId){ // Renamed from editingEquipment
-        setEditingMaquina(prev => prev ? ({...prev, [data.fileType]: null}) : null); // Renamed from setEditingEquipment
+      if(editingMaquina && editingMaquina.id === data.maquinaId){ 
+        setEditingMaquina(prev => prev ? ({...prev, [data.fileType]: null}) : null); 
         form.setValue(data.fileType, null);
       }
       toast({ title: "Arquivo Removido", description: "O arquivo foi removido com sucesso." });
@@ -408,8 +408,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     }
   });
 
-  const deleteMaquinaMutation = useMutation({ // Renamed from deleteEquipmentMutation
-    mutationFn: async (maquinaToDelete: Maquina) => { // Parameter renamed
+  const deleteMaquinaMutation = useMutation({ 
+    mutationFn: async (maquinaToDelete: Maquina) => { 
       if (!db || !storage) {
         throw new Error("Firebase Firestore ou Storage connection not available.");
       }
@@ -440,42 +440,42 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setEditingMaquina(null); // Renamed from setEditingEquipment
+    setEditingMaquina(null); 
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
     form.reset();
     setShowCustomFields({ brand: false, equipmentType: false });
   };
 
-  const onSubmit = async (values: z.infer<typeof MaquinaSchema>) => { // Using MaquinaSchema
-    if (editingMaquina && editingMaquina.id) { // Renamed from editingEquipment
-      updateMaquinaMutation.mutate({ // Renamed from updateEquipmentMutation
+  const onSubmit = async (values: z.infer<typeof MaquinaSchema>) => { 
+    if (editingMaquina && editingMaquina.id) { 
+      updateMaquinaMutation.mutate({ 
         id: editingMaquina.id,
         formData: values,
         catalogFile: partsCatalogFile,
         codesFile: errorCodesFile,
-        currentMaquina: editingMaquina // Renamed from currentEquipment
+        currentMaquina: editingMaquina 
       });
     } else {
-      addMaquinaMutation.mutate({ formData: values, catalogFile: partsCatalogFile, codesFile: errorCodesFile }); // Renamed from addEquipmentMutation
+      addMaquinaMutation.mutate({ formData: values, catalogFile: partsCatalogFile, codesFile: errorCodesFile }); 
     }
   };
 
   const handleModalDeleteConfirm = () => {
-    const maquinaToExclude = editingMaquina; // Renamed from equipmentToExclude
+    const maquinaToExclude = editingMaquina; 
     if (!maquinaToExclude || !maquinaToExclude.id) {
       toast({ title: "Erro Interno", description: "Referência à máquina inválida para exclusão.", variant: "destructive" });
       return;
     }
     const confirmation = window.confirm(`Tem certeza que deseja excluir a máquina "${maquinaToExclude.brand} ${maquinaToExclude.model}" e seus arquivos associados? Esta ação não pode ser desfeita.`);
     if (confirmation) {
-      deleteMaquinaMutation.mutate(maquinaToExclude); // Renamed from deleteEquipmentMutation
+      deleteMaquinaMutation.mutate(maquinaToExclude); 
     }
   };
 
 
   const handleFileRemove = (fileType: 'partsCatalogUrl' | 'errorCodesUrl') => {
-    if (editingMaquina && editingMaquina.id) { // Renamed from editingEquipment
+    if (editingMaquina && editingMaquina.id) { 
       const fileUrlToRemove = editingMaquina[fileType];
       if (fileUrlToRemove) {
         if (window.confirm(`Tem certeza que deseja remover este ${fileType === 'partsCatalogUrl' ? 'catálogo de peças' : 'arquivo de códigos de erro'}?`)) {
@@ -538,7 +538,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   return (
     <>
       <PageHeader
-        title="Rastreamento de Máquinas" // Title updated
+        title="Máquinas" 
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating}>
             <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Máquina
@@ -546,17 +546,17 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
         }
       />
 
-      {maquinaList.length === 0 && !isLoadingMaquinas ? ( // Renamed from equipmentList
+      {maquinaList.length === 0 && !isLoadingMaquinas ? ( 
         <DataTablePlaceholder
           icon={Construction}
-          title="Nenhuma Máquina Registrada" // Title updated
-          description="Adicione sua primeira máquina para começar a rastrear." // Description updated
-          buttonLabel="Adicionar Máquina" // Button label updated
+          title="Nenhuma Máquina Registrada" 
+          description="Adicione sua primeira máquina para começar a rastrear." 
+          buttonLabel="Adicionar Máquina" 
           onButtonClick={() => openModal()}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {maquinaList.map((maq) => { // Renamed from equipmentList
+          {maquinaList.map((maq) => { 
             const customer = maq.customerId ? customers.find(c => c.id === maq.customerId) : null;
             const ownerDisplay = getOwnerDisplayString(maq.ownerReference, maq.customerId, customers);
             const OwnerIconComponent = getOwnerIcon(maq.ownerReference);
@@ -668,14 +668,14 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       <FormModal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editingMaquina ? "Editar Máquina" : "Adicionar Nova Máquina"} // Title updated
-        description="Forneça os detalhes da máquina, incluindo arquivos PDF se necessário." // Description updated
+        title={editingMaquina ? "Editar Máquina" : "Adicionar Nova Máquina"} 
+        description="Forneça os detalhes da máquina, incluindo arquivos PDF se necessário." 
         formId="maquina-form" 
         isSubmitting={isMutating}
-        editingItem={editingMaquina} // Renamed from editingEquipment
+        editingItem={editingMaquina} 
         onDeleteConfirm={handleModalDeleteConfirm}
-        isDeleting={deleteMaquinaMutation.isPending} // Renamed from deleteEquipmentMutation
-        deleteButtonLabel="Excluir Máquina" // Button label updated
+        isDeleting={deleteMaquinaMutation.isPending} 
+        deleteButtonLabel="Excluir Máquina" 
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> 
@@ -790,7 +790,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                   <Select onValueChange={(value) => handleSelectChange('equipmentType', value)} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      {maquinaTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)} {/* Using maquinaTypeOptions */}
+                      {maquinaTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)} 
                       <SelectItem value="_CUSTOM_">Digitar Tipo...</SelectItem>
                     </SelectContent>
                   </Select>
@@ -814,7 +814,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
                   <SelectContent>
-                    {maquinaOperationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)} {/* Using maquinaOperationalStatusOptions */}
+                    {maquinaOperationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)} 
                   </SelectContent>
                 </Select><FormMessage />
               </FormItem>
@@ -840,7 +840,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="batteryBoxHeightMm" render={({ field }) => (
-                    <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="batteryBoxDepthMm" render={({ field }) => (
                     <FormItem><FormLabel>Profundidade (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
@@ -850,7 +850,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
             <FormItem>
               <FormLabel>Catálogo de Peças (PDF)</FormLabel>
-              {editingMaquina?.partsCatalogUrl && !partsCatalogFile && ( // Renamed from editingEquipment
+              {editingMaquina?.partsCatalogUrl && !partsCatalogFile && ( 
                 <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
                   <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
                     <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
@@ -874,7 +874,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
 
             <FormItem>
               <FormLabel>Códigos de Erro (PDF)</FormLabel>
-               {editingMaquina?.errorCodesUrl && !errorCodesFile && ( // Renamed from editingEquipment
+               {editingMaquina?.errorCodesUrl && !errorCodesFile && ( 
                 <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
                   <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
                     <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
@@ -903,7 +903,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     <FormItem><FormLabel>Horímetro Atual (h)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="monthlyRentalValue" render={({ field }) => (
-                    <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormMessage /></FormItem>
                 )} />
             </div>
             <FormField control={form.control} name="notes" render={({ field }) => (
