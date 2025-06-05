@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIcon, XCircle, AlertTriangle } from "lucide-react";
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIcon, XCircle, AlertTriangle, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,12 +22,23 @@ import { db, storage } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy, setDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { isBefore, isToday, addDays, parseISO, isValid } from 'date-fns';
+import { isBefore, isToday, addDays, parseISO, isValid, format } from 'date-fns';
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
 const phaseIcons = {
-  Pendente: <AlertIconLI className="h-4 w-4 text-yellow-400" />, 
+  Pendente: <AlertIconLI className="h-4 w-4 text-yellow-400" />,
   'Em Progresso': <Play className="h-4 w-4 text-blue-500" />,
   'Aguardando Peças': <Pause className="h-4 w-4 text-orange-500" />,
   Concluída: <Check className="h-4 w-4 text-green-500" />,
@@ -68,7 +79,7 @@ async function uploadServiceOrderFile(
 ): Promise<string> {
   const filePath = `service_order_media/${orderId}/${Date.now()}_${file.name}`;
   const fileStorageRef = storageRef(storage, filePath);
-  await uploadBytes(fileStorageRef, fileStorageRef);
+  await uploadBytes(fileStorageRef, file);
   return getDownloadURL(fileStorageRef);
 }
 
@@ -92,14 +103,13 @@ const formatDateForInput = (date: any): string => {
   if (date instanceof Timestamp) {
     d = date.toDate();
   } else if (typeof date === 'string') {
-    d = parseISO(date); 
+    d = parseISO(date);
   } else if (date instanceof Date) {
     d = date;
   } else {
     return "";
   }
   if (!isValid(d)) return "";
-  // Ensure date is treated as local by creating a new date from its parts
   const year = d.getFullYear();
   const month = d.getMonth();
   const day = d.getDate();
@@ -109,9 +119,8 @@ const formatDateForInput = (date: any): string => {
 
 const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
   if (!dateString) return null;
-  const date = parseISO(dateString); // Use parseISO for robust parsing
+  const date = parseISO(dateString);
   if (!isValid(date)) return null;
-  // Create a new Date object at UTC midnight to avoid timezone shifts when converting to Timestamp
   const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   return Timestamp.fromDate(utcDate);
 };
@@ -130,6 +139,7 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       mediaUrl: data.mediaUrl || null,
       serviceType: data.serviceType || "Não especificado",
       customServiceType: data.customServiceType || "",
+      technicalConclusion: data.technicalConclusion || null,
     } as ServiceOrder;
   });
 }
@@ -159,11 +169,13 @@ async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 const getNextOrderNumber = (currentOrders: ServiceOrder[]): string => {
-  let maxOrderNum = 3999; 
+  let maxOrderNum = 3999;
   currentOrders.forEach(order => {
-    const num = parseInt(order.orderNumber, 10);
-    if (!isNaN(num) && num > maxOrderNum) {
-      maxOrderNum = num;
+    if (order.orderNumber) {
+        const num = parseInt(order.orderNumber, 10);
+        if (!isNaN(num) && num > maxOrderNum) {
+        maxOrderNum = num;
+        }
     }
   });
   return (maxOrderNum + 1).toString();
@@ -184,9 +196,9 @@ const getDeadlineStatusInfo = (
     return { status: 'none' };
   }
   const today = new Date();
-  today.setHours(0,0,0,0); // Normalize today to midnight
+  today.setHours(0,0,0,0);
 
-  const endDateNormalized = new Date(endDate.valueOf()); // Clone and normalize
+  const endDateNormalized = new Date(endDate.valueOf());
   endDateNormalized.setHours(0,0,0,0);
 
 
@@ -197,7 +209,7 @@ const getDeadlineStatusInfo = (
     return { status: 'due_today', message: 'Vence Hoje!', icon: <AlertTriangle className="h-4 w-4 text-yellow-500" /> };
   }
   const twoDaysFromNow = addDays(today, 2);
-  if (isBefore(endDateNormalized, twoDaysFromNow) || isToday(endDateNormalized)) { // Check if endDate is today, tomorrow or day after tomorrow
+  if (isBefore(endDateNormalized, twoDaysFromNow) || isToday(endDateNormalized)) {
      return { status: 'due_soon', message: 'Vence em Breve', icon: <AlertTriangle className="h-4 w-4 text-yellow-400" /> };
   }
   return { status: 'none' };
@@ -207,19 +219,22 @@ const getDeadlineStatusInfo = (
 export function ServiceOrderClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
   const [showCustomServiceType, setShowCustomServiceType] = useState(false);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isConclusionModalOpen, setIsConclusionModalOpen] = useState(false);
+  const [technicalConclusionText, setTechnicalConclusionText] = useState("");
+
 
   const form = useForm<z.infer<typeof ServiceOrderSchema>>({
     resolver: zodResolver(ServiceOrderSchema),
     defaultValues: {
       orderNumber: "", customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
       serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
-      startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null
+      startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null, technicalConclusion: null,
     },
   });
 
@@ -259,7 +274,6 @@ export function ServiceOrderClientPage() {
         (companyIds.includes(eq.ownerReference as CompanyId) && (eq.operationalStatus === "Disponível" || eq.operationalStatus === "Em Manutenção"))
       );
     }
-    // Se nenhum cliente selecionado, mostrar equipamentos da frota que podem ser usados ou que precisam de manutenção
     return equipmentList.filter(eq =>
       companyIds.includes(eq.ownerReference as CompanyId) && (eq.operationalStatus === "Disponível" || eq.operationalStatus === "Em Manutenção")
     );
@@ -274,12 +288,10 @@ export function ServiceOrderClientPage() {
           form.setValue('technicianId', preferredTech.id, { shouldValidate: true });
         }
       }
-      // Reset equipment if current selection is not valid for new customer
       if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
         form.setValue('equipmentId', "", { shouldValidate: true });
       }
     } else {
-      // Reset equipment if customer is deselected and current selection is not valid
        if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
         form.setValue('equipmentId', "", { shouldValidate: true });
       }
@@ -292,7 +304,7 @@ export function ServiceOrderClientPage() {
     newMediaUrl?: string | null
   ): Omit<ServiceOrder, 'id' | 'customServiceType'> => {
     const { customServiceType, ...restOfData } = formData;
-    
+
     let finalServiceType = restOfData.serviceType;
     if (restOfData.serviceType === CUSTOM_SERVICE_TYPE_VALUE) {
       finalServiceType = customServiceType || "Não especificado";
@@ -305,6 +317,7 @@ export function ServiceOrderClientPage() {
       endDate: convertToTimestamp(restOfData.endDate),
       vehicleId: restOfData.vehicleId || null,
       mediaUrl: newMediaUrl === undefined ? formData.mediaUrl : newMediaUrl,
+      technicalConclusion: restOfData.technicalConclusion || null,
     };
   };
 
@@ -318,7 +331,7 @@ export function ServiceOrderClientPage() {
       if (data.file) {
         uploadedMediaUrl = await uploadServiceOrderFile(data.file, newOrderId);
       }
-      
+
       const orderDataForFirestore = prepareDataForFirestore(data.formData, uploadedMediaUrl);
       await setDoc(doc(db, FIRESTORE_COLLECTION_NAME, newOrderId), orderDataForFirestore);
       return { ...orderDataForFirestore, id: newOrderId };
@@ -339,11 +352,11 @@ export function ServiceOrderClientPage() {
       setIsUploadingFile(true);
       let newMediaUrl = data.currentOrder.mediaUrl;
 
-      if (data.file) { 
-        await deleteServiceOrderFileFromStorage(data.currentOrder.mediaUrl); 
+      if (data.file) {
+        await deleteServiceOrderFileFromStorage(data.currentOrder.mediaUrl);
         newMediaUrl = await uploadServiceOrderFile(data.file, data.id);
       }
-      
+
       const orderDataForFirestore = prepareDataForFirestore(data.formData, newMediaUrl);
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.id);
       await updateDoc(orderRef, orderDataForFirestore);
@@ -359,7 +372,33 @@ export function ServiceOrderClientPage() {
     },
     onSettled: () => setIsUploadingFile(false)
   });
-  
+
+  const concludeServiceOrderMutation = useMutation({
+    mutationFn: async (data: { orderId: string; conclusionText: string; currentEndDate?: string | null }) => {
+      const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.orderId);
+      let finalEndDate = convertToTimestamp(data.currentEndDate);
+      if (!finalEndDate) {
+        finalEndDate = Timestamp.now();
+      }
+      await updateDoc(orderRef, {
+        phase: "Concluída",
+        technicalConclusion: data.conclusionText,
+        endDate: finalEndDate,
+      });
+      return data.orderId;
+    },
+    onSuccess: (orderId) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      toast({ title: "Ordem de Serviço Concluída", description: `A OS foi marcada como concluída.` });
+      setIsConclusionModalOpen(false);
+      closeModal(); // Fecha o modal principal também
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro ao Concluir OS", description: `Não foi possível concluir a OS. Detalhe: ${err.message}`, variant: "destructive" });
+    },
+  });
+
+
   const removeMediaFileMutation = useMutation({
     mutationFn: async (data: { orderId: string; fileUrl: string }) => {
       await deleteServiceOrderFileFromStorage(data.fileUrl);
@@ -384,13 +423,13 @@ export function ServiceOrderClientPage() {
   const deleteServiceOrderMutation = useMutation({
     mutationFn: async (orderToDelete: ServiceOrder) => {
       if (!orderToDelete?.id) throw new Error("ID da OS é necessário para exclusão.");
-      await deleteServiceOrderFileFromStorage(orderToDelete.mediaUrl); 
+      await deleteServiceOrderFileFromStorage(orderToDelete.mediaUrl);
       return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderToDelete.id));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Ordem de Serviço Excluída", description: `A OS foi excluída.` });
-      closeModal(); 
+      closeModal();
     },
     onError: (err: Error) => {
       toast({ title: "Erro ao Excluir OS", description: `Não foi possível excluir a OS. Detalhe: ${err.message}`, variant: "destructive" });
@@ -406,20 +445,21 @@ export function ServiceOrderClientPage() {
         ...order,
         startDate: formatDateForInput(order.startDate),
         endDate: formatDateForInput(order.endDate),
-        vehicleId: order.vehicleId || null, 
+        vehicleId: order.vehicleId || null,
         mediaUrl: order.mediaUrl || null,
         serviceType: isServiceTypePredefined ? order.serviceType : CUSTOM_SERVICE_TYPE_VALUE,
         customServiceType: isServiceTypePredefined ? "" : order.serviceType,
+        technicalConclusion: order.technicalConclusion || null,
       });
       setShowCustomServiceType(!isServiceTypePredefined);
     } else {
       setEditingOrder(null);
       const nextOrderNum = getNextOrderNumber(serviceOrders);
       form.reset({
-        orderNumber: nextOrderNum, 
+        orderNumber: nextOrderNum,
         customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
         serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
-        startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null
+        startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null, technicalConclusion: null,
       });
       setShowCustomServiceType(false);
     }
@@ -432,6 +472,8 @@ export function ServiceOrderClientPage() {
     setMediaFile(null);
     form.reset();
     setShowCustomServiceType(false);
+    setIsConclusionModalOpen(false);
+    setTechnicalConclusionText("");
   };
 
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
@@ -457,7 +499,7 @@ export function ServiceOrderClientPage() {
       }
     }
   };
-  
+
   const handleServiceTypeChange = (value: string) => {
     form.setValue('serviceType', value);
     setShowCustomServiceType(value === CUSTOM_SERVICE_TYPE_VALUE);
@@ -466,10 +508,32 @@ export function ServiceOrderClientPage() {
     }
   };
 
-  const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending || isUploadingFile || removeMediaFileMutation.isPending;
+  const handleOpenConclusionModal = () => {
+    if (editingOrder) {
+      setTechnicalConclusionText(editingOrder.technicalConclusion || "");
+      setIsConclusionModalOpen(true);
+    }
+  };
+
+  const handleFinalizeConclusion = () => {
+    if (editingOrder && editingOrder.id) {
+      if (!technicalConclusionText.trim()) {
+        toast({ title: "Campo Obrigatório", description: "A conclusão técnica não pode estar vazia.", variant: "destructive"});
+        return;
+      }
+      concludeServiceOrderMutation.mutate({
+        orderId: editingOrder.id,
+        conclusionText: technicalConclusionText,
+        currentEndDate: editingOrder.endDate,
+      });
+    }
+  };
+
+  const isOrderConcludedOrCancelled = editingOrder?.phase === 'Concluída' || editingOrder?.phase === 'Cancelada';
+  const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending || isUploadingFile || removeMediaFileMutation.isPending || concludeServiceOrderMutation.isPending;
   const isLoadingPageData = isLoadingServiceOrders || isLoadingCustomers || isLoadingEquipment || isLoadingTechnicians || isLoadingVehicles;
 
-  if (isLoadingPageData && !isModalOpen) { 
+  if (isLoadingPageData && !isModalOpen) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -477,7 +541,7 @@ export function ServiceOrderClientPage() {
       </div>
     );
   }
-  
+
   if (isErrorServiceOrders) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
@@ -504,8 +568,8 @@ export function ServiceOrderClientPage() {
 
   return (
     <>
-      <PageHeader 
-        title="Ordens de Serviço" 
+      <PageHeader
+        title="Ordens de Serviço"
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || deleteServiceOrderMutation.isPending}>
             <PlusCircle className="mr-2 h-4 w-4" /> Criar Ordem de Serviço
@@ -531,8 +595,8 @@ export function ServiceOrderClientPage() {
             });
 
             return (
-            <Card 
-              key={order.id} 
+            <Card
+              key={order.id}
               className={cardClasses}
               onClick={() => openModal(order)}
             >
@@ -558,6 +622,7 @@ export function ServiceOrderClientPage() {
                 {order.startDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {formatDateForInput(order.startDate)}</p>}
                 {order.endDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Prev.:</span> {formatDateForInput(order.endDate)}</p>}
                 <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Problema Relatado:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
+                {order.technicalConclusion && <p className="flex items-start"><Check className="mr-2 mt-0.5 h-4 w-4 text-green-500 flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Técnica:</span> <span className="whitespace-pre-wrap break-words">{order.technicalConclusion}</span></p>}
                 {order.notes && <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Obs.:</span> <span className="whitespace-pre-wrap break-words">{order.notes}</span></p>}
                 {order.mediaUrl && (
                   <p className="flex items-center">
@@ -597,192 +662,273 @@ export function ServiceOrderClientPage() {
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="orderNumber" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número da Ordem</FormLabel>
+            <fieldset disabled={isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada'}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="orderNumber" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número da Ordem</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Gerado automaticamente"
+                        {...field}
+                        readOnly
+                      />
+                    </FormControl>
+                    <FormDescription>Este número é gerado automaticamente.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="customerId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cliente</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""} disabled={isOrderConcludedOrCancelled}>
+                      <FormControl><SelectTrigger>
+                        <SelectValue placeholder={isLoadingCustomers ? "Carregando..." : "Selecione o Cliente"} />
+                      </SelectTrigger></FormControl>
+                      <SelectContent>
+                        {isLoadingCustomers ? <SelectItem value="loading" disabled>Carregando...</SelectItem> :
+                         customers.map(customer => (
+                          <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="equipmentId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Equipamento</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || NO_EQUIPMENT_SELECTED_VALUE}
+                      disabled={isOrderConcludedOrCancelled}
+                    >
+                      <FormControl><SelectTrigger>
+                        <SelectValue placeholder={isLoadingEquipment ? "Carregando..." : "Selecione o Equipamento"} />
+                      </SelectTrigger></FormControl>
+                      <SelectContent>
+                        {isLoadingEquipment ? (
+                          <SelectItem value={LOADING_EQUIPMENT_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
+                         ) : filteredEquipmentList.length === 0 ? (
+                          <SelectItem value={NO_EQUIPMENT_SELECTED_VALUE} disabled>
+                            {selectedCustomerId ? "Nenhum equipamento para este cliente ou disponível na frota" : "Nenhum equipamento da frota disponível/em manutenção"}
+                          </SelectItem>
+                         ) : (
+                          <>
+                            <SelectItem value={NO_EQUIPMENT_SELECTED_VALUE}>Selecione um equipamento</SelectItem>
+                            {filteredEquipmentList.map(eq => (
+                              <SelectItem key={eq.id} value={eq.id}>{eq.brand} {eq.model} (Chassi: {eq.chassisNumber})</SelectItem>
+                            ))}
+                          </>
+                         )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="phase" render={({ field }) => (
+                  <FormItem><FormLabel>Fase</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isOrderConcludedOrCancelled}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione a fase" /></SelectTrigger></FormControl>
+                      <SelectContent>{phaseOptions.map(opt => <SelectItem key={opt} value={opt} disabled={opt === 'Concluída'}>{opt}</SelectItem>)}</SelectContent>
+                    </Select><FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="technicianId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Técnico</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""} disabled={isOrderConcludedOrCancelled}>
+                      <FormControl><SelectTrigger>
+                        <SelectValue placeholder={isLoadingTechnicians ? "Carregando..." : "Atribuir Técnico"} />
+                      </SelectTrigger></FormControl>
+                      <SelectContent>
+                        {isLoadingTechnicians ? <SelectItem value="loading" disabled>Carregando...</SelectItem> :
+                         technicians.map(tech => (
+                          <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="serviceType" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Serviço</FormLabel>
+                    <Select onValueChange={handleServiceTypeChange} value={field.value} disabled={isOrderConcludedOrCancelled}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {serviceTypeOptionsList.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                        <SelectItem value={CUSTOM_SERVICE_TYPE_VALUE}>Outro (Especificar)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {showCustomServiceType && (
+                      <FormField control={form.control} name="customServiceType" render={({ field: customField }) => (
+                       <FormItem className="mt-2">
+                          <FormControl><Input placeholder="Digite o tipo de serviço" {...customField} value={customField.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+
+                <FormField control={form.control} name="vehicleId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Veículo (Opcional)</FormLabel>
+                    <Select
+                      onValueChange={(selectedValue) => field.onChange(selectedValue === NO_VEHICLE_SELECTED_VALUE ? null : selectedValue)}
+                      value={field.value ?? NO_VEHICLE_SELECTED_VALUE}
+                      disabled={isOrderConcludedOrCancelled}
+                    >
+                      <FormControl><SelectTrigger>
+                        <SelectValue placeholder={isLoadingVehicles ? "Carregando..." : "Selecione o Veículo"} />
+                      </SelectTrigger></FormControl>
+                      <SelectContent>
+                        {isLoadingVehicles ? (
+                          <SelectItem value={LOADING_VEHICLES_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
+                         ) : (
+                          <>
+                            <SelectItem value={NO_VEHICLE_SELECTED_VALUE}>Nenhum</SelectItem>
+                            {vehicles.map(vehicle => (
+                              <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.model} ({vehicle.licensePlate})</SelectItem>
+                            ))}
+                          </>
+                         )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="startDate" render={({ field }) => (
+                  <FormItem><FormLabel>Data de Início</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="endDate" render={({ field }) => (
+                  <FormItem><FormLabel>Data de Conclusão (Prevista)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <FormField control={form.control} name="description" render={({ field }) => (
+                <FormItem><FormLabel>Problema Relatado</FormLabel><FormControl><Textarea placeholder="Descreva o problema relatado pelo cliente ou identificado" {...field} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
+              )} />
+
+              <FormItem>
+                <FormLabel>Mídia (Foto/Vídeo - Opcional)</FormLabel>
+                {editingOrder?.mediaUrl && !mediaFile && (
+                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                    <a href={editingOrder.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                      <LinkIcon className="h-3 w-3"/> Ver Mídia: {getFileNameFromUrl(editingOrder.mediaUrl)}
+                    </a>
+                    {!isOrderConcludedOrCancelled && (
+                      <Button type="button" variant="ghost" size="sm" onClick={handleMediaFileRemove} className="text-destructive hover:text-destructive">
+                        <XCircle className="h-4 w-4 mr-1"/> Remover
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {!isOrderConcludedOrCancelled && (
                   <FormControl>
-                    <Input 
-                      placeholder="Gerado automaticamente" 
-                      {...field} 
-                      readOnly 
+                    <Input
+                      type="file"
+                      accept="image/*,video/*"
+                      onChange={(e) => setMediaFile(e.target.files ? e.target.files[0] : null)}
+                      className="mt-1"
+                      disabled={isOrderConcludedOrCancelled}
                     />
                   </FormControl>
-                  <FormDescription>Este número é gerado automaticamente.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              
-              <FormField control={form.control} name="customerId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cliente</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl><SelectTrigger>
-                      <SelectValue placeholder={isLoadingCustomers ? "Carregando..." : "Selecione o Cliente"} />
-                    </SelectTrigger></FormControl>
-                    <SelectContent>
-                      {isLoadingCustomers ? <SelectItem value="loading" disabled>Carregando...</SelectItem> : 
-                       customers.map(customer => (
-                        <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
+                )}
+                {mediaFile && <FormDescription>Novo arquivo selecionado: {mediaFile.name}</FormDescription>}
+                <FormMessage />
+              </FormItem>
+            </fieldset>
 
-              <FormField control={form.control} name="equipmentId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Equipamento</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value || NO_EQUIPMENT_SELECTED_VALUE}
-                  >
-                    <FormControl><SelectTrigger>
-                      <SelectValue placeholder={isLoadingEquipment ? "Carregando..." : "Selecione o Equipamento"} />
-                    </SelectTrigger></FormControl>
-                    <SelectContent>
-                      {isLoadingEquipment ? (
-                        <SelectItem value={LOADING_EQUIPMENT_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
-                       ) : filteredEquipmentList.length === 0 ? (
-                        <SelectItem value={NO_EQUIPMENT_SELECTED_VALUE} disabled>
-                          {selectedCustomerId ? "Nenhum equipamento para este cliente ou disponível na frota" : "Nenhum equipamento da frota disponível/em manutenção"}
-                        </SelectItem>
-                       ) : (
-                        <>
-                          <SelectItem value={NO_EQUIPMENT_SELECTED_VALUE}>Selecione um equipamento</SelectItem>
-                          {filteredEquipmentList.map(eq => (
-                            <SelectItem key={eq.id} value={eq.id}>{eq.brand} {eq.model} (Chassi: {eq.chassisNumber})</SelectItem>
-                          ))}
-                        </>
-                       )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-              <FormField control={form.control} name="phase" render={({ field }) => (
-                <FormItem><FormLabel>Fase</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione a fase" /></SelectTrigger></FormControl>
-                    <SelectContent>{phaseOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
-                  </Select><FormMessage />
-                </FormItem>
-              )} />
-
-              <FormField control={form.control} name="technicianId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Técnico</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl><SelectTrigger>
-                      <SelectValue placeholder={isLoadingTechnicians ? "Carregando..." : "Atribuir Técnico"} />
-                    </SelectTrigger></FormControl>
-                    <SelectContent>
-                      {isLoadingTechnicians ? <SelectItem value="loading" disabled>Carregando...</SelectItem> :
-                       technicians.map(tech => (
-                        <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              
-              <FormField control={form.control} name="serviceType" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de Serviço</FormLabel>
-                  <Select onValueChange={handleServiceTypeChange} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {serviceTypeOptionsList.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                      <SelectItem value={CUSTOM_SERVICE_TYPE_VALUE}>Outro (Especificar)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {showCustomServiceType && (
-                    <FormField control={form.control} name="customServiceType" render={({ field: customField }) => (
-                     <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite o tipo de serviço" {...customField} value={customField.value ?? ""} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-
-              <FormField control={form.control} name="vehicleId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Veículo (Opcional)</FormLabel>
-                  <Select
-                    onValueChange={(selectedValue) => field.onChange(selectedValue === NO_VEHICLE_SELECTED_VALUE ? null : selectedValue)}
-                    value={field.value ?? NO_VEHICLE_SELECTED_VALUE}
-                  >
-                    <FormControl><SelectTrigger>
-                      <SelectValue placeholder={isLoadingVehicles ? "Carregando..." : "Selecione o Veículo"} />
-                    </SelectTrigger></FormControl>
-                    <SelectContent>
-                      {isLoadingVehicles ? (
-                        <SelectItem value={LOADING_VEHICLES_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
-                       ) : (
-                        <>
-                          <SelectItem value={NO_VEHICLE_SELECTED_VALUE}>Nenhum</SelectItem>
-                          {vehicles.map(vehicle => (
-                            <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.model} ({vehicle.licensePlate})</SelectItem>
-                          ))}
-                        </>
-                       )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
-              <FormField control={form.control} name="startDate" render={({ field }) => (
-                <FormItem><FormLabel>Data de Início</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="endDate" render={({ field }) => (
-                <FormItem><FormLabel>Data de Conclusão (Prevista)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-              )} />
-            </div>
-            <FormField control={form.control} name="description" render={({ field }) => (
-              <FormItem><FormLabel>Problema Relatado</FormLabel><FormControl><Textarea placeholder="Descreva o problema relatado pelo cliente ou identificado" {...field} /></FormControl><FormMessage /></FormItem>
+            {/* Campos editáveis mesmo se concluída/cancelada */}
+            <FormField control={form.control} name="technicalConclusion" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Conclusão Técnica</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder={isOrderConcludedOrCancelled ? "Conclusão técnica registrada." : "Será preenchido ao concluir a OS."}
+                    {...field}
+                    value={field.value ?? ""}
+                    readOnly={!isOrderConcludedOrCancelled} // Editável apenas se já concluída
+                    rows={3}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )} />
-            
-            <FormItem>
-              <FormLabel>Mídia (Foto/Vídeo - Opcional)</FormLabel>
-              {editingOrder?.mediaUrl && !mediaFile && (
-                <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                  <a href={editingOrder.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                    <LinkIcon className="h-3 w-3"/> Ver Mídia: {getFileNameFromUrl(editingOrder.mediaUrl)}
-                  </a>
-                  <Button type="button" variant="ghost" size="sm" onClick={handleMediaFileRemove} className="text-destructive hover:text-destructive">
-                    <XCircle className="h-4 w-4 mr-1"/> Remover
-                  </Button>
-                </div>
-              )}
-              <FormControl>
-                <Input
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={(e) => setMediaFile(e.target.files ? e.target.files[0] : null)}
-                  className="mt-1"
-                />
-              </FormControl>
-              {mediaFile && <FormDescription>Novo arquivo selecionado: {mediaFile.name}</FormDescription>}
-              <FormMessage />
-            </FormItem>
 
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais, peças utilizadas, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
+
+            {/* Botões de Ação no Rodapé do FormModal */}
+            <div className="flex justify-between items-center pt-4 border-t">
+                <div>
+                    {editingOrder && !isOrderConcludedOrCancelled && (
+                        <Button type="button" variant="outline" onClick={handleOpenConclusionModal} disabled={isMutating}>
+                            <Check className="mr-2 h-4 w-4" /> Concluir OS
+                        </Button>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                     <Button type="button" variant="ghost" onClick={closeModal} disabled={isMutating}>
+                        Cancelar
+                    </Button>
+                    <Button type="submit" form="service-order-form" disabled={isMutating} className="bg-primary hover:bg-primary/90">
+                        {isMutating ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                        {editingOrder ? "Salvar Alterações" : "Criar OS"}
+                    </Button>
+                </div>
+            </div>
+             {/* Botão de Excluir será gerenciado pelo FormModal */}
           </form>
         </Form>
       </FormModal>
+
+      {/* AlertDialog para Conclusão Técnica */}
+      <AlertDialog open={isConclusionModalOpen} onOpenChange={setIsConclusionModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Concluir Ordem de Serviço</AlertDialogTitle>
+            <AlertDialogDescription>
+              Por favor, forneça a conclusão técnica para esta Ordem de Serviço. Esta ação marcará a OS como "Concluída".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="technical-conclusion-input" className="text-sm font-medium">
+              Conclusão Técnica
+            </Label>
+            <Textarea
+              id="technical-conclusion-input"
+              value={technicalConclusionText}
+              onChange={(e) => setTechnicalConclusionText(e.target.value)}
+              placeholder="Descreva a solução aplicada, peças trocadas, e o estado final do equipamento."
+              rows={5}
+              className="mt-1"
+            />
+            {concludeServiceOrderMutation.isError && (
+                <p className="text-sm text-destructive mt-2">
+                    Erro: {(concludeServiceOrderMutation.error as Error)?.message || "Não foi possível concluir a OS."}
+                </p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsConclusionModalOpen(false)} disabled={concludeServiceOrderMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFinalizeConclusion} disabled={concludeServiceOrderMutation.isPending || !technicalConclusionText.trim()}>
+              {concludeServiceOrderMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2 h-4 w-4" />}
+              Finalizar Conclusão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
-
-
-    
