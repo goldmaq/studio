@@ -290,8 +290,30 @@ export function CustomerClientPage() {
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
                 {customer.contactName && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Contato: {customer.contactName}</p>}
-                <p className="flex items-center"><Mail className="mr-2 h-4 w-4 text-primary" /> {customer.email}</p>
-                {customer.phone && <p className="flex items-center"><Phone className="mr-2 h-4 w-4 text-primary" /> {customer.phone}</p>}
+                <p className="flex items-center">
+                  <Mail className="mr-2 h-4 w-4 text-primary" />
+                  <a 
+                    href={`mailto:${customer.email}`} 
+                    className="hover:underline text-primary"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {customer.email}
+                  </a>
+                </p>
+                {customer.phone && (
+                  <p className="flex items-center">
+                    <Phone className="mr-2 h-4 w-4 text-primary" />
+                    <a 
+                      href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="hover:underline text-primary"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {customer.phone}
+                    </a>
+                  </p>
+                )}
                 <p className="flex items-start">
                   <MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> 
                   {formatAddressForDisplay(customer)}
@@ -447,5 +469,7 @@ export function CustomerClientPage() {
     </>
   );
 }
+
+    
 
     
