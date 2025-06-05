@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, HandCoins, CalendarClock, History, PackageOpen, Car, ShieldAlert, Trash2, Package } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, PackageOpen } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
@@ -32,10 +33,10 @@ const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
-  Disponível: <CheckCircle className="h-4 w-4 text-green-500" />,
+  Disponível: <CheckCircle className="h-4 w-4 text-success" />,
   Locada: <Package className="h-4 w-4 text-blue-500" />,
-  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-red-500" />,
-  Sucata: <Trash2 className="h-4 w-4 text-red-500" />,
+  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-danger" />,
+  Sucata: <Trash2 className="h-4 w-4 text-danger" />,
 };
 
 const parseNumericToNullOrNumber = (value: any): number | null => {
@@ -377,7 +378,14 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Tipo: {eq.equipmentType}</p>
                 {eq.manufactureYear && <p className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> Ano: {eq.manufactureYear}</p>}
                 <p className="flex items-center">
-                  {operationalStatusIcons[eq.operationalStatus]} <span className="ml-2">Status: {eq.operationalStatus}</span>
+                  {operationalStatusIcons[eq.operationalStatus]}
+                  <span className={cn("ml-2", {
+                    'text-success': eq.operationalStatus === 'Disponível',
+                    'text-blue-500': eq.operationalStatus === 'Locada',
+                    'text-danger': eq.operationalStatus === 'Em Manutenção' || eq.operationalStatus === 'Sucata',
+                  })}>
+                    Status: {eq.operationalStatus}
+                  </span>
                 </p>
                 {customer ? (
                   <p className="flex items-center">
@@ -395,7 +403,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                      <p className="flex items-center"><Users className="mr-2 h-4 w-4 text-muted-foreground" /> Cliente: ID {eq.customerId} (Carregando...)</p>
                 ): null}
 
-                 {eq.hourMeter !== null && eq.hourMeter !== undefined && <p className="flex items-center"><History className="mr-2 h-4 w-4 text-primary" /> Horímetro: {eq.hourMeter}h</p>}
+                 {eq.hourMeter !== null && eq.hourMeter !== undefined && <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Horímetro: {eq.hourMeter}h</p>}
                  {eq.monthlyRentalValue !== null && eq.monthlyRentalValue !== undefined && <p className="flex items-center"><Coins className="mr-2 h-4 w-4 text-primary" /> Aluguel Mensal: R$ {eq.monthlyRentalValue.toFixed(2)}</p>}
 
               </CardContent>
@@ -574,3 +582,4 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
+
