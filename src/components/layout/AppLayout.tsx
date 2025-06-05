@@ -60,7 +60,7 @@ function MainSidebar() {
       <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center h-16"> {/* Added fixed height for consistency */}
         <Link href="/" className="flex items-center gap-2">
           {open ? (
-            <Logo width={120} height={30} className="transition-all duration-300 ease-in-out" />
+            <span className="text-sidebar-foreground font-semibold">o logotipo nao é esse</span>
           ) : (
             // Using a generic icon when collapsed, adjust as needed
             <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />
