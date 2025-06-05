@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, PackageOpen } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -286,14 +286,17 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (equipmentId: string) => {
       if (!equipmentId) throw new Error("ID do equipamento é necessário para exclusão.");
+      console.log("deleteEquipmentMutation - mutationFn: Deletando ID", equipmentId); // Log dentro da mutação
       return deleteDoc(doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, equipmentId));
     },
-    onSuccess: () => {
+    onSuccess: (data, equipmentId, context) => {
+      console.log("deleteEquipmentMutation - onSuccess: Equipamento excluído. ID:", equipmentId, "Data:", data, "Context:", context); // Log no sucesso
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
       toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído." });
       closeModal();
     },
-    onError: (err: Error) => {
+    onError: (err: Error, equipmentId, context) => {
+      console.error("deleteEquipmentMutation - onError: Erro ao excluir. ID:", equipmentId, "Erro:", err, "Context:", context); // Log no erro
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o equipamento. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
@@ -314,10 +317,21 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   };
 
   const handleModalDeleteConfirm = () => {
-    if (editingEquipment && editingEquipment.id) {
-      if (window.confirm(`Tem certeza que deseja excluir o equipamento "${editingEquipment.brand} ${editingEquipment.model}"?`)) {
-        deleteEquipmentMutation.mutate(editingEquipment.id);
+    const equipmentToExclude = editingEquipment;
+    console.log("handleModalDeleteConfirm chamado. editingEquipment:", equipmentToExclude);
+
+    if (equipmentToExclude && equipmentToExclude.id) {
+      const equipmentId = equipmentToExclude.id;
+      console.log(`Confirmando exclusão para ID: ${equipmentId}, Nome: ${equipmentToExclude.brand} ${equipmentToExclude.model}`);
+      if (window.confirm(`Tem certeza que deseja excluir o equipamento "${equipmentToExclude.brand} ${equipmentToExclude.model}"?`)) {
+        console.log("Usuário confirmou a exclusão. Chamando deleteEquipmentMutation.mutate...");
+        deleteEquipmentMutation.mutate(equipmentId);
+      } else {
+        console.log("Usuário cancelou a exclusão no window.confirm.");
       }
+    } else {
+      console.error("Tentativa de exclusão sem editingEquipment válido ou sem editingEquipment.id.");
+      toast({ title: "Erro de Exclusão", description: "Não foi possível identificar o equipamento para exclusão. Tente novamente.", variant: "destructive" });
     }
   };
 
@@ -394,7 +408,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                   {operationalStatusIcons[eq.operationalStatus]}
                   <span className={cn("ml-2", {
                     'text-success': eq.operationalStatus === 'Disponível',
-                    'text-blue-500': eq.operationalStatus === 'Locada', // ou outra cor para 'Locada' se desejar
+                    'text-blue-500': eq.operationalStatus === 'Locada', 
                     'text-danger': eq.operationalStatus === 'Em Manutenção' || eq.operationalStatus === 'Sucata',
                   })}>
                     Status: {eq.operationalStatus}
@@ -436,7 +450,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         formId="equipment-form"
         isSubmitting={isMutating}
         editingItem={editingEquipment}
-        onDeleteConfirm={editingEquipment ? handleModalDeleteConfirm : undefined}
+        onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteEquipmentMutation.isPending}
         deleteButtonLabel="Excluir Equipamento"
       >
