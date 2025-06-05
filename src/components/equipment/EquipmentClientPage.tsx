@@ -26,6 +26,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
+import React from 'react';
 
 
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
@@ -488,7 +489,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const getOwnerIcon = (ownerRef?: OwnerReferenceType | null): LucideIcon => {
     if (ownerRef === OWNER_REF_CUSTOMER) return UserCog;
     if (companyIds.includes(ownerRef as CompanyId)) return Building;
-    return Construction; // Fallback icon or choose another appropriate one
+    return Construction; 
   };
 
   const isLoadingPage = isLoadingEquipment || isLoadingCustomers;
@@ -538,7 +539,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
           {equipmentList.map((eq) => {
             const customer = eq.customerId ? customers.find(c => c.id === eq.customerId) : null;
             const ownerDisplay = getOwnerDisplayString(eq.ownerReference, eq.customerId, customers);
-            const OwnerIcon = getOwnerIcon(eq.ownerReference); // Ensure PascalCase for component usage
+            const ownerIcon = getOwnerIcon(eq.ownerReference); 
+            const OwnerIconComponent = ownerIcon; 
             return (
             <Card
               key={eq.id}
@@ -555,7 +557,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Tipo: {eq.equipmentType}</p>
                 {eq.manufactureYear && <p className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> Ano: {eq.manufactureYear}</p>}
                  <p className="flex items-center">
-                    <OwnerIcon className="mr-2 h-4 w-4 text-primary" /> {ownerDisplay}
+                    <OwnerIconComponent className="mr-2 h-4 w-4 text-primary" /> {ownerDisplay}
                   </p>
                 <p className="flex items-center">
                   {operationalStatusIcons[eq.operationalStatus]}
@@ -710,46 +712,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 </FormItem>
               )}
             />
-
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="equipmentType" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de Equipamento</FormLabel>
-                  <Select onValueChange={(value) => handleSelectChange('equipmentType', value)} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {equipmentTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                      <SelectItem value="_CUSTOM_">Digitar Tipo...</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {showCustomFields.equipmentType && (
-                    <FormField control={form.control} name="customEquipmentType" render={({ field: customField }) => (
-                     <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite o tipo" {...customField} value={customField.value ?? ""} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="manufactureYear" render={({ field }) => (
-                <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="Ex: 2022" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="operationalStatus" render={({ field }) => (
-                <FormItem><FormLabel>Status Operacional</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {operationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                    </SelectContent>
-                  </Select><FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="customerId" render={({ field }) => (
+            
+            <FormField control={form.control} name="customerId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cliente Associado (Serviço/Locação)</FormLabel>
                   <Select
@@ -779,7 +743,45 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                   <FormMessage />
                 </FormItem>
               )} />
+
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField control={form.control} name="equipmentType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de Equipamento</FormLabel>
+                  <Select onValueChange={(value) => handleSelectChange('equipmentType', value)} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {equipmentTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      <SelectItem value="_CUSTOM_">Digitar Tipo...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {showCustomFields.equipmentType && (
+                    <FormField control={form.control} name="customEquipmentType" render={({ field: customField }) => (
+                     <FormItem className="mt-2">
+                        <FormControl><Input placeholder="Digite o tipo" {...customField} value={customField.value ?? ""} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="manufactureYear" render={({ field }) => (
+                <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="Ex: 2022" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+              )} />
             </div>
+            <FormField control={form.control} name="operationalStatus" render={({ field }) => (
+              <FormItem><FormLabel>Status Operacional</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {operationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                  </SelectContent>
+                </Select><FormMessage />
+              </FormItem>
+            )} />
+            
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -875,5 +877,6 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
+
 
 
