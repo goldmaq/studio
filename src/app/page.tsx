@@ -7,7 +7,7 @@ import { Users, Construction, ClipboardList, HardHat, CarFront, SlidersHorizonta
 
 const quickLinks = [
   { title: "Clientes", href: "/customers", icon: Users, description: "Gerenciar informações de clientes" },
-  { title: "Equipamentos", href: "/equipment", icon: Construction, description: "Rastrear equipamentos de empilhadeira" },
+  { title: "Máquinas", href: "/maquinas", icon: Construction, description: "Rastrear máquinas e equipamentos" },
   { title: "Equip. Auxiliares", href: "/auxiliary-equipment", icon: PackageSearch, description: "Controlar baterias, carregadores, etc." },
   { title: "Ordens de Serviço", href: "/service-orders", icon: ClipboardList, description: "Supervisionar operações de serviço" },
   { title: "Técnicos", href: "/technicians", icon: HardHat, description: "Manter registro de técnicos" },
@@ -19,18 +19,6 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="space-y-8">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline text-2xl">Bem-vindo ao Gold Maq</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Seu hub central para gerenciar clientes, equipamentos, ordens de serviço e mais.
-              Use a navegação à esquerda ou os links rápidos abaixo para começar.
-            </p>
-          </CardContent>
-        </Card>
-
         <section>
           <h2 className="text-xl font-headline font-semibold mb-4">Acesso Rápido</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

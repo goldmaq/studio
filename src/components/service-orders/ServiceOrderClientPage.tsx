@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { ServiceOrder, Customer, Equipment, Technician, Vehicle, CompanyId } from "@/types";
+import type { ServiceOrder, Customer, Maquina, Technician, Vehicle, CompanyId } from "@/types";
 import { ServiceOrderSchema, serviceTypeOptionsList, companyIds } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
@@ -176,18 +176,18 @@ async function fetchCustomers(): Promise<Customer[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
 }
 
-async function fetchEquipment(): Promise<Equipment[]> {
+async function fetchEquipment(): Promise<Maquina[]> {
   if (!db) {
     console.error("fetchEquipment: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
-  }
-  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
+  } // add a check here too
+  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc")); // add a check here too
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
+ return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Maquina));
 }
 
 async function fetchTechnicians(): Promise<Technician[]> {
-  if (!db) {
+  if (!db) { // add a check here too
     console.error("fetchTechnicians: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
@@ -197,7 +197,7 @@ async function fetchTechnicians(): Promise<Technician[]> {
 }
 
 async function fetchVehicles(): Promise<Vehicle[]> {
-  if (!db) {
+  if (!db) { // add a check here too
     console.error("fetchVehicles: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
@@ -291,8 +291,8 @@ export function ServiceOrderClientPage() {
     enabled: !!db,
   });
 
-  const { data: equipmentList = [], isLoading: isLoadingEquipment } = useQuery<Equipment[], Error>({
-    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
+  const { data: equipmentList = [], isLoading: isLoadingEquipment } = useQuery<Maquina[], Error>({
+    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME], // Corrected type from Equipment to Maquina
     queryFn: fetchEquipment,
     enabled: !!db,
   });
