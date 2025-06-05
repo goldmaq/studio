@@ -177,7 +177,7 @@ export function TechnicianClientPage() {
                 <div className="flex items-center gap-3">
                   <UserCircle className="w-10 h-10 text-primary" />
                   <div>
-                    <CardTitle className="font-headline text-xl">{tech.name}</CardTitle>
+                    <CardTitle className="font-headline text-xl text-primary">{tech.name}</CardTitle>
                     <CardDescription>Matrícula: {tech.employeeId}</CardDescription>
                   </div>
                 </div>
@@ -222,3 +222,4 @@ export function TechnicianClientPage() {
     </>
   );
 }
+

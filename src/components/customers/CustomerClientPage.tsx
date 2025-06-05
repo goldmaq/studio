@@ -283,7 +283,7 @@ export function CustomerClientPage() {
               onClick={() => openModal(customer)}
             >
               <CardHeader>
-                <CardTitle className="font-headline text-xl">{customer.name}</CardTitle>
+                <CardTitle className="font-headline text-xl text-primary">{customer.name}</CardTitle>
                 <CardDescription className="flex items-center text-sm">
                   <Building className="mr-2 h-4 w-4 text-muted-foreground" />{customer.cnpj}
                 </CardDescription>

@@ -257,7 +257,7 @@ export function ServiceOrderClientPage() {
               onClick={() => openModal(order)}
             >
               <CardHeader>
-                <CardTitle className="font-headline text-xl">Ordem: {order.orderNumber}</CardTitle>
+                <CardTitle className="font-headline text-xl text-primary">Ordem: {order.orderNumber}</CardTitle>
                 <CardDescription className="flex items-center text-sm">
                   {phaseIcons[order.phase]} <span className="ml-2">{order.phase}</span>
                 </CardDescription>
@@ -345,3 +345,4 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
+

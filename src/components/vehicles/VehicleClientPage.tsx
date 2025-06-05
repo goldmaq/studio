@@ -205,7 +205,7 @@ export function VehicleClientPage() {
               onClick={() => openModal(vehicle)}
             >
               <CardHeader>
-                <CardTitle className="font-headline text-xl">{vehicle.model}</CardTitle>
+                <CardTitle className="font-headline text-xl text-primary">{vehicle.model}</CardTitle>
                 <CardDescription className="flex items-center text-sm">
                   <Tag className="mr-2 h-4 w-4 text-muted-foreground" /> Placa: {vehicle.licensePlate} ({vehicle.kind})
                 </CardDescription>
@@ -278,3 +278,4 @@ export function VehicleClientPage() {
     </>
   );
 }
+
