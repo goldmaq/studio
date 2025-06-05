@@ -28,7 +28,6 @@ export const equipmentTypeOptions = [
 export const operationalStatusOptions = ['Disponível', 'Locada', 'Em Manutenção', 'Sucata'] as const;
 
 export type CompanyId = 'goldmaq' | 'goldcomercio' | 'goldjob';
-// Changed: Apply 'as const' to infer a readonly tuple type for companyIds
 export const companyIds = ["goldmaq", "goldcomercio", "goldjob"] as const;
 
 
@@ -119,6 +118,7 @@ export interface Vehicle {
   currentMileage: number;
   fuelConsumption: number;
   costPerKilometer: number;
+  fipeValue?: number | null; // Added FIPE value
   registrationInfo?: string;
   status: 'Disponível' | 'Em Uso' | 'Manutenção';
 }
@@ -201,6 +201,7 @@ export const VehicleSchema = z.object({
   currentMileage: z.coerce.number().min(0, "Quilometragem deve ser positiva"),
   fuelConsumption: z.coerce.number().min(0, "Consumo de combustível deve ser positivo"),
   costPerKilometer: z.coerce.number().min(0, "Custo por quilômetro deve ser positivo"),
+  fipeValue: z.coerce.number().min(0, "Valor FIPE deve ser positivo ou zero").optional().nullable(), // Added FIPE value
   registrationInfo: z.string().optional(),
   status: z.enum(['Disponível', 'Em Uso', 'Manutenção']),
 });
