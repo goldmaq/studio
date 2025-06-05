@@ -5,13 +5,13 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Search, Phone, User } from "lucide-react";
+import { PlusCircle, Users, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Search, Phone, User, Construction } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { Customer, Technician } from "@/types";
+import type { Customer, Technician, Equipment } from "@/types";
 import { CustomerSchema } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
@@ -24,6 +24,7 @@ import { Textarea } from "../ui/textarea";
 
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 const FIRESTORE_TECHNICIAN_COLLECTION_NAME = "tecnicos";
+const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
 
 // Constantes para os valores do SelectItem de técnico
 const NO_TECHNICIAN_FORM_VALUE = ""; // O valor que queremos no formulário para "Nenhum"
@@ -40,6 +41,12 @@ async function fetchTechnicians(): Promise<Technician[]> {
   const q = query(collection(db, FIRESTORE_TECHNICIAN_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
+}
+
+async function fetchEquipment(): Promise<Equipment[]> {
+  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
 }
 
 interface ViaCepResponse {
@@ -108,6 +115,11 @@ export function CustomerClientPage() {
   const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery<Technician[], Error>({
     queryKey: [FIRESTORE_TECHNICIAN_COLLECTION_NAME],
     queryFn: fetchTechnicians,
+  });
+
+  const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
+    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
+    queryFn: fetchEquipment,
   });
 
   const addCustomerMutation = useMutation({
@@ -233,9 +245,9 @@ export function CustomerClientPage() {
   };
   
   const isMutating = addCustomerMutation.isPending || updateCustomerMutation.isPending;
-  const isLoading = isLoadingCustomers || isLoadingTechnicians;
+  const isLoadingPageData = isLoadingCustomers || isLoadingTechnicians || isLoadingEquipment;
 
-  if (isLoading && !isModalOpen) { // Evita piscar o loader global se o modal estiver aberto e carregando técnicos
+  if (isLoadingPageData && !isModalOpen) { 
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -254,6 +266,18 @@ export function CustomerClientPage() {
       </div>
     );
   }
+
+  if (isErrorEquipment) {
+     return (
+      <div className="flex flex-col items-center justify-center h-64 text-destructive">
+        <AlertTriangle className="h-12 w-12 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Equipamentos</h2>
+        <p className="text-center">Não foi possível buscar os dados dos equipamentos. Tente novamente mais tarde.</p>
+        <p className="text-sm mt-2">Detalhe: {errorEquipment?.message}</p>
+      </div>
+    );
+  }
+
 
   return (
     <>
@@ -276,7 +300,9 @@ export function CustomerClientPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {customers.map((customer) => (
+          {customers.map((customer) => {
+            const linkedEquipment = equipmentList.filter(eq => eq.customerId === customer.id);
+            return (
             <Card 
               key={customer.id} 
               className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
@@ -304,11 +330,11 @@ export function CustomerClientPage() {
                   <p className="flex items-center">
                     <Phone className="mr-2 h-4 w-4 text-primary" />
                     <a 
-                      href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="hover:underline text-primary"
-                      onClick={(e) => e.stopPropagation()}
+                       href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       className="hover:underline text-primary"
+                       onClick={(e) => e.stopPropagation()}
                     >
                       {customer.phone}
                     </a>
@@ -326,12 +352,41 @@ export function CustomerClientPage() {
                   </p>
                 }
                 {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
+
+                {/* Seção de Equipamentos Vinculados */}
+                <div className="pt-2 mt-2 border-t border-border">
+                  {isLoadingEquipment ? (
+                     <p className="flex items-center text-xs text-muted-foreground mt-2">
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Carregando equipamentos...
+                     </p>
+                  ) : linkedEquipment.length > 0 ? (
+                    <div>
+                      <h4 className="font-semibold text-xs mt-2 mb-1 flex items-center">
+                        <Construction className="mr-1.5 h-3.5 w-3.5 text-primary" /> Equipamentos Vinculados:
+                      </h4>
+                      <ul className="list-none pl-1 space-y-0.5">
+                        {linkedEquipment.slice(0, 3).map(eq => ( // Limitar a 3 para não poluir muito o card
+                          <li key={eq.id} className="text-xs text-muted-foreground">
+                            {eq.brand} {eq.model} <span className="text-gray-400">(Chassi: {eq.chassisNumber})</span>
+                          </li>
+                        ))}
+                        {linkedEquipment.length > 3 && (
+                           <li className="text-xs text-muted-foreground">...e mais {linkedEquipment.length - 3}.</li>
+                        )}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="flex items-center text-xs text-muted-foreground mt-2">
+                      <Construction className="mr-1.5 h-3.5 w-3.5 text-gray-400" /> Nenhum equipamento vinculado.
+                    </p>
+                  )}
+                </div>
               </CardContent>
               <CardFooter className="border-t pt-4">
                  {/* Botão Editar removido, ação de clique no card */}
               </CardFooter>
             </Card>
-          ))}
+          )})}
         </div>
       )}
 
@@ -469,7 +524,5 @@ export function CustomerClientPage() {
     </>
   );
 }
-
-    
 
     
