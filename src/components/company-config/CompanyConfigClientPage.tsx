@@ -115,10 +115,17 @@ async function fetchCompanyConfigs(): Promise<Company[]> {
         bankPixKey: data.bankPixKey,
       } as Company);
     } else {
+      // If the document doesn't exist, use the initial data from code for display,
+      // but DO NOT write it back to Firestore from this read function.
+      // Seeding or creating initial documents should be handled elsewhere.
       const initialData = initialCompanyDataFromCode[id];
       if (initialData) {
-        await setDoc(docRef, initialData); 
+        console.warn(`CompanyConfig: Document for ${id} not found in Firestore. Using initial data from code. Consider seeding this data if it should persist.`);
         fetchedCompanies.push({ id, ...initialData });
+      } else {
+        console.error(`CompanyConfig: Document for ${id} not found and no initial data in code.`);
+        // Optionally, you could push a placeholder or skip, depending on requirements
+        // For now, skipping if no initial data.
       }
     }
   }
@@ -153,7 +160,14 @@ export function CompanyConfigClientPage() {
       const { id, ...dataToUpdate } = companyData;
       if (!id) throw new Error("ID da empresa é necessário para atualização.");
       const companyRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
-      return updateDoc(companyRef, dataToUpdate);
+      // Check if the document exists before updating, or use setDoc to create/overwrite
+      const docSnap = await getDoc(companyRef);
+      if (docSnap.exists()) {
+        return updateDoc(companyRef, dataToUpdate);
+      } else {
+        // If the intent is to create if not exists, use setDoc
+        return setDoc(companyRef, dataToUpdate); 
+      }
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -416,4 +430,5 @@ export function CompanyConfigClientPage() {
   );
 }
 
+    
     

@@ -142,12 +142,12 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'],
       technicianId: data.technicianId || null,
       serviceType: data.serviceType || "Não especificado",
-      customServiceType: data.customServiceType || "",
+      // customServiceType é omitido aqui porque não existe na interface ServiceOrder, mas é tratado em prepareDataForFirestore
       vehicleId: data.vehicleId || null,
       startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
       endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
       description: data.description || "N/A",
-      notes: data.notes || "",
+      notes: data.notes || undefined, // Garante que notes seja string ou undefined
       mediaUrl: data.mediaUrl || null,
       technicalConclusion: data.technicalConclusion || null,
     } as ServiceOrder;
@@ -327,9 +327,6 @@ export function ServiceOrderClientPage() {
       finalServiceType = customServiceType || "Não especificado";
     }
     
-    // Explicitly construct the object to be sent to Firestore
-    // This ensures all necessary fields from ServiceOrder (minus those excluded) are present
-    // and startDate/endDate are correctly typed as Timestamp | null.
     return {
       orderNumber: restOfData.orderNumber,
       customerId: restOfData.customerId,
@@ -343,7 +340,7 @@ export function ServiceOrderClientPage() {
       technicianId: restOfData.technicianId || null,
       mediaUrl: newMediaUrl === undefined ? formData.mediaUrl : newMediaUrl,
       technicalConclusion: restOfData.technicalConclusion || null,
-      notes: restOfData.notes || null,
+      notes: restOfData.notes === null ? undefined : restOfData.notes,
     };
   };
 
@@ -360,9 +357,6 @@ export function ServiceOrderClientPage() {
 
       const orderDataForFirestore = prepareDataForFirestore(data.formData, uploadedMediaUrl);
       await setDoc(doc(db, FIRESTORE_COLLECTION_NAME, newOrderId), orderDataForFirestore);
-      // For the return, we need to re-format dates if the calling code expects string dates from ServiceOrder type.
-      // However, if this is just for optimistic updates or toast, the Timestamp might be fine.
-      // Let's return what was sent to Firestore for now, as the query will refetch with string dates.
       return { ...orderDataForFirestore, id: newOrderId };
     },
     onSuccess: (data) => {
