@@ -583,7 +583,14 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                  {eq.partsCatalogUrl && (
                     <p className="flex items-center">
                         <BookOpen className="mr-2 h-4 w-4 text-primary" />
-                        <a href={eq.partsCatalogUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-primary hover:underline">
+                        <a 
+                          href={eq.partsCatalogUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          onClick={e => e.stopPropagation()} 
+                          className="text-primary hover:underline hover:text-primary/80 transition-colors"
+                          title={`Ver Catálogo de Peças: ${getFileNameFromUrl(eq.partsCatalogUrl)}`}
+                        >
                             Catálogo de Peças
                         </a>
                     </p>
@@ -591,7 +598,14 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                  {eq.errorCodesUrl && (
                     <p className="flex items-center">
                         <AlertCircle className="mr-2 h-4 w-4 text-primary" />
-                        <a href={eq.errorCodesUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-primary hover:underline">
+                        <a 
+                          href={eq.errorCodesUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          onClick={e => e.stopPropagation()} 
+                          className="text-primary hover:underline hover:text-primary/80 transition-colors"
+                          title={`Ver Códigos de Erro: ${getFileNameFromUrl(eq.errorCodesUrl)}`}
+                        >
                             Códigos de Erro
                         </a>
                     </p>
@@ -851,3 +865,4 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
+
