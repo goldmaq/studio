@@ -75,7 +75,7 @@ function MainSidebar() {
               const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
               return (
                 <SidebarMenuItem key={item.label}>
-                  <Link href={item.href} passHref legacyBehavior>
+                  <Link href={item.href} asChild>
                     <SidebarMenuButton
                       isActive={isActive}
                       tooltip={{ children: item.label, side: "right" }}
