@@ -5,15 +5,15 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIcon, XCircle, AlertTriangle, Save, Trash2 } from "lucide-react";
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIconLI, XCircle, AlertTriangle, Save, Trash2 } from "lucide-react"; // Renamed LinkIcon to LinkIconLI to avoid conflict
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { ServiceOrder, Customer, Maquina, Technician, Vehicle, CompanyId } from "@/types";
-import { ServiceOrderSchema, serviceTypeOptionsList, companyIds } from "@/types";
+import type { ServiceOrder, Customer, Maquina, Technician, Vehicle } from "@/types";
+import { ServiceOrderSchema, serviceTypeOptionsList } from "@/types"; // Removed companyIds and Equipment as they are not directly used here
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -35,8 +35,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label";
-import { DialogFooter } from "@/components/ui/dialog";
 
+const MAX_FILES_ALLOWED = 5;
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
 const phaseIcons = {
@@ -69,7 +69,7 @@ const getFileNameFromUrl = (url: string): string => {
     const segments = pathAndQuery.split('/');
     const fileNameWithPossiblePrefix = segments.pop() || "arquivo";
     const fileNameCleaned = fileNameWithPossiblePrefix.split('?')[0];
-    const finalFileName = fileNameCleaned.substring(fileNameCleaned.indexOf('_') + 1);
+    const finalFileName = fileNameCleaned.substring(fileNameCleaned.indexOf('_') + 1) || fileNameCleaned;
     return finalFileName || "arquivo";
   } catch (e) {
     console.error("Error parsing filename from URL:", e);
@@ -85,7 +85,7 @@ async function uploadServiceOrderFile(
     console.error("uploadServiceOrderFile: Firebase Storage is not available.");
     throw new Error("Firebase Storage is not available");
   }
-  const filePath = `service_order_media/${orderId}/${Date.now()}_${file.name}`;
+  const filePath = `service_order_media/${orderId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const fileStorageRef = storageRef(storage, filePath);
   await uploadBytes(fileStorageRef, file);
   return getDownloadURL(fileStorageRef);
@@ -95,7 +95,6 @@ async function deleteServiceOrderFileFromStorage(fileUrl?: string | null) {
   if (fileUrl) {
     if (!storage) {
       console.warn("deleteServiceOrderFileFromStorage: Firebase Storage is not available. Skipping deletion.");
-      // Decide if this should throw an error or just warn. For deletion, warning might be acceptable.
       return;
     }
     try {
@@ -123,8 +122,9 @@ const formatDateForInput = (date: any): string => {
     return "";
   }
   if (!isValid(d)) return "";
+  // Ensure we are using local date parts to avoid timezone shifts to previous day
   const year = d.getFullYear();
-  const month = d.getMonth();
+  const month = d.getMonth(); // 0-indexed
   const day = d.getDate();
   const localDate = new Date(year, month, day);
   return localDate.toISOString().split('T')[0];
@@ -132,10 +132,10 @@ const formatDateForInput = (date: any): string => {
 
 const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
   if (!dateString) return null;
-  const date = parseISO(dateString);
+  const date = parseISO(dateString); // This parses "YYYY-MM-DD" as UTC midnight
   if (!isValid(date)) return null;
-  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  return Timestamp.fromDate(utcDate);
+  // No need to create new Date with UTC parts if parseISO already handles it correctly for YYYY-MM-DD
+  return Timestamp.fromDate(date);
 };
 
 async function fetchServiceOrders(): Promise<ServiceOrder[]> {
@@ -147,11 +147,12 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data() as DocumentData;
-    return {
+    const serviceOrder: ServiceOrder = {
       id: docSnap.id,
       orderNumber: data.orderNumber || "N/A",
       customerId: data.customerId || "N/A",
       equipmentId: data.equipmentId || "N/A",
+      requesterName: data.requesterName || undefined,
       phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'],
       technicianId: data.technicianId || null,
       serviceType: data.serviceType || "Não especificado",
@@ -160,9 +161,10 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
       description: data.description || "N/A",
       notes: data.notes || undefined,
-      mediaUrl: data.mediaUrl || null,
+      mediaUrls: Array.isArray(data.mediaUrls) ? data.mediaUrls.filter(url => typeof url === 'string') : [],
       technicalConclusion: data.technicalConclusion || null,
-    } as ServiceOrder;
+    };
+    return serviceOrder;
   });
 }
 
@@ -180,14 +182,14 @@ async function fetchEquipment(): Promise<Maquina[]> {
   if (!db) {
     console.error("fetchEquipment: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
-  } // add a check here too
-  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc")); // add a check here too
+  }
+  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
   const querySnapshot = await getDocs(q);
  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Maquina));
 }
 
 async function fetchTechnicians(): Promise<Technician[]> {
-  if (!db) { // add a check here too
+  if (!db) {
     console.error("fetchTechnicians: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
@@ -197,7 +199,7 @@ async function fetchTechnicians(): Promise<Technician[]> {
 }
 
 async function fetchVehicles(): Promise<Vehicle[]> {
-  if (!db) { // add a check here too
+  if (!db) {
     console.error("fetchVehicles: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
@@ -207,7 +209,7 @@ async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 const getNextOrderNumber = (currentOrders: ServiceOrder[]): string => {
-  let maxOrderNum = 3999;
+  let maxOrderNum = 3999; // Start from a base if no orders exist or all are below this
   currentOrders.forEach(order => {
     if (order.orderNumber) {
         const num = parseInt(order.orderNumber, 10);
@@ -224,7 +226,7 @@ type DeadlineStatus = 'overdue' | 'due_today' | 'due_soon' | 'none';
 const getDeadlineStatusInfo = (
   endDateString?: string,
   phase?: ServiceOrder['phase']
-): { status: DeadlineStatus; message?: string; icon?: JSX.Element } => {
+): { status: DeadlineStatus; message?: string; icon?: JSX.Element; alertClass?: string } => {
   if (!endDateString || phase === 'Concluída' || phase === 'Cancelada') {
     return { status: 'none' };
   }
@@ -233,22 +235,23 @@ const getDeadlineStatusInfo = (
   if (!isValid(endDate)) {
     return { status: 'none' };
   }
+  
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const endDateNormalized = new Date(endDate.valueOf());
+  const endDateNormalized = new Date(endDate.valueOf()); // Use valueOf to get epoch time for comparison
   endDateNormalized.setHours(0,0,0,0);
 
 
   if (isBefore(endDateNormalized, today)) {
-    return { status: 'overdue', message: 'Atrasada!', icon: <AlertTriangle className="h-4 w-4 text-red-500" /> };
+    return { status: 'overdue', message: 'Atrasada!', icon: <AlertTriangle className="h-5 w-5" />, alertClass: "bg-red-100 border-red-500 text-red-700" };
   }
   if (isToday(endDateNormalized)) {
-    return { status: 'due_today', message: 'Vence Hoje!', icon: <AlertTriangle className="h-4 w-4 text-yellow-500" /> };
+    return { status: 'due_today', message: 'Vence Hoje!', icon: <AlertTriangle className="h-5 w-5" />, alertClass: "bg-yellow-100 border-yellow-500 text-yellow-700" };
   }
   const twoDaysFromNow = addDays(today, 2);
-  if (isBefore(endDateNormalized, twoDaysFromNow) || isToday(endDateNormalized)) {
-     return { status: 'due_soon', message: 'Vence em Breve', icon: <AlertTriangle className="h-4 w-4 text-yellow-400" /> };
+  if (isBefore(endDateNormalized, twoDaysFromNow)) { // Removed || isToday(endDateNormalized) as it's covered by above
+     return { status: 'due_soon', message: 'Vence em Breve', icon: <AlertTriangle className="h-5 w-5" />, alertClass: "bg-amber-100 border-amber-500 text-amber-700" };
   }
   return { status: 'none' };
 };
@@ -261,7 +264,7 @@ export function ServiceOrderClientPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
   const [showCustomServiceType, setShowCustomServiceType] = useState(false);
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]); // For new files to be uploaded
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isConclusionModalOpen, setIsConclusionModalOpen] = useState(false);
   const [technicalConclusionText, setTechnicalConclusionText] = useState("");
@@ -271,18 +274,20 @@ export function ServiceOrderClientPage() {
     resolver: zodResolver(ServiceOrderSchema),
     defaultValues: {
       orderNumber: "", customerId: "", equipmentId: "", phase: "Pendente", technicianId: null,
-      serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
-      startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null, technicalConclusion: null,
+      requesterName: "", serviceType: "", customServiceType: "", vehicleId: null, description: "",
+      notes: "", startDate: formatDateForInput(new Date().toISOString()), endDate: "",
+      mediaUrls: [], technicalConclusion: null,
     },
   });
 
   const selectedCustomerId = useWatch({ control: form.control, name: 'customerId' });
   const selectedEquipmentId = useWatch({ control: form.control, name: 'equipmentId' });
+  const formMediaUrls = useWatch({ control: form.control, name: 'mediaUrls' }); // To track existing media URLs from form state
 
   const { data: serviceOrders = [], isLoading: isLoadingServiceOrders, isError: isErrorServiceOrders, error: errorServiceOrders } = useQuery<ServiceOrder[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchServiceOrders,
-    enabled: !!db, // Only run query if db is available
+    enabled: !!db,
   });
 
   const { data: customers = [], isLoading: isLoadingCustomers } = useQuery<Customer[], Error>({
@@ -292,7 +297,7 @@ export function ServiceOrderClientPage() {
   });
 
   const { data: equipmentList = [], isLoading: isLoadingEquipment } = useQuery<Maquina[], Error>({
-    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME], // Corrected type from Equipment to Maquina
+    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
     queryFn: fetchEquipment,
     enabled: !!db,
   });
@@ -317,10 +322,7 @@ export function ServiceOrderClientPage() {
         <p className="text-lg text-center text-muted-foreground">
           Não foi possível conectar aos serviços do Firebase.
           <br />
-          Verifique a configuração das variáveis de ambiente e sua conexão com a internet.
-        </p>
-        <p className="text-sm text-center text-muted-foreground mt-2">
-          Se o problema persistir, contate o suporte técnico.
+          Verifique a configuração e sua conexão com a internet.
         </p>
       </div>
     );
@@ -331,20 +333,20 @@ export function ServiceOrderClientPage() {
     if (selectedCustomerId) {
       return equipmentList.filter(eq =>
         eq.customerId === selectedCustomerId ||
-        (companyIds.includes(eq.ownerReference as CompanyId) && (eq.operationalStatus === "Disponível" || eq.operationalStatus === "Em Manutenção"))
+        (eq.ownerReference && ['goldmaq', 'goldcomercio', 'goldjob'].includes(eq.ownerReference) && (eq.operationalStatus === "Disponível" || eq.operationalStatus === "Em Manutenção"))
       );
     }
     return equipmentList.filter(eq =>
-      companyIds.includes(eq.ownerReference as CompanyId) && (eq.operationalStatus === "Disponível" || eq.operationalStatus === "Em Manutenção")
+      eq.ownerReference && ['goldmaq', 'goldcomercio', 'goldjob'].includes(eq.ownerReference) && (eq.operationalStatus === "Disponível" || eq.operationalStatus === "Em Manutenção")
     );
   }, [equipmentList, selectedCustomerId, isLoadingEquipment]);
 
   useEffect(() => {
-    if (!editingOrder) {
+    if (!editingOrder) { // Only set preferred technician for new orders
         if (selectedCustomerId) {
             const customer = customers.find(c => c.id === selectedCustomerId);
             if (customer?.preferredTechnician) {
-                const preferredTech = technicians.find(t => t.name === customer.preferredTechnician);
+                const preferredTech = technicians.find(t => t.name === customer.preferredTechnician); // Assuming preferredTechnician stores name
                 form.setValue('technicianId', preferredTech ? preferredTech.id : null, { shouldValidate: true });
             } else {
                 form.setValue('technicianId', null, { shouldValidate: true });
@@ -354,33 +356,37 @@ export function ServiceOrderClientPage() {
         }
     }
 
+    // Reset equipment if customer changes and selected equipment is no longer valid
     if (selectedCustomerId) {
       if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
         form.setValue('equipmentId', NO_EQUIPMENT_SELECTED_VALUE, { shouldValidate: true });
       }
-    } else {
+    } else { // No customer selected, reset equipment if it's not in the general available list
        if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
         form.setValue('equipmentId', NO_EQUIPMENT_SELECTED_VALUE, { shouldValidate: true });
       }
     }
-  }, [selectedCustomerId, customers, technicians, form, editingOrder, equipmentList, selectedEquipmentId, filteredEquipmentList]);
+  }, [selectedCustomerId, customers, technicians, form, editingOrder, filteredEquipmentList, selectedEquipmentId]);
 
 
   const prepareDataForFirestore = (
     formData: z.infer<typeof ServiceOrderSchema>,
-    newMediaUrl?: string | null
-  ): Omit<ServiceOrder, 'id' | 'customServiceType' | 'startDate' | 'endDate'> & { startDate: Timestamp | null; endDate: Timestamp | null; } => {
-    const { customServiceType, ...restOfData } = formData;
+    processedMediaUrls?: (string | null)[] | null // Array can contain null if some files failed or were removed
+  ): Omit<ServiceOrder, 'id' | 'customServiceType' | 'startDate' | 'endDate' | 'mediaUrls'> & { startDate: Timestamp | null; endDate: Timestamp | null; mediaUrls: string[] | null } => {
+    const { customServiceType, mediaUrls: formMediaUrlsIgnored, ...restOfData } = formData;
 
     let finalServiceType = restOfData.serviceType;
     if (restOfData.serviceType === CUSTOM_SERVICE_TYPE_VALUE) {
       finalServiceType = customServiceType || "Não especificado";
     }
     
+    const validProcessedUrls = processedMediaUrls?.filter(url => typeof url === 'string') as string[] | undefined;
+
     return {
       orderNumber: restOfData.orderNumber,
       customerId: restOfData.customerId,
       equipmentId: restOfData.equipmentId,
+      requesterName: restOfData.requesterName || undefined,
       phase: restOfData.phase,
       description: restOfData.description,
       serviceType: finalServiceType,
@@ -388,27 +394,29 @@ export function ServiceOrderClientPage() {
       endDate: convertToTimestamp(restOfData.endDate),
       vehicleId: restOfData.vehicleId || null,
       technicianId: restOfData.technicianId || null,
-      mediaUrl: newMediaUrl === undefined ? formData.mediaUrl : newMediaUrl,
+      mediaUrls: validProcessedUrls && validProcessedUrls.length > 0 ? validProcessedUrls : null,
       technicalConclusion: restOfData.technicalConclusion || null,
-      notes: restOfData.notes === null ? undefined : restOfData.notes,
+      notes: restOfData.notes === null || restOfData.notes === "" ? undefined : restOfData.notes,
     };
   };
 
 
   const addServiceOrderMutation = useMutation({
-    mutationFn: async (data: { formData: z.infer<typeof ServiceOrderSchema>, file: File | null }) => {
+    mutationFn: async (data: { formData: z.infer<typeof ServiceOrderSchema>, filesToUpload: File[] }) => {
       if (!db) throw new Error("Firebase DB is not available for adding service order.");
       setIsUploadingFile(true);
       const newOrderId = doc(collection(db, FIRESTORE_COLLECTION_NAME)).id;
-      let uploadedMediaUrl: string | null = null;
+      const uploadedUrls: string[] = [];
 
-      if (data.file) {
-        uploadedMediaUrl = await uploadServiceOrderFile(data.file, newOrderId);
+      if (data.filesToUpload && data.filesToUpload.length > 0) {
+        for (const file of data.filesToUpload) {
+          const url = await uploadServiceOrderFile(file, newOrderId);
+          uploadedUrls.push(url);
+        }
       }
-
-      const orderDataForFirestore = prepareDataForFirestore(data.formData, uploadedMediaUrl);
+      const orderDataForFirestore = prepareDataForFirestore(data.formData, uploadedUrls);
       await setDoc(doc(db, FIRESTORE_COLLECTION_NAME, newOrderId), orderDataForFirestore);
-      return { ...orderDataForFirestore, id: newOrderId };
+      return { ...orderDataForFirestore, id: newOrderId }; // Return with the ID and processed data
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -422,19 +430,32 @@ export function ServiceOrderClientPage() {
   });
 
   const updateServiceOrderMutation = useMutation({
-    mutationFn: async (data: { id: string, formData: z.infer<typeof ServiceOrderSchema>, file: File | null, currentOrder: ServiceOrder }) => {
+    mutationFn: async (data: { id: string, formData: z.infer<typeof ServiceOrderSchema>, filesToUpload: File[], existingMediaUrlsToKeep: string[] }) => {
       if (!db) throw new Error("Firebase DB is not available for updating service order.");
       setIsUploadingFile(true);
-      let newMediaUrl = data.currentOrder.mediaUrl;
+      
+      let finalMediaUrls: string[] = [...data.existingMediaUrlsToKeep]; // Start with URLs to keep
 
-      if (data.file) {
-        await deleteServiceOrderFileFromStorage(data.currentOrder.mediaUrl);
-        newMediaUrl = await uploadServiceOrderFile(data.file, data.id);
+      // Upload new files and add to the list
+      if (data.filesToUpload && data.filesToUpload.length > 0) {
+        const newUploadedUrls: string[] = [];
+        for (const file of data.filesToUpload) {
+          const url = await uploadServiceOrderFile(file, data.id);
+          newUploadedUrls.push(url);
+        }
+        finalMediaUrls = [...finalMediaUrls, ...newUploadedUrls];
       }
 
-      const orderDataForFirestore = prepareDataForFirestore(data.formData, newMediaUrl);
+      // Delete files from storage that are no longer in `existingMediaUrlsToKeep` or `newUploadedUrls`
+      const originalUrls = editingOrder?.mediaUrls || [];
+      const urlsToDelete = originalUrls.filter(url => !data.existingMediaUrlsToKeep.includes(url));
+      for (const urlToDelete of urlsToDelete) {
+        await deleteServiceOrderFileFromStorage(urlToDelete);
+      }
+      
+      const orderDataForFirestore = prepareDataForFirestore(data.formData, finalMediaUrls);
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.id);
-      await updateDoc(orderRef, orderDataForFirestore as { [x: string]: any });
+      await updateDoc(orderRef, orderDataForFirestore as { [x: string]: any }); // Cast to any for updateDoc
       return { ...orderDataForFirestore, id: data.id };
     },
     onSuccess: (data) => {
@@ -453,7 +474,7 @@ export function ServiceOrderClientPage() {
       if (!db) throw new Error("Firebase DB is not available for concluding service order.");
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.orderId);
       let finalEndDate = convertToTimestamp(data.currentEndDate);
-      if (!finalEndDate) {
+      if (!finalEndDate) { // If endDate is not set or invalid, use current date
         finalEndDate = Timestamp.now();
       }
       await updateDoc(orderRef, {
@@ -467,41 +488,21 @@ export function ServiceOrderClientPage() {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Ordem de Serviço Concluída", description: `A OS foi marcada como concluída.` });
       setIsConclusionModalOpen(false);
-      closeModal(); 
+      closeModal();
     },
     onError: (err: Error) => {
       toast({ title: "Erro ao Concluir OS", description: `Não foi possível concluir a OS. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
 
-
-  const removeMediaFileMutation = useMutation({
-    mutationFn: async (data: { orderId: string; fileUrl: string }) => {
-      if (!db) throw new Error("Firebase DB is not available for removing media.");
-      await deleteServiceOrderFileFromStorage(data.fileUrl); // storage check is inside this helper
-      const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.orderId);
-      await updateDoc(orderRef, { mediaUrl: null });
-      return { orderId: data.orderId };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
-      if(editingOrder && editingOrder.id === data.orderId){
-        setEditingOrder(prev => prev ? ({...prev, mediaUrl: null}) : null);
-        form.setValue('mediaUrl', null);
-      }
-      toast({ title: "Arquivo Removido", description: "O arquivo de mídia foi removido." });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Erro ao Remover Arquivo", description: err.message, variant: "destructive" });
-    }
-  });
-
-
   const deleteServiceOrderMutation = useMutation({
     mutationFn: async (orderToDelete: ServiceOrder) => {
       if (!db) throw new Error("Firebase DB is not available for deleting service order.");
       if (!orderToDelete?.id) throw new Error("ID da OS é necessário para exclusão.");
-      await deleteServiceOrderFileFromStorage(orderToDelete.mediaUrl); // storage check is inside
+      
+      if (orderToDelete.mediaUrls && orderToDelete.mediaUrls.length > 0) {
+        await Promise.all(orderToDelete.mediaUrls.map(url => deleteServiceOrderFileFromStorage(url)));
+      }
       return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderToDelete.id));
     },
     onSuccess: () => {
@@ -515,7 +516,7 @@ export function ServiceOrderClientPage() {
   });
 
   const openModal = useCallback((order?: ServiceOrder) => {
-    setMediaFile(null);
+    setMediaFiles([]); // Clear any staged new files
     if (order) {
       setEditingOrder(order);
       const isServiceTypePredefined = serviceTypeOptionsList.includes(order.serviceType as any);
@@ -525,11 +526,12 @@ export function ServiceOrderClientPage() {
         endDate: formatDateForInput(order.endDate),
         vehicleId: order.vehicleId || null,
         technicianId: order.technicianId || null,
-        mediaUrl: order.mediaUrl || null,
+        mediaUrls: order.mediaUrls || [], // Initialize with existing URLs
         serviceType: isServiceTypePredefined ? order.serviceType : CUSTOM_SERVICE_TYPE_VALUE,
         customServiceType: isServiceTypePredefined ? "" : order.serviceType,
         technicalConclusion: order.technicalConclusion || null,
         notes: order.notes || "",
+        requesterName: order.requesterName || "",
       });
       setShowCustomServiceType(!isServiceTypePredefined);
     } else {
@@ -537,9 +539,10 @@ export function ServiceOrderClientPage() {
       const nextOrderNum = getNextOrderNumber(serviceOrders);
       form.reset({
         orderNumber: nextOrderNum,
-        customerId: "", equipmentId: "", phase: "Pendente", technicianId: null,
-        serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
-        startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null, technicalConclusion: null,
+        customerId: "", equipmentId: NO_EQUIPMENT_SELECTED_VALUE, phase: "Pendente", technicianId: null,
+        requesterName: "", serviceType: "", customServiceType: "", vehicleId: null, description: "",
+        notes: "", startDate: formatDateForInput(new Date().toISOString()), endDate: "",
+        mediaUrls: [], technicalConclusion: null,
       });
       setShowCustomServiceType(false);
     }
@@ -549,7 +552,7 @@ export function ServiceOrderClientPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingOrder(null);
-    setMediaFile(null);
+    setMediaFiles([]);
     form.reset();
     setShowCustomServiceType(false);
     setIsConclusionModalOpen(false);
@@ -557,15 +560,20 @@ export function ServiceOrderClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
+    const existingUrlsToKeep = form.getValues('mediaUrls') || [];
+    const newFilesToUpload = mediaFiles;
+
     if (editingOrder?.phase === 'Concluída' && editingOrder?.id) {
-        updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, file: mediaFile, currentOrder: editingOrder });
+        // If order is already concluded, only allow certain fields to be updated if necessary,
+        // or simply allow note/media updates. For now, just general update.
+        updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, filesToUpload: newFilesToUpload, existingMediaUrlsToKeep });
         return;
     }
 
     if (editingOrder && editingOrder.id) {
-      updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, file: mediaFile, currentOrder: editingOrder });
+      updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, filesToUpload: newFilesToUpload, existingMediaUrlsToKeep });
     } else {
-      addServiceOrderMutation.mutate({ formData: values, file: mediaFile });
+      addServiceOrderMutation.mutate({ formData: values, filesToUpload: newFilesToUpload });
     }
   };
 
@@ -577,13 +585,31 @@ export function ServiceOrderClientPage() {
     }
   };
 
-  const handleMediaFileRemove = () => {
-    if (editingOrder && editingOrder.id && editingOrder.mediaUrl) {
-      if (window.confirm(`Tem certeza que deseja remover este arquivo de mídia?`)) {
-        removeMediaFileMutation.mutate({ orderId: editingOrder.id, fileUrl: editingOrder.mediaUrl });
-      }
+  const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    const currentExistingUrlsCount = form.getValues('mediaUrls')?.length || 0;
+    const availableSlots = MAX_FILES_ALLOWED - currentExistingUrlsCount;
+    
+    if (files.length > availableSlots) {
+      toast({
+        title: "Limite de Arquivos Excedido",
+        description: `Você pode anexar no máximo ${MAX_FILES_ALLOWED} arquivos no total. Você já tem ${currentExistingUrlsCount} e tentou adicionar ${files.length}. Selecione no máximo ${availableSlots} novo(s) arquivo(s).`,
+        variant: "destructive",
+      });
+      setMediaFiles(files.slice(0, availableSlots)); // Keep only allowed number of new files
+    } else {
+      setMediaFiles(files);
     }
   };
+  
+  const handleRemoveAllExistingAttachments = () => {
+    if (editingOrder && window.confirm("Tem certeza que deseja remover TODOS os anexos existentes desta Ordem de Serviço? Esta ação não poderá ser desfeita até que você salve o formulário.")) {
+      form.setValue('mediaUrls', []); // Clear existing URLs from form state
+      // Actual deletion from storage will happen on submit via updateServiceOrderMutation
+      toast({title: "Anexos Marcados para Remoção", description: "Os anexos existentes serão removidos ao salvar."})
+    }
+  };
+
 
   const handleServiceTypeChange = (value: string) => {
     form.setValue('serviceType', value);
@@ -595,7 +621,7 @@ export function ServiceOrderClientPage() {
 
   const handleOpenConclusionModal = () => {
     if (editingOrder) {
-      setTechnicalConclusionText(editingOrder.technicalConclusion || ""); 
+      setTechnicalConclusionText(form.getValues("technicalConclusion") || editingOrder.technicalConclusion || "");
       setIsConclusionModalOpen(true);
     }
   };
@@ -609,13 +635,13 @@ export function ServiceOrderClientPage() {
       concludeServiceOrderMutation.mutate({
         orderId: editingOrder.id,
         conclusionText: technicalConclusionText,
-        currentEndDate: form.getValues("endDate"), 
+        currentEndDate: form.getValues("endDate"),
       });
     }
   };
 
   const isOrderConcludedOrCancelled = editingOrder?.phase === 'Concluída' || editingOrder?.phase === 'Cancelada';
-  const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending || isUploadingFile || removeMediaFileMutation.isPending || concludeServiceOrderMutation.isPending;
+  const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending || isUploadingFile || concludeServiceOrderMutation.isPending || deleteServiceOrderMutation.isPending;
   const isLoadingPageData = isLoadingServiceOrders || isLoadingCustomers || isLoadingEquipment || isLoadingTechnicians || isLoadingVehicles;
 
   if (isLoadingPageData && !isModalOpen) {
@@ -653,7 +679,6 @@ export function ServiceOrderClientPage() {
     return vehicle ? `${vehicle.model} (${vehicle.licensePlate})` : id;
   };
 
-
   return (
     <>
       <PageHeader
@@ -677,25 +702,20 @@ export function ServiceOrderClientPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {serviceOrders.map((order) => {
             const deadlineInfo = getDeadlineStatusInfo(order.endDate, order.phase);
-            const cardClasses = cn("flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer", {
-              "border-red-500 border-2": deadlineInfo.status === 'overdue',
-              "border-yellow-500 border-2": deadlineInfo.status === 'due_today' || deadlineInfo.status === 'due_soon',
-            });
+            const cardClasses = cn("flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer");
+            // No longer adding border directly to cardClasses for deadline, using internal div
 
             return (
-            <Card
-              key={order.id}
-              className={cardClasses}
-              onClick={() => openModal(order)}
-            >
-              <CardHeader>
+            <Card key={order.id} className={cardClasses} onClick={() => openModal(order)} >
+              {deadlineInfo.status !== 'none' && deadlineInfo.alertClass && (
+                <div className={cn("p-2 text-sm font-medium rounded-t-md flex items-center justify-center", deadlineInfo.alertClass)}>
+                  {deadlineInfo.icon}
+                  <span className="ml-2">{deadlineInfo.message}</span>
+                </div>
+              )}
+              <CardHeader className={cn(deadlineInfo.status !== 'none' && deadlineInfo.alertClass ? "pt-2" : "")}>
                 <div className="flex justify-between items-start">
                   <CardTitle className="font-headline text-xl text-primary">OS: {order.orderNumber}</CardTitle>
-                  {deadlineInfo.icon && (
-                    <div title={deadlineInfo.message}>
-                      {deadlineInfo.icon}
-                    </div>
-                  )}
                 </div>
                 <CardDescription className="flex items-center text-sm pt-1">
                   {phaseIcons[order.phase]} <span className="font-medium text-muted-foreground ml-1 mr-1">Fase:</span> {order.phase}
@@ -703,6 +723,13 @@ export function ServiceOrderClientPage() {
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
                 <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span> {isLoadingCustomers ? 'Carregando...' : getCustomerName(order.customerId)}</p>
+                {order.requesterName && (
+                  <p className="flex items-start">
+                    <User className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="font-medium text-muted-foreground mr-1">Solicitante:</span>
+                    <span className="whitespace-pre-wrap break-words">{order.requesterName}</span>
+                  </p>
+                )}
                 <p className="flex items-center"><Construction className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Equip.:</span> {isLoadingEquipment ? 'Carregando...' : getEquipmentIdentifier(order.equipmentId)}</p>
                 <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Técnico:</span> {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
                 {order.vehicleId && <p className="flex items-center"><VehicleIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Veículo:</span> {isLoadingVehicles ? 'Carregando...' : getVehicleIdentifier(order.vehicleId)}</p>}
@@ -712,21 +739,31 @@ export function ServiceOrderClientPage() {
                 <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Problema Relatado:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
                 {order.technicalConclusion && <p className="flex items-start"><Check className="mr-2 mt-0.5 h-4 w-4 text-green-500 flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Técnica:</span> <span className="whitespace-pre-wrap break-words">{order.technicalConclusion}</span></p>}
                 {order.notes && <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Obs.:</span> <span className="whitespace-pre-wrap break-words">{order.notes}</span></p>}
-                {order.mediaUrl && (
-                  <p className="flex items-center">
-                    <LinkIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
-                    <span className="font-medium text-muted-foreground mr-1">Mídia:</span>
-                    <a
-                      href={order.mediaUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={e => e.stopPropagation()}
-                      className="text-primary hover:underline hover:text-primary/80 transition-colors truncate"
-                      title={`Ver Mídia: ${getFileNameFromUrl(order.mediaUrl)}`}
-                    >
-                      {getFileNameFromUrl(order.mediaUrl)}
-                    </a>
-                  </p>
+                {order.mediaUrls && order.mediaUrls.length > 0 && (
+                  <div>
+                     <p className="flex items-center text-sm font-medium text-muted-foreground mb-1">
+                       <UploadCloud className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> Anexos:
+                     </p>
+                     <ul className="list-disc list-inside space-y-1">
+                       {order.mediaUrls.map((mediaUrl, index) => (
+                          typeof mediaUrl === 'string' && (
+                           <li key={index} className="flex items-center text-sm">
+                             <LinkIconLI className="mr-2 h-3 w-3 text-primary flex-shrink-0" />
+                             <a
+                                href={mediaUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="text-primary hover:underline truncate flex-grow"
+                                title={`Ver Mídia: ${getFileNameFromUrl(mediaUrl)}`}
+                             >
+                                {getFileNameFromUrl(mediaUrl)}
+                             </a>
+                           </li>
+                          )
+                       ))}
+                     </ul>
+                  </div>
                 )}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
@@ -748,7 +785,7 @@ export function ServiceOrderClientPage() {
         isDeleting={deleteServiceOrderMutation.isPending}
         deleteButtonLabel="Excluir OS"
         submitButtonLabel={editingOrder ? "Salvar Alterações" : "Criar OS"}
-        disableSubmit={editingOrder?.phase === 'Concluída'}
+        disableSubmit={editingOrder?.phase === 'Concluída' && editingOrder?.phase !== 'Cancelada'} // Only disable submit if concluded, not if cancelled
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
@@ -758,11 +795,7 @@ export function ServiceOrderClientPage() {
                   <FormItem>
                     <FormLabel>Número da Ordem</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Gerado automaticamente"
-                        {...field}
-                        readOnly
-                      />
+                      <Input placeholder="Gerado automaticamente" {...field} readOnly />
                     </FormControl>
                     <FormDescription>Este número é gerado automaticamente.</FormDescription>
                     <FormMessage />
@@ -796,7 +829,7 @@ export function ServiceOrderClientPage() {
                       disabled={isOrderConcludedOrCancelled}
                     >
                       <FormControl><SelectTrigger>
-                        <SelectValue placeholder={isLoadingEquipment ? "Carregando..." : "Selecione o Equipamento"} />
+                        <SelectValue placeholder={isLoadingEquipment ? "Carregando..." : (filteredEquipmentList.length === 0 && !selectedCustomerId ? "Nenhum equipamento da frota disponível" : "Selecione o Equipamento")} />
                       </SelectTrigger></FormControl>
                       <SelectContent>
                         {isLoadingEquipment ? (
@@ -823,7 +856,7 @@ export function ServiceOrderClientPage() {
                   <FormItem><FormLabel>Fase</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isOrderConcludedOrCancelled}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Selecione a fase" /></SelectTrigger></FormControl>
-                      <SelectContent>{phaseOptions.map(opt => <SelectItem key={opt} value={opt} disabled={opt === 'Concluída'}>{opt}</SelectItem>)}</SelectContent>
+                      <SelectContent>{phaseOptions.map(opt => <SelectItem key={opt} value={opt} disabled={opt === 'Concluída' && editingOrder?.phase !== 'Concluída'}>{opt}</SelectItem>)}</SelectContent>
                     </Select><FormMessage />
                   </FormItem>
                 )} />
@@ -914,39 +947,74 @@ export function ServiceOrderClientPage() {
                   <FormItem><FormLabel>Data de Conclusão (Prevista)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
-              <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem><FormLabel>Problema Relatado</FormLabel><FormControl><Textarea placeholder="Descreva o problema relatado pelo cliente ou identificado" {...field} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
+
+              <FormField control={form.control} name="requesterName" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome do Solicitante (Opcional)</FormLabel>
+                  <FormControl><Input placeholder="Nome da pessoa que solicitou o serviço" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
 
-              <FormItem>
-                <FormLabel>Mídia (Foto/Vídeo - Opcional)</FormLabel>
-                {editingOrder?.mediaUrl && !mediaFile && (
-                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                    <a href={editingOrder.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                      <LinkIcon className="h-3 w-3"/> Ver Mídia: {getFileNameFromUrl(editingOrder.mediaUrl)}
-                    </a>
-                    {!isOrderConcludedOrCancelled && (
-                      <Button type="button" variant="ghost" size="sm" onClick={handleMediaFileRemove} className="text-destructive hover:text-destructive">
-                        <XCircle className="h-4 w-4 mr-1"/> Remover
-                      </Button>
-                    )}
-                  </div>
-                )}
-                {!isOrderConcludedOrCancelled && (
-                  <FormControl>
-                    <Input
-                      type="file"
-                      accept="image/*,video/*"
-                      onChange={(e) => setMediaFile(e.target.files ? e.target.files[0] : null)}
-                      className="mt-1"
-                      disabled={isOrderConcludedOrCancelled}
-                    />
-                  </FormControl>
-                )}
-                {mediaFile && <FormDescription>Novo arquivo selecionado: {mediaFile.name}</FormDescription>}
-                <FormMessage />
-              </FormItem>
+              <FormField control={form.control} name="description" render={({ field }) => (
+                <FormItem><FormLabel>Problema Relatado</FormLabel><FormControl><Textarea placeholder="Descreva o problema relatado pelo cliente ou identificado" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
+              )} />
             </fieldset>
+            
+            {/* Media Upload Section */}
+            <FormItem>
+              <FormLabel>Anexos (Foto/Vídeo/PDF - Opcional) - Máx {MAX_FILES_ALLOWED} arquivos.</FormLabel>
+              {/* Display existing files */}
+              {editingOrder && formMediaUrls && formMediaUrls.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-sm font-medium mb-1">Anexos Existentes ({formMediaUrls.length}):</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {formMediaUrls.map((mediaUrl, index) => (
+                      typeof mediaUrl === 'string' && (
+                        <li key={`existing-${index}-${mediaUrl}`} className="flex items-center justify-between text-sm">
+                          <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate flex-grow mr-2" title={`Ver Mídia: ${getFileNameFromUrl(mediaUrl)}`}>
+                            <LinkIconLI className="h-3 w-3 inline-block mr-1"/> {getFileNameFromUrl(mediaUrl)}
+                          </a>
+                        </li>
+                      )
+                    ))}
+                  </ul>
+                  {!isOrderConcludedOrCancelled && (
+                    <Button variant="link" size="sm" className="text-red-500 mt-1 p-0 h-auto" onClick={handleRemoveAllExistingAttachments} disabled={isMutating || isOrderConcludedOrCancelled}>
+                        Remover Todos os Anexos Existentes
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* File input for new files */}
+              {!isOrderConcludedOrCancelled && (
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                    onChange={handleFileSelection}
+                    className={cn("mt-1", {
+                      "border-red-500": (formMediaUrls?.length || 0) + mediaFiles.length > MAX_FILES_ALLOWED,
+                    })}
+                    multiple
+                    disabled={isOrderConcludedOrCancelled || (formMediaUrls?.length || 0) + mediaFiles.length >= MAX_FILES_ALLOWED}
+                  />
+                </FormControl>
+              )}
+
+              {/* Display newly selected files for upload */}
+              {mediaFiles.length > 0 && !isOrderConcludedOrCancelled && (
+                <FormDescription className="mt-2 text-sm text-muted-foreground">
+                  Novos arquivos selecionados ({mediaFiles.length}): {mediaFiles.map(file => file.name).join(', ')}. <br />
+                  Total de anexos após salvar: {(formMediaUrls?.length || 0) + mediaFiles.length} / {MAX_FILES_ALLOWED}.
+                </FormDescription>
+              )}
+              {((formMediaUrls?.length || 0) + mediaFiles.length) > MAX_FILES_ALLOWED && !isOrderConcludedOrCancelled && (
+                <p className="text-sm font-medium text-destructive mt-1">Limite de {MAX_FILES_ALLOWED} arquivos excedido.</p>
+              )}
+              <FormMessage /> {/* For Zod validation errors on mediaUrls field if any from schema */}
+            </FormItem>
             
             {editingOrder && !isOrderConcludedOrCancelled && editingOrder.phase !== 'Cancelada' && (
               <div className="pt-4">
@@ -956,7 +1024,7 @@ export function ServiceOrderClientPage() {
               </div>
             )}
 
-            {editingOrder && isOrderConcludedOrCancelled && (
+            {editingOrder && (editingOrder.phase === 'Concluída' || editingOrder.phase === 'Cancelada') && (
               <FormField control={form.control} name="technicalConclusion" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Conclusão Técnica</FormLabel>
@@ -1020,3 +1088,4 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
+
