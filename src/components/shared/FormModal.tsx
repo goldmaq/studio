@@ -54,14 +54,15 @@ export function FormModal<T>({
           {children}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
+        <DialogFooter className="gap-2 sm:justify-between pt-4">
           <div className="flex-grow-0">
             {editingItem && onDeleteConfirm && (
               <Button
-                variant="destructive"
+                variant="outline"
+                size="sm"
                 onClick={onDeleteConfirm}
                 disabled={disableActions}
-                className="w-full sm:w-auto"
+                className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground focus:ring-destructive/50"
               >
                 {isDeleting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -77,7 +78,7 @@ export function FormModal<T>({
               Cancelar
             </Button>
             <Button type="submit" form={formId} disabled={disableActions} className="bg-primary hover:bg-primary/90">
-              {isSubmitting ? "Salvando..." : (editingItem ? "Salvar Alterações" : "Criar")}
+              {isSubmitting ? (isDeleting ? "Processando..." : "Salvando...") : (editingItem ? "Salvar Alterações" : "Criar")}
             </Button>
           </div>
         </DialogFooter>
@@ -85,3 +86,4 @@ export function FormModal<T>({
     </Dialog>
   );
 }
+
