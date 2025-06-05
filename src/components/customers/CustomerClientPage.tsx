@@ -79,6 +79,56 @@ const formatAddressForDisplay = (customer: Customer): string => {
   return parts.join(', ').trim() || "Endereço não fornecido";
 };
 
+const getWhatsAppNumber = (phone?: string): string => {
+  if (!phone) return "";
+  let cleaned = phone.replace(/\D/g, ''); // Remove non-digits
+
+  // If it already starts with 55 (Brazil code) and has a valid BR length (DDD + number)
+  if (cleaned.startsWith('55') && (cleaned.length === 12 || cleaned.length === 13)) {
+    return cleaned;
+  }
+  // If it's a BR number (DDD + number) without country code
+  if (!cleaned.startsWith('55') && (cleaned.length === 10 || cleaned.length === 11)) {
+    return `55${cleaned}`;
+  }
+  // Fallback: return cleaned number; WhatsApp might not resolve it correctly if it's not a recognized format.
+  // This scenario occurs if the number is not a standard Brazilian format or is an international number without '55'.
+  return cleaned;
+};
+
+const formatPhoneNumberForInputDisplay = (value: string): string => {
+  if (!value) return "";
+  const cleaned = value.replace(/\D/g, "");
+  const len = cleaned.length;
+
+  if (len === 0) return "";
+  
+  let ddd = cleaned.substring(0, 2);
+  let numberPart = cleaned.substring(2);
+
+  if (len <= 2) return `(${cleaned}`; // (XX
+  if (len <= 6) return `(${ddd}) ${numberPart}`; // (XX) XXXX
+  
+  // (XX) XXXXX-XXXX (9-digit mobile) or (XX) XXXX-XXXX (8-digit landline)
+  if (numberPart.length <= 5) { // (XX) XXXXX or (XX) XXXX
+    return `(${ddd}) ${numberPart}`;
+  }
+  
+  if (numberPart.length <= 9) { // covers both 8 and 9 digit numbers
+    const firstPartLength = numberPart.length === 9 ? 5 : 4;
+    const firstDigits = numberPart.substring(0, firstPartLength);
+    const secondDigits = numberPart.substring(firstPartLength);
+    if (secondDigits) {
+      return `(${ddd}) ${firstDigits}-${secondDigits}`;
+    }
+    return `(${ddd}) ${firstDigits}`;
+  }
+  // If longer than 11 digits total (2 ddd + 9 number), cap it
+  const firstDigits = numberPart.substring(0, 5);
+  const secondDigits = numberPart.substring(5, 9);
+  return `(${ddd}) ${firstDigits}-${secondDigits}`;
+};
+
 
 export function CustomerClientPage() {
   const queryClient = useQueryClient();
@@ -211,7 +261,10 @@ export function CustomerClientPage() {
   const openModal = (customer?: Customer) => {
     if (customer) {
       setEditingCustomer(customer);
-      form.reset(customer);
+      form.reset({
+        ...customer,
+        phone: customer.phone ? formatPhoneNumberForInputDisplay(customer.phone) : "",
+      });
     } else {
       setEditingCustomer(null);
       form.reset({
@@ -230,6 +283,8 @@ export function CustomerClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof CustomerSchema>) => {
+    // The phone value from the form is already formatted for display,
+    // Firestore will store it as is. The getWhatsAppNumber function will clean it.
     if (editingCustomer && editingCustomer.id) {
       updateCustomerMutation.mutate({ ...values, id: editingCustomer.id });
     } else {
@@ -303,6 +358,11 @@ export function CustomerClientPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {customers.map((customer) => {
             const linkedEquipment = equipmentList.filter(eq => eq.customerId === customer.id);
+            const whatsappNumber = getWhatsAppNumber(customer.phone);
+            const whatsappLink = whatsappNumber 
+              ? `https://wa.me/${whatsappNumber}?text=Olá%20${encodeURIComponent(customer.name)},%20entramos%20em%20contato%20referente%20a%20Gold%20Maq.`
+              : "#";
+
             return (
             <Card 
               key={customer.id} 
@@ -333,11 +393,12 @@ export function CustomerClientPage() {
                   <p className="flex items-center">
                     <Phone className="mr-2 h-4 w-4 text-primary" />
                     <a 
-                       href={`https://wa.me/${customer.phone.replace(/\D/g, '')}?text=Olá%20${customer.name},%20entramos%20em%20contato%20referente%20a%20Gold%20Maq.`}
+                       href={whatsappLink}
                        target="_blank"
                        rel="noopener noreferrer"
                        className="hover:underline text-primary"
                        onClick={(e) => e.stopPropagation()}
+                       title={whatsappNumber ? "Abrir no WhatsApp" : "Número de telefone inválido para WhatsApp"}
                     >
                       {customer.phone}
                     </a>
@@ -427,7 +488,26 @@ export function CustomerClientPage() {
               <FormItem><FormLabel>Email Principal</FormLabel><FormControl><Input type="email" placeholder="contato@exemplo.com" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="phone" render={({ field }) => (
-              <FormItem><FormLabel>Telefone Principal (Opcional)</FormLabel><FormControl><Input placeholder="(00) 00000-0000" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              <FormItem>
+                <FormLabel>Telefone Principal (Opcional)</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="(00) 00000-0000" 
+                    {...field} 
+                    value={field.value ?? ""}
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/\D/g, "");
+                      if (rawValue.length <= 11) { // Max 11 digits (DDD + 9-digit number)
+                        field.onChange(formatPhoneNumberForInputDisplay(e.target.value));
+                      } else {
+                        field.onChange(formatPhoneNumberForInputDisplay(rawValue.substring(0,11)));
+                      }
+                    }}
+                    maxLength={15} // (XX) XXXXX-XXXX is 15 chars
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )} />
 
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Endereço</h3>
@@ -534,9 +614,3 @@ export function CustomerClientPage() {
     </>
   );
 }
-
-    
-
-    
-
-    
