@@ -2,13 +2,13 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+// import Image from "next/image"; // No longer needed for the logo
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   LayoutDashboard,
   Users,
-  Construction, // Will be kept for "Máquinas" as it's a generic construction icon
+  Construction,
   ClipboardList,
   HardHat,
   CarFront,
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/icons/Logo"; // Import the SVG Logo component
 
 interface NavItem {
   href: string;
@@ -40,7 +41,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/", icon: LayoutDashboard, label: "Painel" },
   { href: "/customers", icon: Users, label: "Clientes" },
-  { href: "/maquinas", icon: Construction, label: "Máquinas" }, // Changed label here
+  { href: "/maquinas", icon: Construction, label: "Máquinas" },
   { href: "/auxiliary-equipment", icon: PackageSearch, label: "Equip. Auxiliares" },
   { href: "/service-orders", icon: ClipboardList, label: "Ordens de Serviço" },
   { href: "/technicians", icon: HardHat, label: "Técnicos" },
@@ -61,13 +62,7 @@ function MainSidebar() {
       <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center h-16">
         <Link href="/" className="flex items-center gap-2">
           {open ? (
-             <Image 
-              src="/images/logo.png" 
-              alt="Gold Maq Controle Logo" 
-              width={120} 
-              height={30} 
-              className="transition-all duration-300 ease-in-out" 
-            />
+            <Logo className="transition-all duration-300 ease-in-out" /> // Use the SVG Logo component
           ) : (
             <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />
           )}

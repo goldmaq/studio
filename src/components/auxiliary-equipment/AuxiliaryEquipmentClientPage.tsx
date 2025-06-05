@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { AuxiliaryEquipment, Equipment } from "@/types";
+import type { AuxiliaryEquipment, Maquina } from "@/types"; // Changed Equipment to Maquina
 import { AuxiliaryEquipmentSchema, auxiliaryEquipmentTypeOptions, auxiliaryEquipmentStatusOptions } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
@@ -27,7 +27,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME = "equipamentosAuxiliares";
-const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; 
+const FIRESTORE_MAQUINAS_COLLECTION_NAME = "equipamentos"; // Firestore collection name remains "equipamentos"
 
 const NO_LINKED_EQUIPMENT_VALUE = "_NO_LINKED_EQUIPMENT_";
 const LOADING_EQUIPMENT_VALUE = "_LOADING_EQUIPMENT_";
@@ -59,14 +59,14 @@ async function fetchAuxiliaryEquipment(): Promise<AuxiliaryEquipment[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuxiliaryEquipment));
 }
 
-async function fetchMainEquipment(): Promise<Equipment[]> {
+async function fetchMaquinasPrincipais(): Promise<Maquina[]> { // Renamed function, changed return type
   if (!db) {
-    console.error("fetchMainEquipment: Firebase DB is not available.");
+    console.error("fetchMaquinasPrincipais: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
-  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
+  const q = query(collection(db, FIRESTORE_MAQUINAS_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Maquina)); // Changed to Maquina
 }
 
 export function AuxiliaryEquipmentClientPage() {
@@ -93,13 +93,13 @@ export function AuxiliaryEquipmentClientPage() {
   const { data: auxEquipmentList = [], isLoading: isLoadingAux, isError: isErrorAux, error: errorAux } = useQuery<AuxiliaryEquipment[], Error>({
     queryKey: [FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME],
     queryFn: fetchAuxiliaryEquipment,
-    enabled: !!db, // Only run query if db is available
+    enabled: !!db, 
   });
 
-  const { data: mainEquipmentList = [], isLoading: isLoadingMainEq } = useQuery<Equipment[], Error>({
-    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
-    queryFn: fetchMainEquipment,
-    enabled: !!db, // Only run query if db is available
+  const { data: maquinasPrincipaisList = [], isLoading: isLoadingMaquinasPrincipais } = useQuery<Maquina[], Error>({ // Renamed variable, changed type
+    queryKey: [FIRESTORE_MAQUINAS_COLLECTION_NAME],
+    queryFn: fetchMaquinasPrincipais, // Renamed function
+    enabled: !!db, 
   });
 
   if (!db) {
@@ -233,13 +233,13 @@ export function AuxiliaryEquipmentClientPage() {
     }
   };
   
-  const getLinkedEquipmentName = (equipmentId?: string | null): string => {
-    if (!equipmentId || !mainEquipmentList) return "Nenhum";
-    const equipment = mainEquipmentList.find(eq => eq.id === equipmentId);
-    return equipment ? `${equipment.brand} ${equipment.model} (${equipment.chassisNumber})` : "Não encontrado";
+  const getLinkedMaquinaName = (maquinaId?: string | null): string => { // Renamed function
+    if (!maquinaId || !maquinasPrincipaisList) return "Nenhuma"; // Renamed variable
+    const maquina = maquinasPrincipaisList.find(eq => eq.id === maquinaId); // Renamed variable
+    return maquina ? `${maquina.brand} ${maquina.model} (${maquina.chassisNumber})` : "Não encontrada";
   };
 
-  const isLoadingPageData = isLoadingAux || isLoadingMainEq;
+  const isLoadingPageData = isLoadingAux || isLoadingMaquinasPrincipais; // Renamed variable
   const isMutating = addAuxEquipmentMutation.isPending || updateAuxEquipmentMutation.isPending || deleteAuxEquipmentMutation.isPending;
 
   if (isLoadingPageData && !isModalOpen) {
@@ -321,7 +321,7 @@ export function AuxiliaryEquipmentClientPage() {
                   <p className="flex items-center">
                     <LinkIconLI className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
                     <span className="font-medium text-muted-foreground mr-1">Vinculado a:</span>
-                    {isLoadingMainEq ? <Loader2 className="h-3 w-3 animate-spin" /> : getLinkedEquipmentName(item.linkedEquipmentId)}
+                    {isLoadingMaquinasPrincipais ? <Loader2 className="h-3 w-3 animate-spin" /> : getLinkedMaquinaName(item.linkedEquipmentId)}
                   </p>
                 )}
                 {item.notes && (
@@ -396,21 +396,21 @@ export function AuxiliaryEquipmentClientPage() {
 
             <FormField control={form.control} name="linkedEquipmentId" render={({ field }) => (
               <FormItem>
-                <FormLabel>Vincular ao Equipamento Principal (Opcional)</FormLabel>
+                <FormLabel>Vincular à Máquina Principal (Opcional)</FormLabel> 
                 <Select
                   onValueChange={(selectedValue) => field.onChange(selectedValue === NO_LINKED_EQUIPMENT_VALUE ? null : selectedValue)}
                   value={field.value ?? NO_LINKED_EQUIPMENT_VALUE}
                 >
                   <FormControl><SelectTrigger>
-                    <SelectValue placeholder={isLoadingMainEq ? "Carregando..." : "Selecione para vincular"} />
+                    <SelectValue placeholder={isLoadingMaquinasPrincipais ? "Carregando..." : "Selecione para vincular"} />
                   </SelectTrigger></FormControl>
                   <SelectContent>
-                    {isLoadingMainEq ? (
+                    {isLoadingMaquinasPrincipais ? (
                       <SelectItem value={LOADING_EQUIPMENT_VALUE} disabled>Carregando...</SelectItem>
                     ) : (
                       <>
-                        <SelectItem value={NO_LINKED_EQUIPMENT_VALUE}>Nenhum</SelectItem>
-                        {mainEquipmentList.map((eq) => (
+                        <SelectItem value={NO_LINKED_EQUIPMENT_VALUE}>Nenhuma</SelectItem>
+                        {maquinasPrincipaisList.map((eq) => ( // Renamed variable
                           <SelectItem key={eq.id} value={eq.id}>
                             {eq.brand} {eq.model} (Chassi: {eq.chassisNumber})
                           </SelectItem>
@@ -432,3 +432,5 @@ export function AuxiliaryEquipmentClientPage() {
     </>
   );
 }
+
+    
