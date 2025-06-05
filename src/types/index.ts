@@ -1,5 +1,4 @@
 
-
 export interface Customer {
   id: string;
   name: string;
@@ -14,7 +13,7 @@ export interface Customer {
   neighborhood: string;
   city: string;
   state: string; 
-  preferredTechnician?: string | null; // Alterado para permitir null
+  preferredTechnician?: string | null; 
   notes?: string;
 }
 
@@ -69,6 +68,16 @@ export interface Equipment {
   errorCodesUrl?: string | null;   
 }
 
+export const serviceTypeOptionsList = [
+  "Manutenção Preventiva",
+  "Manutenção Corretiva",
+  "Instalação",
+  "Orçamento",
+  "Visita Técnica",
+  "Revisão Geral",
+] as const;
+
+
 export interface ServiceOrder {
   id: string;
   orderNumber: string;
@@ -76,14 +85,14 @@ export interface ServiceOrder {
   equipmentId: string;
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
   technicianId: string;
-  natureOfService: string;
+  serviceType: string; 
+  customServiceType?: string; 
   vehicleId?: string | null; 
-  estimatedLaborCost: number;
-  actualLaborCost?: number;
   startDate?: string; 
   endDate?: string;   
-  description: string;
+  description: string; 
   notes?: string;
+  mediaUrl?: string | null;
 }
 
 export interface Technician {
@@ -143,7 +152,7 @@ export const CustomerSchema = z.object({
   neighborhood: z.string().min(1, "Bairro é obrigatório"),
   city: z.string().min(1, "Cidade é obrigatória"),
   state: z.string().length(2, "UF deve ter 2 caracteres").min(2, "UF é obrigatória e deve ter 2 caracteres"),
-  preferredTechnician: z.string().nullable().optional(), // Alterado para nullable
+  preferredTechnician: z.string().nullable().optional(), 
   notes: z.string().optional(),
 });
 
@@ -212,15 +221,24 @@ export const ServiceOrderSchema = z.object({
   equipmentId: z.string().min(1, "Equipamento é obrigatório"),
   phase: z.enum(['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada']),
   technicianId: z.string().min(1, "Técnico é obrigatório"),
-  natureOfService: z.string().min(1, "Natureza do serviço é obrigatória"),
+  serviceType: z.string().min(1, "Tipo de serviço é obrigatório"),
+  customServiceType: z.string().optional(),
   vehicleId: z.string().nullable().optional(), 
-  estimatedLaborCost: z.coerce.number().min(0, "Custo estimado deve ser positivo"),
-  actualLaborCost: z.coerce.number().min(0, "Custo real deve ser positivo").optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  description: z.string().min(1, "Descrição é obrigatória"),
+  description: z.string().min(1, "Problema relatado é obrigatório"), 
   notes: z.string().optional(),
+  mediaUrl: z.string().url("URL de mídia inválida").nullable().optional(),
+}).refine(data => {
+  if (data.serviceType === '_CUSTOM_' && (!data.customServiceType || data.customServiceType.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Por favor, especifique o tipo de serviço customizado.",
+  path: ["customServiceType"],
 });
+
 
 export const CompanySchema = z.object({
   name: z.string().min(1, "Nome da empresa é obrigatório"),
@@ -237,4 +255,3 @@ export const CompanySchema = z.object({
   bankAccount: z.string().optional(),
   bankPixKey: z.string().optional(),
 });
-

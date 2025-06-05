@@ -1,25 +1,26 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon } from "lucide-react"; // Renamed AlertTriangle to AlertIconLI
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIcon, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import type { ServiceOrder, Customer, Equipment, Technician, Vehicle } from "@/types";
-import { ServiceOrderSchema } from "@/types";
+import { ServiceOrderSchema, serviceTypeOptionsList } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy } from "firebase/firestore";
+import { db, storage } from "@/lib/firebase";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy, setDoc } from "firebase/firestore";
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
@@ -39,6 +40,45 @@ const FIRESTORE_VEHICLE_COLLECTION_NAME = "veiculos";
 
 const NO_VEHICLE_SELECTED_VALUE = "_NO_VEHICLE_SELECTED_";
 const LOADING_VEHICLES_SELECT_ITEM_VALUE = "_LOADING_VEHICLES_";
+const CUSTOM_SERVICE_TYPE_VALUE = "_CUSTOM_";
+
+const getFileNameFromUrl = (url: string): string => {
+  try {
+    const decodedUrl = decodeURIComponent(url);
+    const pathAndQuery = decodedUrl.split('?')[0];
+    const segments = pathAndQuery.split('/');
+    const fileNameWithPossiblePrefix = segments.pop() || "arquivo";
+    const fileNameCleaned = fileNameWithPossiblePrefix.split('?')[0];
+    const finalFileName = fileNameCleaned.substring(fileNameCleaned.indexOf('_') + 1);
+    return finalFileName || "arquivo";
+  } catch (e) {
+    console.error("Error parsing filename from URL:", e);
+    return "arquivo";
+  }
+};
+
+async function uploadServiceOrderFile(
+  file: File,
+  orderId: string
+): Promise<string> {
+  const filePath = `service_order_media/${orderId}/${Date.now()}_${file.name}`;
+  const fileStorageRef = storageRef(storage, filePath);
+  await uploadBytes(fileStorageRef, file);
+  return getDownloadURL(fileStorageRef);
+}
+
+async function deleteServiceOrderFileFromStorage(fileUrl?: string | null) {
+  if (fileUrl) {
+    try {
+      const gcsPath = new URL(fileUrl).pathname.split('/o/')[1].split('?')[0];
+      const decodedPath = decodeURIComponent(gcsPath);
+      const fileStorageRef = storageRef(storage, decodedPath);
+      await deleteObject(fileStorageRef);
+    } catch (e) {
+      console.warn(`[DELETE SO FILE] Failed to delete file from storage: ${fileUrl}`, e);
+    }
+  }
+}
 
 
 const formatDateForInput = (date: any): string => {
@@ -79,6 +119,9 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
       endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
       vehicleId: data.vehicleId || null,
+      mediaUrl: data.mediaUrl || null,
+      serviceType: data.serviceType || "Não especificado",
+      customServiceType: data.customServiceType || "",
     } as ServiceOrder;
   });
 }
@@ -113,15 +156,20 @@ export function ServiceOrderClientPage() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
+  const [showCustomServiceType, setShowCustomServiceType] = useState(false);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
 
   const form = useForm<z.infer<typeof ServiceOrderSchema>>({
     resolver: zodResolver(ServiceOrderSchema),
     defaultValues: {
       orderNumber: "", customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
-      natureOfService: "", vehicleId: null, estimatedLaborCost: 0, description: "", notes: "",
-      startDate: formatDateForInput(new Date().toISOString()), endDate: ""
+      serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
+      startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null
     },
   });
+
+  const selectedCustomerId = useWatch({ control: form.control, name: 'customerId' });
 
   const { data: serviceOrders = [], isLoading: isLoadingServiceOrders, isError: isErrorServiceOrders, error: errorServiceOrders } = useQuery<ServiceOrder[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
@@ -148,120 +196,199 @@ export function ServiceOrderClientPage() {
     queryFn: fetchVehicles,
   });
 
+  useEffect(() => {
+    if (selectedCustomerId && customers.length > 0 && technicians.length > 0) {
+      const customer = customers.find(c => c.id === selectedCustomerId);
+      if (customer?.preferredTechnician) {
+        const preferredTech = technicians.find(t => t.name === customer.preferredTechnician);
+        if (preferredTech) {
+          form.setValue('technicianId', preferredTech.id, { shouldValidate: true });
+        }
+      }
+    }
+  }, [selectedCustomerId, customers, technicians, form]);
+
+  const prepareDataForFirestore = (
+    formData: z.infer<typeof ServiceOrderSchema>,
+    newMediaUrl?: string | null
+  ): Omit<ServiceOrder, 'id' | 'customServiceType'> => {
+    const { customServiceType, ...restOfData } = formData;
+    
+    let finalServiceType = restOfData.serviceType;
+    if (restOfData.serviceType === CUSTOM_SERVICE_TYPE_VALUE) {
+      finalServiceType = customServiceType || "Não especificado";
+    }
+
+    return {
+      ...restOfData,
+      serviceType: finalServiceType,
+      startDate: convertToTimestamp(restOfData.startDate),
+      endDate: convertToTimestamp(restOfData.endDate),
+      vehicleId: restOfData.vehicleId || null,
+      mediaUrl: newMediaUrl === undefined ? formData.mediaUrl : newMediaUrl,
+    };
+  };
+
+
   const addServiceOrderMutation = useMutation({
-    mutationFn: async (newOrderData: z.infer<typeof ServiceOrderSchema>) => {
-      const dataToSave = {
-        ...newOrderData,
-        startDate: convertToTimestamp(newOrderData.startDate),
-        endDate: convertToTimestamp(newOrderData.endDate),
-        estimatedLaborCost: Number(newOrderData.estimatedLaborCost),
-        actualLaborCost: newOrderData.actualLaborCost ? Number(newOrderData.actualLaborCost) : undefined,
-        vehicleId: newOrderData.vehicleId || null,
-      };
-      return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), dataToSave);
+    mutationFn: async (data: { formData: z.infer<typeof ServiceOrderSchema>, file: File | null }) => {
+      setIsUploadingFile(true);
+      const newOrderId = doc(collection(db, FIRESTORE_COLLECTION_NAME)).id;
+      let uploadedMediaUrl: string | null = null;
+
+      if (data.file) {
+        uploadedMediaUrl = await uploadServiceOrderFile(data.file, newOrderId);
+      }
+      
+      const orderDataForFirestore = prepareDataForFirestore(data.formData, uploadedMediaUrl);
+      await setDoc(doc(db, FIRESTORE_COLLECTION_NAME, newOrderId), orderDataForFirestore);
+      return { ...orderDataForFirestore, id: newOrderId };
     },
-    onSuccess: (docRef, variables) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
-      toast({ title: "Ordem de Serviço Criada", description: `Ordem ${variables.orderNumber} criada.` });
+      toast({ title: "Ordem de Serviço Criada", description: `Ordem ${data.orderNumber} criada.` });
       closeModal();
     },
     onError: (err: Error, variables) => {
-      toast({ title: "Erro ao Criar OS", description: `Não foi possível criar a OS ${variables.orderNumber}. Detalhe: ${err.message}`, variant: "destructive" });
+      toast({ title: "Erro ao Criar OS", description: `Não foi possível criar a OS ${variables.formData.orderNumber}. Detalhe: ${err.message}`, variant: "destructive" });
     },
+    onSettled: () => setIsUploadingFile(false)
   });
 
   const updateServiceOrderMutation = useMutation({
-    mutationFn: async (orderData: ServiceOrder) => {
-      const { id, ...dataToUpdate } = orderData;
-      if (!id) throw new Error("ID da OS é necessário para atualização.");
-      const dataToSave = {
-        ...dataToUpdate,
-        startDate: convertToTimestamp(orderData.startDate),
-        endDate: convertToTimestamp(orderData.endDate),
-        estimatedLaborCost: Number(orderData.estimatedLaborCost),
-        actualLaborCost: orderData.actualLaborCost ? Number(orderData.actualLaborCost) : undefined,
-        vehicleId: orderData.vehicleId || null,
-      };
-      const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
-      return updateDoc(orderRef, dataToSave);
+    mutationFn: async (data: { id: string, formData: z.infer<typeof ServiceOrderSchema>, file: File | null, currentOrder: ServiceOrder }) => {
+      setIsUploadingFile(true);
+      let newMediaUrl = data.currentOrder.mediaUrl;
+
+      if (data.file) { // New file to upload
+        await deleteServiceOrderFileFromStorage(data.currentOrder.mediaUrl); // Delete old if exists
+        newMediaUrl = await uploadServiceOrderFile(data.file, data.id);
+      }
+      // If data.file is null, newMediaUrl keeps its current value (which might be null if user removed existing file without uploading new)
+      // This is handled by removeFileMutation if user explicitly clicks remove.
+
+      const orderDataForFirestore = prepareDataForFirestore(data.formData, newMediaUrl);
+      const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.id);
+      await updateDoc(orderRef, orderDataForFirestore);
+      return { ...orderDataForFirestore, id: data.id };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
-      toast({ title: "Ordem de Serviço Atualizada", description: `Ordem ${variables.orderNumber} atualizada.` });
+      toast({ title: "Ordem de Serviço Atualizada", description: `Ordem ${data.orderNumber} atualizada.` });
       closeModal();
     },
     onError: (err: Error, variables) => {
-      toast({ title: "Erro ao Atualizar OS", description: `Não foi possível atualizar a OS ${variables.orderNumber}. Detalhe: ${err.message}`, variant: "destructive" });
+      toast({ title: "Erro ao Atualizar OS", description: `Não foi possível atualizar a OS ${variables.formData.orderNumber}. Detalhe: ${err.message}`, variant: "destructive" });
     },
+    onSettled: () => setIsUploadingFile(false)
+  });
+  
+  const removeMediaFileMutation = useMutation({
+    mutationFn: async (data: { orderId: string; fileUrl: string }) => {
+      await deleteServiceOrderFileFromStorage(data.fileUrl);
+      const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.orderId);
+      await updateDoc(orderRef, { mediaUrl: null });
+      return { orderId: data.orderId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
+      if(editingOrder && editingOrder.id === data.orderId){
+        setEditingOrder(prev => prev ? ({...prev, mediaUrl: null}) : null);
+        form.setValue('mediaUrl', null);
+      }
+      toast({ title: "Arquivo Removido", description: "O arquivo de mídia foi removido." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro ao Remover Arquivo", description: err.message, variant: "destructive" });
+    }
   });
 
+
   const deleteServiceOrderMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      if (!orderId) throw new Error("ID da OS é necessário para exclusão.");
-      return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderId));
+    mutationFn: async (orderToDelete: ServiceOrder) => {
+      if (!orderToDelete?.id) throw new Error("ID da OS é necessário para exclusão.");
+      await deleteServiceOrderFileFromStorage(orderToDelete.mediaUrl); // Delete associated media file
+      return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderToDelete.id));
     },
-    onSuccess: (_, orderId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Ordem de Serviço Excluída", description: `A OS foi excluída.` });
       closeModal(); 
     },
-    onError: (err: Error, orderId) => {
+    onError: (err: Error) => {
       toast({ title: "Erro ao Excluir OS", description: `Não foi possível excluir a OS. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
 
-  const openModal = (order?: ServiceOrder) => {
+  const openModal = useCallback((order?: ServiceOrder) => {
+    setMediaFile(null);
     if (order) {
       setEditingOrder(order);
+      const isServiceTypePredefined = serviceTypeOptionsList.includes(order.serviceType as any);
       form.reset({
         ...order,
         startDate: formatDateForInput(order.startDate),
         endDate: formatDateForInput(order.endDate),
-        estimatedLaborCost: Number(order.estimatedLaborCost) || 0,
-        actualLaborCost: order.actualLaborCost ? Number(order.actualLaborCost) : undefined,
         vehicleId: order.vehicleId || null, 
+        mediaUrl: order.mediaUrl || null,
+        serviceType: isServiceTypePredefined ? order.serviceType : CUSTOM_SERVICE_TYPE_VALUE,
+        customServiceType: isServiceTypePredefined ? "" : order.serviceType,
       });
+      setShowCustomServiceType(!isServiceTypePredefined);
     } else {
       setEditingOrder(null);
       form.reset({
-        orderNumber: `OS-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`, 
+        orderNumber: "", 
         customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
-        natureOfService: "", vehicleId: null, estimatedLaborCost: 0, description: "", notes: "",
-        startDate: formatDateForInput(new Date().toISOString()), endDate: ""
+        serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
+        startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null
       });
+      setShowCustomServiceType(false);
     }
     setIsModalOpen(true);
-  };
+  }, [form]);
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingOrder(null);
+    setMediaFile(null);
     form.reset();
+    setShowCustomServiceType(false);
   };
 
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
-    const orderData = {
-      ...values,
-      estimatedLaborCost: Number(values.estimatedLaborCost),
-      actualLaborCost: values.actualLaborCost ? Number(values.actualLaborCost) : undefined,
-      vehicleId: values.vehicleId || null, 
-    };
     if (editingOrder && editingOrder.id) {
-      updateServiceOrderMutation.mutate({ ...orderData, id: editingOrder.id });
+      updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, file: mediaFile, currentOrder: editingOrder });
     } else {
-      addServiceOrderMutation.mutate(orderData);
+      addServiceOrderMutation.mutate({ formData: values, file: mediaFile });
     }
   };
 
   const handleModalDeleteConfirm = () => {
     if (editingOrder && editingOrder.id) {
        if (window.confirm(`Tem certeza que deseja excluir a Ordem de Serviço "${editingOrder.orderNumber}"?`)) {
-        deleteServiceOrderMutation.mutate(editingOrder.id);
+        deleteServiceOrderMutation.mutate(editingOrder);
+      }
+    }
+  };
+
+  const handleMediaFileRemove = () => {
+    if (editingOrder && editingOrder.id && editingOrder.mediaUrl) {
+      if (window.confirm(`Tem certeza que deseja remover este arquivo de mídia?`)) {
+        removeMediaFileMutation.mutate({ orderId: editingOrder.id, fileUrl: editingOrder.mediaUrl });
       }
     }
   };
   
-  const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending;
+  const handleServiceTypeChange = (value: string) => {
+    form.setValue('serviceType', value);
+    setShowCustomServiceType(value === CUSTOM_SERVICE_TYPE_VALUE);
+    if (value !== CUSTOM_SERVICE_TYPE_VALUE) {
+      form.setValue('customServiceType', "");
+    }
+  };
+
+  const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending || isUploadingFile || removeMediaFileMutation.isPending;
   const isLoadingPageData = isLoadingServiceOrders || isLoadingCustomers || isLoadingEquipment || isLoadingTechnicians || isLoadingVehicles;
 
   if (isLoadingPageData && !isModalOpen) { 
@@ -335,13 +462,27 @@ export function ServiceOrderClientPage() {
                 <p className="flex items-center text-sm"><Construction className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Equip.:</span> {isLoadingEquipment ? 'Carregando...' : getEquipmentIdentifier(order.equipmentId)}</p>
                 <p className="flex items-center text-sm"><HardHat className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Técnico:</span> {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
                 {order.vehicleId && <p className="flex items-center text-sm"><VehicleIcon className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Veículo:</span> {isLoadingVehicles ? 'Carregando...' : getVehicleIdentifier(order.vehicleId)}</p>}
-                <p className="flex items-center text-sm"><Settings2 className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Serviço:</span> {order.natureOfService}</p>
-                <p className="flex items-center text-sm"><DollarSign className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Custo Est.:</span> R$ {Number(order.estimatedLaborCost).toFixed(2)}</p>
-                {order.actualLaborCost !== undefined && <p className="flex items-center text-sm"><DollarSign className="mr-2 h-4 w-4 text-green-500" /> <span className="font-medium text-muted-foreground mr-1">Custo Real:</span> R$ {Number(order.actualLaborCost).toFixed(2)}</p>}
+                <p className="flex items-center text-sm"><Settings2 className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Tipo Serviço:</span> {order.serviceType}</p>
                 {order.startDate && <p className="flex items-center text-sm"><Calendar className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {formatDateForInput(order.startDate)}</p>}
-                {order.endDate && <p className="flex items-center text-sm"><Calendar className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Término:</span> {formatDateForInput(order.endDate)}</p>}
-                <p className="flex items-start text-sm"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Descrição:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
+                {order.endDate && <p className="flex items-center text-sm"><Calendar className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Prev.:</span> {formatDateForInput(order.endDate)}</p>}
+                <p className="flex items-start text-sm"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Problema Relatado:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
                 {order.notes && <p className="flex items-start text-sm"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Obs.:</span> <span className="whitespace-pre-wrap break-words">{order.notes}</span></p>}
+                {order.mediaUrl && (
+                  <p className="flex items-center text-sm">
+                    <LinkIcon className="mr-2 h-4 w-4 text-primary" />
+                    <span className="font-medium text-muted-foreground mr-1">Mídia:</span>
+                    <a
+                      href={order.mediaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="text-primary hover:underline hover:text-primary/80 transition-colors truncate"
+                      title={`Ver Mídia: ${getFileNameFromUrl(order.mediaUrl)}`}
+                    >
+                      {getFileNameFromUrl(order.mediaUrl)}
+                    </a>
+                  </p>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
               </CardFooter>
@@ -366,7 +507,7 @@ export function ServiceOrderClientPage() {
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="orderNumber" render={({ field }) => (
-                <FormItem><FormLabel>Número da Ordem</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Número da Ordem</FormLabel><FormControl><Input placeholder="Ex: 4001" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               
               <FormField control={form.control} name="customerId" render={({ field }) => (
@@ -432,9 +573,28 @@ export function ServiceOrderClientPage() {
                 </FormItem>
               )} />
               
-              <FormField control={form.control} name="natureOfService" render={({ field }) => (
-                <FormItem><FormLabel>Natureza do Serviço</FormLabel><FormControl><Input placeholder="ex: Manutenção Preventiva" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormField control={form.control} name="serviceType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de Serviço</FormLabel>
+                  <Select onValueChange={handleServiceTypeChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {serviceTypeOptionsList.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      <SelectItem value={CUSTOM_SERVICE_TYPE_VALUE}>Outro (Especificar)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {showCustomServiceType && (
+                    <FormField control={form.control} name="customServiceType" render={({ field: customField }) => (
+                     <FormItem className="mt-2">
+                        <FormControl><Input placeholder="Digite o tipo de serviço" {...customField} value={customField.value ?? ""} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                  <FormMessage />
+                </FormItem>
               )} />
+
 
               <FormField control={form.control} name="vehicleId" render={({ field }) => (
                 <FormItem>
@@ -463,24 +623,43 @@ export function ServiceOrderClientPage() {
                 </FormItem>
               )} />
 
-              <FormField control={form.control} name="estimatedLaborCost" render={({ field }) => (
-                <FormItem><FormLabel>Custo Estimado da Mão de Obra</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-              )} />
               <FormField control={form.control} name="startDate" render={({ field }) => (
                 <FormItem><FormLabel>Data de Início</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="endDate" render={({ field }) => (
-                <FormItem><FormLabel>Data de Término (Opcional)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={form.control} name="actualLaborCost" render={({ field }) => (
-                <FormItem className="md:col-span-2"><FormLabel>Custo Real da Mão de Obra (Opcional)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Data de Conclusão (Prevista)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
             <FormField control={form.control} name="description" render={({ field }) => (
-              <FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea placeholder="Descrição detalhada do serviço" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Problema Relatado</FormLabel><FormControl><Textarea placeholder="Descreva o problema relatado pelo cliente ou identificado" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+            
+            <FormItem>
+              <FormLabel>Mídia (Foto/Vídeo - Opcional)</FormLabel>
+              {editingOrder?.mediaUrl && !mediaFile && (
+                <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                  <a href={editingOrder.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                    <LinkIcon className="h-3 w-3"/> Ver Mídia: {getFileNameFromUrl(editingOrder.mediaUrl)}
+                  </a>
+                  <Button type="button" variant="ghost" size="sm" onClick={handleMediaFileRemove} className="text-destructive hover:text-destructive">
+                    <XCircle className="h-4 w-4 mr-1"/> Remover
+                  </Button>
+                </div>
+              )}
+              <FormControl>
+                <Input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => setMediaFile(e.target.files ? e.target.files[0] : null)}
+                  className="mt-1"
+                />
+              </FormControl>
+              {mediaFile && <FormDescription>Novo arquivo selecionado: {mediaFile.name}</FormDescription>}
+              <FormMessage />
+            </FormItem>
+
             <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais, peças utilizadas, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
         </Form>
