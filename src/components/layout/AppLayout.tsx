@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-// import Image from "next/image"; // Remove next/image import
+import Image from "next/image"; // Import next/image
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/icons/Logo"; // Import the SVG Logo component
+// import { Logo } from "@/components/icons/Logo"; // No longer needed if using Image
 
 interface NavItem {
   href: string;
@@ -60,7 +60,14 @@ function MainSidebar() {
       <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center h-16">
         <Link href="/" className="flex items-center gap-2">
           {open ? (
-            <Logo className="transition-all duration-300 ease-in-out" />
+            <Image 
+              src="/images/logo.png" 
+              alt="Gold Maq Controle Logo" 
+              width={120} 
+              height={30} 
+              className="transition-all duration-300 ease-in-out" 
+              priority // Add priority if it's LCP
+            />
           ) : (
             <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />
           )}
