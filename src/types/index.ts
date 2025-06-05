@@ -83,6 +83,7 @@ export interface ServiceOrder {
   orderNumber: string;
   customerId: string;
   equipmentId: string; // This ID refers to a 'Maquina' entity
+  requesterName?: string; // Nome do solicitante do serviço
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
   technicianId?: string | null;
   serviceType: string; 
@@ -92,7 +93,7 @@ export interface ServiceOrder {
   endDate?: string;   
   description: string; 
   notes?: string | undefined;
-  mediaUrl?: string | null;
+  mediaUrls?: string[] | null; // Array de URLs de mídia (fotos/vídeos)
   technicalConclusion?: string | null;
 }
 
@@ -236,7 +237,8 @@ export const VehicleSchema = z.object({
 export const ServiceOrderSchema = z.object({
   orderNumber: z.string().min(1, "Número da ordem é obrigatório"),
   customerId: z.string().min(1, "Cliente é obrigatório"),
-  equipmentId: z.string().min(1, "Máquina é obrigatória"), // Refere-se a uma Máquina
+  equipmentId: z.string().min(1, "Máquina é obrigatória"), 
+  requesterName: z.string().optional(),
   phase: z.enum(['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada']),
   technicianId: z.string().nullable().optional(),
   serviceType: z.string().min(1, "Tipo de serviço é obrigatório"),
@@ -246,7 +248,7 @@ export const ServiceOrderSchema = z.object({
   endDate: z.string().optional(),   
   description: z.string().min(1, "Problema relatado é obrigatório"), 
   notes: z.string().optional().nullable(),
-  mediaUrl: z.string().url("URL de mídia inválida").nullable().optional(),
+  mediaUrls: z.array(z.string().url("URL de mídia inválida")).max(5, "Máximo de 5 arquivos de mídia").nullable().optional(),
   technicalConclusion: z.string().nullable().optional(),
 }).refine(data => {
   if (data.serviceType === '_CUSTOM_' && (!data.customServiceType || data.customServiceType.trim() === "")) {
