@@ -150,6 +150,17 @@ async function fetchVehicles(): Promise<Vehicle[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Vehicle));
 }
 
+const getNextOrderNumber = (currentOrders: ServiceOrder[]): string => {
+  let maxOrderNum = 3999; 
+  currentOrders.forEach(order => {
+    const num = parseInt(order.orderNumber, 10);
+    if (!isNaN(num) && num > maxOrderNum) {
+      maxOrderNum = num;
+    }
+  });
+  return (maxOrderNum + 1).toString();
+};
+
 export function ServiceOrderClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -260,13 +271,11 @@ export function ServiceOrderClientPage() {
       setIsUploadingFile(true);
       let newMediaUrl = data.currentOrder.mediaUrl;
 
-      if (data.file) { // New file to upload
-        await deleteServiceOrderFileFromStorage(data.currentOrder.mediaUrl); // Delete old if exists
+      if (data.file) { 
+        await deleteServiceOrderFileFromStorage(data.currentOrder.mediaUrl); 
         newMediaUrl = await uploadServiceOrderFile(data.file, data.id);
       }
-      // If data.file is null, newMediaUrl keeps its current value (which might be null if user removed existing file without uploading new)
-      // This is handled by removeFileMutation if user explicitly clicks remove.
-
+      
       const orderDataForFirestore = prepareDataForFirestore(data.formData, newMediaUrl);
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.id);
       await updateDoc(orderRef, orderDataForFirestore);
@@ -307,7 +316,7 @@ export function ServiceOrderClientPage() {
   const deleteServiceOrderMutation = useMutation({
     mutationFn: async (orderToDelete: ServiceOrder) => {
       if (!orderToDelete?.id) throw new Error("ID da OS é necessário para exclusão.");
-      await deleteServiceOrderFileFromStorage(orderToDelete.mediaUrl); // Delete associated media file
+      await deleteServiceOrderFileFromStorage(orderToDelete.mediaUrl); 
       return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderToDelete.id));
     },
     onSuccess: () => {
@@ -337,8 +346,9 @@ export function ServiceOrderClientPage() {
       setShowCustomServiceType(!isServiceTypePredefined);
     } else {
       setEditingOrder(null);
+      const nextOrderNum = getNextOrderNumber(serviceOrders);
       form.reset({
-        orderNumber: "", 
+        orderNumber: nextOrderNum, 
         customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
         serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
         startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null
@@ -346,7 +356,7 @@ export function ServiceOrderClientPage() {
       setShowCustomServiceType(false);
     }
     setIsModalOpen(true);
-  }, [form]);
+  }, [form, serviceOrders]);
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -507,7 +517,18 @@ export function ServiceOrderClientPage() {
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="orderNumber" render={({ field }) => (
-                <FormItem><FormLabel>Número da Ordem</FormLabel><FormControl><Input placeholder="Ex: 4001" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Número da Ordem</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Gerado automaticamente" 
+                      {...field} 
+                      readOnly 
+                    />
+                  </FormControl>
+                  <FormDescription>Este número é gerado automaticamente.</FormDescription>
+                  <FormMessage />
+                </FormItem>
               )} />
               
               <FormField control={form.control} name="customerId" render={({ field }) => (
