@@ -17,14 +17,29 @@ export interface Customer {
   notes?: string;
 }
 
+export const equipmentTypeOptions = [
+  'Empilhadeira Contrabalançada GLP', 
+  'Empilhadeira Contrabalançada Elétrica', 
+  'Empilhadeira Retrátil', 
+  'Transpaleteira Elétrica', 
+  'Rebocador Industrial', 
+  'Plataforma Elevatória Tesoura', 
+  'Plataforma Elevatória Articulada',
+  'Outro (Manual)'
+] as const;
+
+export const operationalStatusOptions = ['Operacional', 'Precisa de Reparo', 'Fora de Serviço'] as const;
+
+export const fuelTypeOptions = ['Elétrico', 'GLP', 'Diesel', 'Gasolina', 'Não Aplicável'] as const;
+
 export interface Equipment {
   id:string;
   brand: string;
   model: string;
   chassisNumber: string;
-  equipmentType: string;
+  equipmentType: typeof equipmentTypeOptions[number] | string; // Allow string for custom
   manufactureYear: number | null;
-  operationalStatus: 'Operacional' | 'Precisa de Reparo' | 'Fora de Serviço';
+  operationalStatus: typeof operationalStatusOptions[number];
   customerId?: string | null;
   customBrand?: string;
   customModel?: string;
@@ -44,9 +59,6 @@ export interface Equipment {
   batteryVoltage?: string | null;
   batteryAmpHour?: string | null;
   monthlyRentalValue?: number | null;
-  acquisitionDate?: string | null; 
-  lastPreventiveMaintenance?: string | null; 
-  nextPreventiveMaintenance?: string | null; 
   hourMeter?: number | null;
   notes?: string | null;
 }
@@ -124,21 +136,6 @@ export const CustomerSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const equipmentTypeOptions = [
-  'Empilhadeira Contrabalançada GLP', 
-  'Empilhadeira Contrabalançada Elétrica', 
-  'Empilhadeira Retrátil', 
-  'Transpaleteira Elétrica', 
-  'Rebocador Industrial', 
-  'Plataforma Elevatória Tesoura', 
-  'Plataforma Elevatória Articulada',
-  'Outro (Manual)'
-] as const;
-
-export const operationalStatusOptions = ['Operacional', 'Precisa de Reparo', 'Fora de Serviço'] as const;
-
-export const fuelTypeOptions = ['Elétrico', 'GLP', 'Diesel', 'Gasolina', 'Não Aplicável'] as const;
-
 export const EquipmentSchema = z.object({
   brand: z.string().min(1, "Marca é obrigatória"),
   model: z.string().min(1, "Modelo é obrigatório"),
@@ -165,9 +162,6 @@ export const EquipmentSchema = z.object({
   batteryVoltage: z.string().optional().nullable(),
   batteryAmpHour: z.string().optional().nullable(),
   monthlyRentalValue: z.coerce.number().min(0, "Valor deve ser positivo ou zero").optional().nullable(),
-  acquisitionDate: z.string().optional().nullable(), 
-  lastPreventiveMaintenance: z.string().optional().nullable(),
-  nextPreventiveMaintenance: z.string().optional().nullable(),
   hourMeter: z.coerce.number().min(0, "Horímetro deve ser positivo ou zero").optional().nullable(),
   notes: z.string().optional().nullable(),
 });

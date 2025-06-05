@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-// import { useRouter, useSearchParams } from "next/navigation"; // useSearchParams removed, useRouter might be needed if re-added
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
@@ -12,8 +11,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import type { Equipment, Customer } from "@/types"; 
-import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, fuelTypeOptions } from "@/types"; 
+import type { Equipment, Customer } from "@/types";
+import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, fuelTypeOptions } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -25,15 +24,15 @@ import { Textarea } from "@/components/ui/textarea";
 
 
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
-const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes"; 
+const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 
-const NO_CUSTOMER_FORM_VALUE = ""; 
-const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_"; 
+const NO_CUSTOMER_FORM_VALUE = "";
+const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
   Operacional: <CheckCircle className="h-4 w-4 text-green-500" />,
-  'Precisa de Reparo': <AlertIconLI className="h-4 w-4 text-yellow-500" />, 
+  'Precisa de Reparo': <AlertIconLI className="h-4 w-4 text-yellow-500" />,
   'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
 };
 
@@ -49,24 +48,38 @@ async function fetchEquipment(): Promise<Equipment[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data();
-    return { 
-      id: docSnap.id, 
-      ...data,
-      manufactureYear: data.manufactureYear === undefined ? null : data.manufactureYear,
-      towerOpenHeightMm: data.towerOpenHeightMm === undefined ? null : data.towerOpenHeightMm,
-      towerClosedHeightMm: data.towerClosedHeightMm === undefined ? null : data.towerClosedHeightMm,
-      totalWidthMm: data.totalWidthMm === undefined ? null : data.totalWidthMm,
-      totalLengthMm: data.totalLengthMm === undefined ? null : data.totalLengthMm,
-      machineWeightKg: data.machineWeightKg === undefined ? null : data.machineWeightKg,
-      nominalCapacityKg: data.nominalCapacityKg === undefined ? null : data.nominalCapacityKg,
-      turningRadiusMm: data.turningRadiusMm === undefined ? null : data.turningRadiusMm,
-      monthlyRentalValue: data.monthlyRentalValue === undefined ? null : data.monthlyRentalValue,
-      lastPreventiveMaintenance: data.lastPreventiveMaintenance || null,
-      nextPreventiveMaintenance: data.nextPreventiveMaintenance || null,
-      hourMeter: data.hourMeter === undefined ? null : data.hourMeter,
+    
+    // Explicitly map fields to the Equipment type
+    const equipmentData: Equipment = {
+      id: docSnap.id,
+      brand: data.brand || "Marca Desconhecida",
+      model: data.model || "Modelo Desconhecido",
+      chassisNumber: data.chassisNumber || "N/A",
+      equipmentType: (equipmentTypeOptions.includes(data.equipmentType as any) || typeof data.equipmentType === 'string') ? data.equipmentType : "Outro (Manual)",
+      manufactureYear: data.manufactureYear !== undefined && !isNaN(Number(data.manufactureYear)) ? Number(data.manufactureYear) : null,
+      operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Operacional",
       customerId: data.customerId === undefined ? null : data.customerId,
-      fuelType: data.fuelType === undefined ? null : data.fuelType,
-    } as Equipment;
+      
+      towerType: data.towerType === undefined ? null : data.towerType,
+      towerOpenHeightMm: data.towerOpenHeightMm !== undefined && !isNaN(Number(data.towerOpenHeightMm)) ? Number(data.towerOpenHeightMm) : null,
+      towerClosedHeightMm: data.towerClosedHeightMm !== undefined && !isNaN(Number(data.towerClosedHeightMm)) ? Number(data.towerClosedHeightMm) : null,
+      forkSize: data.forkSize === undefined ? null : data.forkSize,
+      totalWidthMm: data.totalWidthMm !== undefined && !isNaN(Number(data.totalWidthMm)) ? Number(data.totalWidthMm) : null,
+      totalLengthMm: data.totalLengthMm !== undefined && !isNaN(Number(data.totalLengthMm)) ? Number(data.totalLengthMm) : null,
+      machineWeightKg: data.machineWeightKg !== undefined && !isNaN(Number(data.machineWeightKg)) ? Number(data.machineWeightKg) : null,
+      color: data.color === undefined ? null : data.color,
+      nominalCapacityKg: data.nominalCapacityKg !== undefined && !isNaN(Number(data.nominalCapacityKg)) ? Number(data.nominalCapacityKg) : null,
+      turningRadiusMm: data.turningRadiusMm !== undefined && !isNaN(Number(data.turningRadiusMm)) ? Number(data.turningRadiusMm) : null,
+      engineType: data.engineType === undefined ? null : data.engineType,
+      fuelType: fuelTypeOptions.includes(data.fuelType as any) ? data.fuelType : null,
+      batteryVoltage: data.batteryVoltage === undefined ? null : data.batteryVoltage,
+      batteryAmpHour: data.batteryAmpHour === undefined ? null : data.batteryAmpHour,
+      monthlyRentalValue: data.monthlyRentalValue !== undefined && !isNaN(Number(data.monthlyRentalValue)) ? Number(data.monthlyRentalValue) : null,
+      hourMeter: data.hourMeter !== undefined && !isNaN(Number(data.hourMeter)) ? Number(data.hourMeter) : null,
+      notes: data.notes === undefined ? null : data.notes,
+      // customBrand, customModel, customEquipmentType are form-only, not directly stored typically
+    };
+    return equipmentData;
   });
 }
 
@@ -83,11 +96,10 @@ interface EquipmentClientPageProps {
 export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  // const router = useRouter(); // Only needed if programmatically navigating
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
-  
+
   const [showCustomFields, setShowCustomFields] = useState({
     brand: false,
     model: false,
@@ -97,7 +109,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const form = useForm<z.infer<typeof EquipmentSchema>>({
     resolver: zodResolver(EquipmentSchema),
     defaultValues: {
-      brand: "", model: "", chassisNumber: "", equipmentType: "", 
+      brand: "", model: "", chassisNumber: "", equipmentType: "",
       operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
       manufactureYear: new Date().getFullYear(),
       customBrand: "", customModel: "", customEquipmentType: "",
@@ -105,8 +117,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
       color: undefined, nominalCapacityKg: undefined, turningRadiusMm: undefined,
       engineType: undefined, fuelType: undefined, batteryVoltage: undefined, batteryAmpHour: undefined,
-      notes: "", monthlyRentalValue: undefined, acquisitionDate: undefined, 
-      lastPreventiveMaintenance: undefined, nextPreventiveMaintenance: undefined, hourMeter: undefined,
+      notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
     },
   });
 
@@ -124,13 +135,17 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     if (equipment) {
       setEditingEquipment(equipment);
       const defaultValues = {
-        ...equipment,
-        brand: equipment.brand, 
-        model: equipment.model,
-        equipmentType: equipment.equipmentType,
-        customBrand: "", 
-        customModel: "",
-        customEquipmentType: "",
+        ...equipment, // Spread known fields from the Equipment type
+        // Ensure custom fields are reset or based on whether the main field is '_CUSTOM_'
+        brand: equipmentTypeOptions.includes(equipment.brand as any) || equipment.brand === '_CUSTOM_' ? equipment.brand : '_CUSTOM_',
+        customBrand: equipmentTypeOptions.includes(equipment.brand as any) ? "" : equipment.brand,
+
+        model: equipment.model === '_CUSTOM_' || !equipment.model ? equipment.model : equipment.model, // Adjust if models are in a predefined list
+        customModel: equipment.model === '_CUSTOM_' ? equipment.customModel || equipment.model : "", // This logic might need refinement based on how custom models are stored
+
+        equipmentType: equipmentTypeOptions.includes(equipment.equipmentType as any) || equipment.equipmentType === '_CUSTOM_' ? equipment.equipmentType : '_CUSTOM_',
+        customEquipmentType: equipmentTypeOptions.includes(equipment.equipmentType as any) ? "" : equipment.equipmentType,
+
         customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
         manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
         towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
@@ -142,19 +157,20 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         turningRadiusMm: equipment.turningRadiusMm ?? undefined,
         monthlyRentalValue: equipment.monthlyRentalValue ?? undefined,
         hourMeter: equipment.hourMeter ?? undefined,
-        acquisitionDate: equipment.acquisitionDate || undefined,
-        lastPreventiveMaintenance: equipment.lastPreventiveMaintenance || undefined,
-        nextPreventiveMaintenance: equipment.nextPreventiveMaintenance || undefined,
         notes: equipment.notes || "",
         fuelType: equipment.fuelType || undefined,
       };
       form.reset(defaultValues);
-      setShowCustomFields({ brand: false, model: false, equipmentType: false });
+      setShowCustomFields({
+          brand: !equipmentTypeOptions.includes(equipment.brand as any) && equipment.brand !== '_CUSTOM_',
+          model: defaultValues.model === '_CUSTOM_', // Example, needs specific logic if models are predefined
+          equipmentType: !equipmentTypeOptions.includes(equipment.equipmentType as any) && equipment.equipmentType !== '_CUSTOM_',
+      });
 
     } else {
       setEditingEquipment(null);
-      form.reset({ 
-        brand: "", model: "", chassisNumber: "", equipmentType: "", 
+      form.reset({
+        brand: "", model: "", chassisNumber: "", equipmentType: "",
         operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
         manufactureYear: new Date().getFullYear(),
         customBrand: "", customModel: "", customEquipmentType: "",
@@ -162,23 +178,21 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
         color: undefined, nominalCapacityKg: undefined, turningRadiusMm: undefined,
         engineType: undefined, fuelType: undefined, batteryVoltage: undefined, batteryAmpHour: undefined,
-        notes: "", monthlyRentalValue: undefined, acquisitionDate: undefined,
-        lastPreventiveMaintenance: undefined, nextPreventiveMaintenance: undefined, hourMeter: undefined,
+        notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
       });
       setShowCustomFields({ brand: false, model: false, equipmentType: false });
     }
     setIsModalOpen(true);
-  }, [form]); 
+  }, [form]);
 
   useEffect(() => {
-    if (equipmentIdFromUrl) { 
+    if (equipmentIdFromUrl) {
       if (!isLoadingEquipment && equipmentList.length > 0) {
         const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdFromUrl);
         if (equipmentToEdit) {
           openModal(equipmentToEdit);
           if (typeof window !== "undefined") {
-            // Clear the URL parameter after opening the modal
-            window.history.replaceState(null, '', '/equipment'); 
+            window.history.replaceState(null, '', '/equipment');
           }
         }
       }
@@ -187,18 +201,15 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
 
   const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id'> => {
-    const { 
-      customBrand, customModel, customEquipmentType, 
-      customerId: formCustomerId, 
-      ...restOfData 
+    const {
+      customBrand, customModel, customEquipmentType,
+      customerId: formCustomerId,
+      ...restOfData
     } = formData;
-  
-    return {
+
+    // Ensure numeric fields that might be empty strings from the form are converted to null or number
+    const parsedData = {
       ...restOfData,
-      brand: restOfData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : restOfData.brand,
-      model: restOfData.model === '_CUSTOM_' ? customModel || "Não especificado" : restOfData.model,
-      equipmentType: restOfData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : restOfData.equipmentType,
-      customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
       towerOpenHeightMm: parseNumericToNullOrNumber(restOfData.towerOpenHeightMm),
       towerClosedHeightMm: parseNumericToNullOrNumber(restOfData.towerClosedHeightMm),
@@ -209,10 +220,23 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       turningRadiusMm: parseNumericToNullOrNumber(restOfData.turningRadiusMm),
       monthlyRentalValue: parseNumericToNullOrNumber(restOfData.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(restOfData.hourMeter),
-      acquisitionDate: restOfData.acquisitionDate || null,
-      lastPreventiveMaintenance: restOfData.lastPreventiveMaintenance || null,
-      nextPreventiveMaintenance: restOfData.nextPreventiveMaintenance || null,
-      fuelType: restOfData.fuelType || null,
+    };
+
+    return {
+      ...parsedData,
+      brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
+      model: parsedData.model === '_CUSTOM_' ? customModel || "Não especificado" : parsedData.model, // Assuming model also has _CUSTOM_ logic
+      equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
+      customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
+      fuelType: parsedData.fuelType || null,
+      // Explicitly set other optional fields to null if they are empty string or undefined, if necessary by schema
+      notes: parsedData.notes || null,
+      towerType: parsedData.towerType || null,
+      forkSize: parsedData.forkSize || null,
+      color: parsedData.color || null,
+      engineType: parsedData.engineType || null,
+      batteryVoltage: parsedData.batteryVoltage || null,
+      batteryAmpHour: parsedData.batteryAmpHour || null,
     };
   };
 
@@ -248,7 +272,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       toast({ title: "Erro ao Atualizar", description: `Não foi possível atualizar ${variables.brand} ${variables.model}. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
-  
+
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (equipmentId: string) => {
       if (!equipmentId) throw new Error("ID do equipamento é necessário para exclusão.");
@@ -257,7 +281,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
       toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído." });
-      closeModal(); 
+      closeModal();
     },
     onError: (err: Error) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o equipamento. Detalhe: ${err.message}`, variant: "destructive" });
@@ -286,7 +310,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       }
     }
   };
-  
+
   const handleSelectChange = (field: 'brand' | 'model' | 'equipmentType', value: string) => {
     form.setValue(field, value);
     setShowCustomFields(prev => ({ ...prev, [field]: value === '_CUSTOM_' }));
@@ -294,11 +318,11 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         form.setValue(field === 'brand' ? 'customBrand' : field === 'model' ? 'customModel' : 'customEquipmentType', "");
     }
   };
-  
+
   const isLoading = isLoadingEquipment || isLoadingCustomers;
   const isMutating = addEquipmentMutation.isPending || updateEquipmentMutation.isPending;
 
-  if (isLoading && !isModalOpen) { 
+  if (isLoading && !isModalOpen) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -320,8 +344,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   return (
     <>
-      <PageHeader 
-        title="Rastreamento de Equipamentos" 
+      <PageHeader
+        title="Rastreamento de Equipamentos"
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || deleteEquipmentMutation.isPending}>
             <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Equipamento
@@ -340,8 +364,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {equipmentList.map((eq) => (
-            <Card 
-              key={eq.id} 
+            <Card
+              key={eq.id}
               className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
               onClick={() => openModal(eq)}
             >
@@ -357,7 +381,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 <p className="flex items-center">
                   {operationalStatusIcons[eq.operationalStatus]} <span className="ml-2">Status: {eq.operationalStatus}</span>
                 </p>
-                {eq.customerId && customers.find(c => c.id === eq.customerId) && 
+                {eq.customerId && customers.find(c => c.id === eq.customerId) &&
                   <p className="flex items-center"><Users className="mr-2 h-4 w-4 text-primary" /> Cliente: {customers.find(c => c.id === eq.customerId)?.name}</p>
                 }
                  {eq.hourMeter !== null && eq.hourMeter !== undefined && <p className="flex items-center"><History className="mr-2 h-4 w-4 text-primary" /> Horímetro: {eq.hourMeter}h</p>}
@@ -523,7 +547,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 </FormItem>
               )} />
             </div>
-            
+
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <FormField control={form.control} name="towerType" render={({ field }) => (
@@ -580,7 +604,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                     <FormItem><FormLabel>Amperagem Bateria (Ah)</FormLabel><FormControl><Input placeholder="Ex: 625Ah" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
-            
+
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Informações Adicionais (Opcional)</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField control={form.control} name="hourMeter" render={({ field }) => (
@@ -588,15 +612,6 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 )} />
                 <FormField control={form.control} name="monthlyRentalValue" render={({ field }) => (
                     <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="acquisitionDate" render={({ field }) => (
-                    <FormItem><FormLabel>Data de Aquisição</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="lastPreventiveMaintenance" render={({ field }) => (
-                    <FormItem><FormLabel>Última Preventiva</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="nextPreventiveMaintenance" render={({ field }) => (
-                    <FormItem><FormLabel>Próxima Preventiva</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
             <FormField control={form.control} name="notes" render={({ field }) => (
