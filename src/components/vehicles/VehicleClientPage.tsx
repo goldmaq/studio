@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, CarFront, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle, DollarSign } from "lucide-react"; // Added DollarSign
+import { PlusCircle, CarFront, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,16 @@ const statusIcons = {
 };
 
 const FIRESTORE_COLLECTION_NAME = "veiculos";
+
+const mockVehiclesData: Vehicle[] = [
+  { id: "mock1", model: "FIAT DOBLO", licensePlate: "ENC8C91", fipeValue: 29243, kind: "Furgão", currentMileage: 150000, fuelConsumption: 9.5, costPerKilometer: 0.6, status: "Disponível", registrationInfo: "Exemplo" },
+  { id: "mock2", model: "FIAT FIORINO", licensePlate: "FQC4777", fipeValue: 48869, kind: "Furgão", currentMileage: 80000, fuelConsumption: 11.0, costPerKilometer: 0.5, status: "Em Uso", registrationInfo: "Exemplo" },
+  { id: "mock3", model: "FIAT STRADA", licensePlate: "CUL3A99", fipeValue: 70000, kind: "Picape", currentMileage: 50000, fuelConsumption: 12.5, costPerKilometer: 0.45, status: "Disponível", registrationInfo: "Exemplo" },
+  { id: "mock4", model: "FIAT STRADA", licensePlate: "ENG1878", fipeValue: 68424, kind: "Picape", currentMileage: 60000, fuelConsumption: 12.0, costPerKilometer: 0.48, status: "Manutenção", registrationInfo: "Exemplo" },
+  { id: "mock5", model: "RENAULT MASTER", licensePlate: "GDZ8E43", fipeValue: 320000, kind: "Van", currentMileage: 200000, fuelConsumption: 8.0, costPerKilometer: 0.7, status: "Disponível", registrationInfo: "Exemplo" },
+  { id: "mock6", model: "RENAULT MASTER", licensePlate: "LTB7E97", fipeValue: 259000, kind: "Van", currentMileage: 120000, fuelConsumption: 8.5, costPerKilometer: 0.65, status: "Em Uso", registrationInfo: "Exemplo" },
+  { id: "mock7", model: "VOLKSWAGEN SAVEIRO", licensePlate: "DFJ5I61", fipeValue: 37723, kind: "Picape", currentMileage: 95000, fuelConsumption: 11.5, costPerKilometer: 0.52, status: "Disponível", registrationInfo: "Exemplo" },
+];
 
 async function fetchVehicles(): Promise<Vehicle[]> {
   const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("model", "asc"), orderBy("licensePlate", "asc"));
@@ -62,14 +72,17 @@ export function VehicleClientPage() {
     defaultValues: { model: "", licensePlate: "", kind: "", currentMileage: 0, fuelConsumption: 0, costPerKilometer: 0, fipeValue: null, registrationInfo: "", status: "Disponível" },
   });
 
-  const { data: vehicles = [], isLoading, isError, error } = useQuery<Vehicle[], Error>({
+  const { data: vehiclesFromFirestore = [], isLoading, isError, error } = useQuery<Vehicle[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchVehicles,
   });
 
+  const isMockDataActive = vehiclesFromFirestore.length === 0 && !isLoading && !isError;
+  const vehiclesToDisplay = isMockDataActive ? mockVehiclesData : vehiclesFromFirestore;
+
+
   const addVehicleMutation = useMutation({
     mutationFn: async (newVehicleData: z.infer<typeof VehicleSchema>) => {
-      // Zod schema with z.coerce.number() handles parsing for numeric fields
       return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newVehicleData);
     },
     onSuccess: (docRef, variables) => {
@@ -85,8 +98,7 @@ export function VehicleClientPage() {
   const updateVehicleMutation = useMutation({
     mutationFn: async (vehicleData: Vehicle) => {
       const { id, ...dataToUpdate } = vehicleData;
-      if (!id) throw new Error("ID do veículo é necessário para atualização.");
-      // Zod schema handles coercion, so dataToUpdate already has correct types
+      if (!id || id.startsWith("mock")) throw new Error("ID do veículo inválido para atualização.");
       const vehicleRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
       return updateDoc(vehicleRef, dataToUpdate);
     },
@@ -102,22 +114,24 @@ export function VehicleClientPage() {
 
   const deleteVehicleMutation = useMutation({
     mutationFn: async (vehicleId: string) => {
-      if (!vehicleId) throw new Error("ID do veículo é necessário para exclusão.");
+      if (!vehicleId || vehicleId.startsWith("mock")) throw new Error("ID do veículo inválido para exclusão.");
       return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, vehicleId));
     },
-    onSuccess: (_, vehicleId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Veículo Excluído", description: `O veículo foi removido.` });
       closeModal(); 
     },
-    onError: (err: Error, vehicleId) => {
+    onError: (err: Error) => {
       toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o veículo. Detalhe: ${err.message}`, variant: "destructive" });
     },
   });
 
   const openModal = (vehicle?: Vehicle) => {
     if (vehicle) {
-      setEditingVehicle(vehicle);
+      // If it's a mock vehicle or a real one, prefill the form.
+      // If it's mock, editingVehicle will be set, but onSubmit will lead to add.
+      setEditingVehicle(vehicle); 
       form.reset({
         ...vehicle,
         currentMileage: Number(vehicle.currentMileage),
@@ -126,7 +140,7 @@ export function VehicleClientPage() {
         fipeValue: vehicle.fipeValue !== undefined && vehicle.fipeValue !== null ? Number(vehicle.fipeValue) : null,
       });
     } else {
-      setEditingVehicle(null);
+      setEditingVehicle(null); // For creating a new vehicle from scratch
       form.reset({ model: "", licensePlate: "", kind: "", currentMileage: 0, fuelConsumption: 0, costPerKilometer: 0, fipeValue: null, registrationInfo: "", status: "Disponível" });
     }
     setIsModalOpen(true);
@@ -139,7 +153,9 @@ export function VehicleClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof VehicleSchema>) => {
-    if (editingVehicle && editingVehicle.id) {
+    // If editingVehicle exists AND its id is NOT a mock id, then update.
+    // Otherwise, it's an add operation (either new from scratch or from a mock item).
+    if (editingVehicle && editingVehicle.id && !editingVehicle.id.startsWith("mock")) {
       updateVehicleMutation.mutate({ ...values, id: editingVehicle.id });
     } else {
       addVehicleMutation.mutate(values);
@@ -147,10 +163,12 @@ export function VehicleClientPage() {
   };
 
   const handleModalDeleteConfirm = () => {
-    if (editingVehicle && editingVehicle.id) {
+    if (editingVehicle && editingVehicle.id && !editingVehicle.id.startsWith("mock")) {
        if (window.confirm(`Tem certeza que deseja excluir o veículo "${editingVehicle.model} (${editingVehicle.licensePlate})"?`)) {
         deleteVehicleMutation.mutate(editingVehicle.id);
       }
+    } else {
+      toast({ title: "Ação Inválida", description: "Não é possível excluir um veículo de exemplo ou não salvo.", variant: "default" });
     }
   };
 
@@ -187,7 +205,21 @@ export function VehicleClientPage() {
         }
       />
 
-      {vehicles.length === 0 && !isLoading ? (
+      {isMockDataActive && (
+         <Card className="mb-6 bg-accent/10 border-accent/30 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-accent-foreground font-headline text-lg">Dados de Exemplo Ativos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-foreground/80">
+              Os veículos listados abaixo são exemplos para demonstração, pois nenhum veículo foi encontrado no banco de dados.
+              Clique em um card para preencher o formulário e então salve para adicioná-lo permanentemente.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {vehiclesToDisplay.length === 0 && !isMockDataActive ? ( // Only show placeholder if no Firestore data AND no mock data (which shouldn't happen with current logic)
         <DataTablePlaceholder
           icon={CarFront}
           title="Nenhum Veículo Registrado"
@@ -197,11 +229,11 @@ export function VehicleClientPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {vehicles.map((vehicle) => (
+          {vehiclesToDisplay.map((vehicle) => (
             <Card 
               key={vehicle.id} 
               className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
-              onClick={() => openModal(vehicle)}
+              onClick={() => openModal(vehicle)} // Clicking a mock item will prefill the "add new" form
             >
               <CardHeader>
                 <CardTitle className="font-headline text-xl text-primary">{vehicle.model}</CardTitle>
@@ -233,11 +265,11 @@ export function VehicleClientPage() {
       <FormModal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editingVehicle ? "Editar Veículo" : "Adicionar Novo Veículo"}
+        title={editingVehicle && editingVehicle.id && !editingVehicle.id.startsWith("mock") ? "Editar Veículo" : "Adicionar Novo Veículo"}
         description="Forneça os detalhes do veículo."
         formId="vehicle-form"
         isSubmitting={isMutating}
-        editingItem={editingVehicle}
+        editingItem={editingVehicle && editingVehicle.id && !editingVehicle.id.startsWith("mock") ? editingVehicle : null} // Only pass real items for delete
         onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteVehicleMutation.isPending}
         deleteButtonLabel="Excluir Veículo"
