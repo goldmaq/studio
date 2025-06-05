@@ -526,39 +526,40 @@ const sidebarMenuButtonVariants = cva(
 const SidebarMenuButton = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> & {
-    asChild?: boolean; // This is SidebarMenuButton's own prop to decide if it renders Slot or button
+    asChild?: boolean; 
     isActive?: boolean;
     tooltip?: string | React.ComponentProps<typeof TooltipContent>;
   } & VariantProps<typeof sidebarMenuButtonVariants>
 >(
   (
     {
-      asChild: useSlot = false, // SidebarMenuButton's own decision to use Slot or <button>
+      asChild: ownAsChildProp = false, 
       isActive = false,
       variant = "default",
       size = "default",
       tooltip,
       className,
-      children, // Explicitly get children for SidebarMenuButton
-      ...allOtherPropsFromParent // These are props from the parent (e.g., Link)
+      children,
+      ...otherPropsFromParent 
     },
     ref
   ) => {
-    const Comp = useSlot ? Slot : "button";
+    const Comp = ownAsChildProp ? Slot : "button";
     const { isMobile, state } = useSidebar();
 
-    let propsForComp: Record<string, any>;
+    let propsForElement = { ...otherPropsFromParent };
 
-    if (!useSlot) {
-      // If SidebarMenuButton is rendering a native <button>,
-      // explicitly remove 'asChild' if it came from the parent.
-      const { asChild: parentAsChild, ...restOfParentProps } = allOtherPropsFromParent;
-      propsForComp = restOfParentProps;
-    } else {
-      // If SidebarMenuButton is rendering a Slot, pass all props from parent.
-      // Slot is designed to handle merging, including a parent's 'asChild'.
-      propsForComp = allOtherPropsFromParent;
+    if (!ownAsChildProp) {
+      // If SidebarMenuButton is rendering a native DOM element (e.g., "button"),
+      // and it received an 'asChild' prop from its parent (e.g., Link),
+      // that 'asChild' prop from the parent must be removed before spreading.
+      if ('asChild' in propsForElement) {
+        delete propsForElement.asChild;
+      }
     }
+    // If ownAsChildProp is true, Comp is Slot. Slot can handle an 'asChild' prop
+    // if it's passed down from a grandparent (e.g., Link -> SidebarMenuButton (asChild) -> Slot).
+    // In this case, propsForElement correctly retains the 'asChild' from otherPropsFromParent.
 
     const buttonElement = (
       <Comp
@@ -567,9 +568,9 @@ const SidebarMenuButton = React.forwardRef<
         data-size={size}
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-        {...propsForComp} // Spread the (potentially) cleaned props
+        {...propsForElement} 
       >
-        {children} {/* Pass the explicit children of SidebarMenuButton */}
+        {children} 
       </Comp>
     );
 
