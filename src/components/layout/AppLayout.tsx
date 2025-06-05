@@ -2,17 +2,19 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image"; // Importar o componente Image
+// import Image from "next/image"; // Remove next/image import
+import { Logo } from "@/components/icons/Logo"; // Import the SVG Logo component
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   LayoutDashboard,
   Users,
-  Construction,
+  Construction, // Keep for fallback icon
   ClipboardList,
   HardHat,
   CarFront,
   SlidersHorizontal,
+  Settings, // Example fallback icon for collapsed sidebar
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -55,17 +57,14 @@ function MainSidebar() {
       collapsible={open ? "icon" : "offcanvas"}
       className="shadow-lg"
     >
-      <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center">
+      <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center h-16"> {/* Added fixed height for consistency */}
         <Link href="/" className="flex items-center gap-2">
-          {/* Adiciona o componente Image para o logo */}
-          <Image
-            src="/images/logo.png" // Caminho para o logo na pasta public
-            alt="Gold Maq Controle Logo"
-            width={open ? 120 : 30} // Ajusta o tamanho com base no estado da sidebar
-            height={open ? 30 : 30}
-            // priority // Opcional: para carregar o logo mais rapidamente
-            className="transition-all duration-300 ease-in-out"
-          />
+          {open ? (
+            <Logo width={120} height={30} className="transition-all duration-300 ease-in-out" />
+          ) : (
+            // Using a generic icon when collapsed, adjust as needed
+            <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />
+          )}
         </Link>
       </SidebarHeader>
       <SidebarContent>

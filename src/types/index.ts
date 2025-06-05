@@ -28,7 +28,8 @@ export const equipmentTypeOptions = [
 export const operationalStatusOptions = ['Disponível', 'Locada', 'Em Manutenção', 'Sucata'] as const;
 
 export type CompanyId = 'goldmaq' | 'goldcomercio' | 'goldjob';
-export const companyIds: CompanyId[] = ["goldmaq", "goldcomercio", "goldjob"];
+// Changed: Apply 'as const' to infer a readonly tuple type for companyIds
+export const companyIds = ["goldmaq", "goldcomercio", "goldjob"] as const;
 
 
 export const companyDisplayOptions: { id: CompanyId; name: string }[] = [
@@ -50,7 +51,7 @@ export interface Equipment {
   manufactureYear: number | null;
   operationalStatus: typeof operationalStatusOptions[number];
   customerId?: string | null;
-  ownerReference?: OwnerReferenceType | null; // Alterado de ownerCompanyId para ownerReference
+  ownerReference?: OwnerReferenceType | null; 
   customBrand?: string; 
   customEquipmentType?: string; 
 
@@ -183,7 +184,7 @@ export const EquipmentSchema = z.object({
   return true;
 }, {
   message: "Um cliente deve ser selecionado se a propriedade for definida como 'Cliente Vinculado'.",
-  path: ["customerId"], // Ou path: ["ownerReference"] se preferir associar o erro ao campo de propriedade
+  path: ["customerId"], 
 });
 
 
