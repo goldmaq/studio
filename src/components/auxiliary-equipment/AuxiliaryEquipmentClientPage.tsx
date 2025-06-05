@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
 import { PlusCircle, PackageSearch, Edit, Trash2, Tag, CheckCircle, Construction, Link as LinkIconLI, FileText, Package, ShieldAlert, Loader2, AlertTriangle, Box, BatteryCharging, Anchor } from "lucide-react";
-import type { LucideIcon } from "lucide-react"; // Import LucideIcon
+import type { LucideIcon } from "lucide-react"; 
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -21,13 +21,13 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase"; // Import db
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME = "equipamentosAuxiliares";
-const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; // Para vincular
+const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; 
 
 const NO_LINKED_EQUIPMENT_VALUE = "_NO_LINKED_EQUIPMENT_";
 const LOADING_EQUIPMENT_VALUE = "_LOADING_EQUIPMENT_";
@@ -40,7 +40,6 @@ const statusIcons: Record<typeof auxiliaryEquipmentStatusOptions[number], JSX.El
   Sucata: <Trash2 className="h-4 w-4 text-red-500" />,
 };
 
-// Store component constructors, not JSX elements
 const typeIcons: Record<string, LucideIcon> = {
   Bateria: BatteryCharging,
   Carregador: Box,
@@ -51,12 +50,20 @@ const typeIcons: Record<string, LucideIcon> = {
 
 
 async function fetchAuxiliaryEquipment(): Promise<AuxiliaryEquipment[]> {
+  if (!db) {
+    console.error("fetchAuxiliaryEquipment: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuxiliaryEquipment));
 }
 
 async function fetchMainEquipment(): Promise<Equipment[]> {
+  if (!db) {
+    console.error("fetchMainEquipment: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
@@ -86,15 +93,32 @@ export function AuxiliaryEquipmentClientPage() {
   const { data: auxEquipmentList = [], isLoading: isLoadingAux, isError: isErrorAux, error: errorAux } = useQuery<AuxiliaryEquipment[], Error>({
     queryKey: [FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME],
     queryFn: fetchAuxiliaryEquipment,
+    enabled: !!db, // Only run query if db is available
   });
 
   const { data: mainEquipmentList = [], isLoading: isLoadingMainEq } = useQuery<Equipment[], Error>({
     queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
     queryFn: fetchMainEquipment,
+    enabled: !!db, // Only run query if db is available
   });
+
+  if (!db) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão com Firebase" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar ao banco de dados.
+          <br />
+          Verifique a configuração do Firebase e sua conexão com a internet.
+        </p>
+      </div>
+    );
+  }
 
   const addAuxEquipmentMutation = useMutation({
     mutationFn: async (newItemData: z.infer<typeof AuxiliaryEquipmentSchema>) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível para adicionar equipamento auxiliar.");
       const { customType, ...dataToSave } = newItemData;
       const finalData = {
         ...dataToSave,
@@ -117,6 +141,7 @@ export function AuxiliaryEquipmentClientPage() {
 
   const updateAuxEquipmentMutation = useMutation({
     mutationFn: async (itemData: AuxiliaryEquipment) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível para atualizar equipamento auxiliar.");
       const { id, customType, ...dataToUpdate } = itemData;
       if (!id) throw new Error("ID do item é necessário para atualização.");
       const finalData = {
@@ -141,6 +166,7 @@ export function AuxiliaryEquipmentClientPage() {
 
   const deleteAuxEquipmentMutation = useMutation({
     mutationFn: async (itemId: string) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível para excluir equipamento auxiliar.");
       if (!itemId) throw new Error("ID do item é necessário para exclusão.");
       return deleteDoc(doc(db, FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME, itemId));
     },
@@ -406,5 +432,3 @@ export function AuxiliaryEquipmentClientPage() {
     </>
   );
 }
-
-    
