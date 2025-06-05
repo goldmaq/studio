@@ -18,9 +18,9 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-import { db, storage } from "@/lib/firebase"; 
+import { db, storage } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc } from "firebase/firestore";
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"; 
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -110,7 +110,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
       manufactureYear: parseNumericToNullOrNumber(data.manufactureYear),
       operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Disponível",
       customerId: data.customerId || null,
-      ownerReference: data.ownerReference || null, 
+      ownerReference: data.ownerReference || null,
       towerOpenHeightMm: parseNumericToNullOrNumber(data.towerOpenHeightMm),
       towerClosedHeightMm: parseNumericToNullOrNumber(data.towerClosedHeightMm),
       nominalCapacityKg: parseNumericToNullOrNumber(data.nominalCapacityKg),
@@ -157,7 +157,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     defaultValues: {
       brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
       operationalStatus: "Disponível", customerId: NO_CUSTOMER_FORM_VALUE,
-      ownerReference: undefined, 
+      ownerReference: undefined,
       manufactureYear: new Date().getFullYear(),
       customBrand: "", customEquipmentType: "",
       towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
@@ -173,7 +173,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const ownerReferenceValue = useWatch({ control: form.control, name: 'ownerReference' });
   const { setValue } = form;
 
-  useEffect(() => {
+ useEffect(() => {
     if (customerIdValue && customerIdValue !== NO_CUSTOMER_FORM_VALUE) {
       // Cliente está vinculado
       if (ownerReferenceValue === OWNER_REF_CUSTOMER) {
@@ -181,9 +181,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         if (currentOperationalStatus === 'Locada') {
           setValue('operationalStatus', 'Em Manutenção', { shouldValidate: true });
         }
-        // Não altera outros status automaticamente, permite ao usuário definir
+        // Não altera outros status ('Disponível', 'Em Manutenção', etc.) automaticamente para máquinas de cliente
       } else {
-        // Máquina é da Gold Maq e está locada para este cliente
+        // Máquina é da Gold Maq e está locada PARA este cliente
         if (
           currentOperationalStatus !== 'Em Manutenção' &&
           currentOperationalStatus !== 'Sucata' &&
@@ -281,7 +281,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     newPartsCatalogUrl?: string | null,
     newErrorCodesUrl?: string | null
   ): Omit<Equipment, 'id' | 'customBrand' | 'customEquipmentType'> => {
-    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReference, ...restOfData } = formData;
+    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, ...restOfData } = formData;
     const parsedData = {
       ...restOfData,
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
@@ -294,13 +294,22 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       monthlyRentalValue: parseNumericToNullOrNumber(restOfData.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(restOfData.hourMeter),
     };
+
+    let finalOwnerReference: OwnerReferenceType | null = null;
+    if (formOwnerReferenceFromForm === NO_OWNER_REFERENCE_VALUE || formOwnerReferenceFromForm === null || formOwnerReferenceFromForm === undefined) {
+      finalOwnerReference = null;
+    } else {
+      // At this point, formOwnerReferenceFromForm should be one of CompanyId or OWNER_REF_CUSTOMER
+      finalOwnerReference = formOwnerReferenceFromForm as OwnerReferenceType;
+    }
+
     return {
       ...parsedData,
       brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
       customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
-      ownerReference: (formOwnerReference === NO_OWNER_REFERENCE_VALUE || formOwnerReference === null || formOwnerReference === undefined) ? null : formOwnerReference as OwnerReferenceType,
+      ownerReference: finalOwnerReference,
       notes: parsedData.notes || null,
       partsCatalogUrl: newPartsCatalogUrl === undefined ? formData.partsCatalogUrl : newPartsCatalogUrl,
       errorCodesUrl: newErrorCodesUrl === undefined ? formData.errorCodesUrl : newErrorCodesUrl,
@@ -324,7 +333,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       if (data.codesFile) {
         errorCodesUrl = await uploadFile(data.codesFile, newEquipmentId, 'errorCodes');
       }
-      
+
       const equipmentDataForFirestore = prepareDataForFirestore(data.formData, partsCatalogUrl, errorCodesUrl);
       await setDoc(doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, newEquipmentId), equipmentDataForFirestore);
       return { ...equipmentDataForFirestore, id: newEquipmentId };
@@ -350,21 +359,21 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       formData: z.infer<typeof EquipmentSchema>,
       catalogFile: File | null,
       codesFile: File | null,
-      currentEquipment: Equipment 
+      currentEquipment: Equipment
     }) => {
       setIsUploadingFiles(true);
       let newPartsCatalogUrl = data.currentEquipment.partsCatalogUrl;
       let newErrorCodesUrl = data.currentEquipment.errorCodesUrl;
 
-      if (data.catalogFile) { 
-        await deleteFileFromStorage(data.currentEquipment.partsCatalogUrl); 
+      if (data.catalogFile) {
+        await deleteFileFromStorage(data.currentEquipment.partsCatalogUrl);
         newPartsCatalogUrl = await uploadFile(data.catalogFile, data.id, 'partsCatalog');
       }
-      if (data.codesFile) { 
-        await deleteFileFromStorage(data.currentEquipment.errorCodesUrl); 
+      if (data.codesFile) {
+        await deleteFileFromStorage(data.currentEquipment.errorCodesUrl);
         newErrorCodesUrl = await uploadFile(data.codesFile, data.id, 'errorCodes');
       }
-      
+
       const equipmentDataForFirestore = prepareDataForFirestore(data.formData, newPartsCatalogUrl, newErrorCodesUrl);
       const equipmentRef = doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, data.id);
       await updateDoc(equipmentRef, equipmentDataForFirestore);
@@ -396,7 +405,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
       if(editingEquipment && editingEquipment.id === data.equipmentId){
         setEditingEquipment(prev => prev ? ({...prev, [data.fileType]: null}) : null);
-        form.setValue(data.fileType, null); 
+        form.setValue(data.fileType, null);
       }
       toast({ title: "Arquivo Removido", description: "O arquivo foi removido com sucesso." });
     },
@@ -415,7 +424,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       await deleteFileFromStorage(errorCodesUrl);
       const equipmentRef = doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, id);
       await deleteDoc(equipmentRef);
-      return id; 
+      return id;
     },
     onSuccess: (deletedEquipmentId) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
@@ -443,12 +452,12 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const onSubmit = async (values: z.infer<typeof EquipmentSchema>) => {
     if (editingEquipment && editingEquipment.id) {
-      updateEquipmentMutation.mutate({ 
-        id: editingEquipment.id, 
-        formData: values, 
-        catalogFile: partsCatalogFile, 
+      updateEquipmentMutation.mutate({
+        id: editingEquipment.id,
+        formData: values,
+        catalogFile: partsCatalogFile,
         codesFile: errorCodesFile,
-        currentEquipment: editingEquipment 
+        currentEquipment: editingEquipment
       });
     } else {
       addEquipmentMutation.mutate({ formData: values, catalogFile: partsCatalogFile, codesFile: errorCodesFile });
@@ -456,7 +465,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   };
 
   const handleModalDeleteConfirm = () => {
-    const equipmentToExclude = editingEquipment;    
+    const equipmentToExclude = editingEquipment;
     if (!equipmentToExclude || !equipmentToExclude.id) {
       toast({ title: "Erro Interno", description: "Referência ao equipamento inválida para exclusão.", variant: "destructive" });
       return;
@@ -499,11 +508,11 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     }
     return 'Propriedade: Não Especificado';
   };
-  
+
   const getOwnerIcon = (ownerRef?: OwnerReferenceType | null): LucideIcon => {
     if (ownerRef === OWNER_REF_CUSTOMER) return UserCog;
     if (companyIds.includes(ownerRef as CompanyId)) return Building;
-    return Construction; 
+    return Construction;
   };
 
   const isLoadingPage = isLoadingEquipment || isLoadingCustomers;
@@ -553,8 +562,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
           {equipmentList.map((eq) => {
             const customer = eq.customerId ? customers.find(c => c.id === eq.customerId) : null;
             const ownerDisplay = getOwnerDisplayString(eq.ownerReference, eq.customerId, customers);
-            const ownerIcon = getOwnerIcon(eq.ownerReference); 
-            const OwnerIconComponent = ownerIcon; 
+            const ownerIcon = getOwnerIcon(eq.ownerReference);
+            const OwnerIconComponent = ownerIcon;
             return (
             <Card
               key={eq.id}
@@ -577,7 +586,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                   {operationalStatusIcons[eq.operationalStatus]}
                   <span className={cn("ml-2", {
                     'text-success': eq.operationalStatus === 'Disponível',
-                    'text-blue-500': eq.operationalStatus === 'Locada', 
+                    'text-blue-500': eq.operationalStatus === 'Locada',
                     'text-danger': eq.operationalStatus === 'Em Manutenção' || eq.operationalStatus === 'Sucata',
                   })}>
                     Status: {eq.operationalStatus}
@@ -601,15 +610,15 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
                  {eq.hourMeter !== null && eq.hourMeter !== undefined && <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Horímetro: {eq.hourMeter}h</p>}
                  {eq.monthlyRentalValue !== null && eq.monthlyRentalValue !== undefined && <p className="flex items-center"><Coins className="mr-2 h-4 w-4 text-primary" /> Aluguel Mensal: R$ {eq.monthlyRentalValue.toFixed(2)}</p>}
-                 
+
                  {eq.partsCatalogUrl && (
                     <p className="flex items-center">
                         <BookOpen className="mr-2 h-4 w-4 text-primary" />
-                        <a 
-                          href={eq.partsCatalogUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          onClick={e => e.stopPropagation()} 
+                        <a
+                          href={eq.partsCatalogUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
                           className="text-primary hover:underline hover:text-primary/80 transition-colors"
                           title={`Ver Catálogo de Peças: ${getFileNameFromUrl(eq.partsCatalogUrl)}`}
                         >
@@ -620,11 +629,11 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                  {eq.errorCodesUrl && (
                     <p className="flex items-center">
                         <AlertCircle className="mr-2 h-4 w-4 text-primary" />
-                        <a 
-                          href={eq.errorCodesUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          onClick={e => e.stopPropagation()} 
+                        <a
+                          href={eq.errorCodesUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
                           className="text-primary hover:underline hover:text-primary/80 transition-colors"
                           title={`Ver Códigos de Erro: ${getFileNameFromUrl(eq.errorCodesUrl)}`}
                         >
@@ -693,7 +702,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             <FormField control={form.control} name="chassisNumber" render={({ field }) => (
               <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
-            
+
             <FormField
               control={form.control}
               name="ownerReference"
@@ -726,7 +735,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 </FormItem>
               )}
             />
-            
+
             <FormField control={form.control} name="customerId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cliente Associado (Serviço/Locação)</FormLabel>
@@ -795,7 +804,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 </Select><FormMessage />
               </FormItem>
             )} />
-            
+
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -837,9 +846,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 </div>
               )}
               <FormControl>
-                <Input 
-                  type="file" 
-                  accept=".pdf" 
+                <Input
+                  type="file"
+                  accept=".pdf"
                   onChange={(e) => setPartsCatalogFile(e.target.files ? e.target.files[0] : null)}
                   className="mt-1"
                 />
@@ -861,9 +870,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 </div>
               )}
               <FormControl>
-                <Input 
-                  type="file" 
-                  accept=".pdf" 
+                <Input
+                  type="file"
+                  accept=".pdf"
                   onChange={(e) => setErrorCodesFile(e.target.files ? e.target.files[0] : null)}
                   className="mt-1"
                 />
@@ -891,5 +900,3 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
-
-    
