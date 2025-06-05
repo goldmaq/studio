@@ -32,26 +32,44 @@ if (!firebaseConfigValues.appId) missingEnvVarDetails.push("NEXT_PUBLIC_FIREBASE
 
 let app: FirebaseApp;
 let db: Firestore;
-let storage: FirebaseStorage; // Adicionado
+let storage: FirebaseStorage;
 
 if (missingEnvVarDetails.length > 0) {
-  const errorMessage = `Firebase Fatal Error: Essential Firebase configuration is missing: ${missingEnvVarDetails.join(", ")}. 
-Please ensure these environment variables are set in your .env.local (for local development) 
-or in your hosting provider's settings (for deployment). 
+  const errorMessage = `Firebase Fatal Error: Essential Firebase configuration is missing: ${missingEnvVarDetails.join(", ")}.
+Please ensure these environment variables are set in your .env.local (for local development)
+or in your hosting provider's settings (for deployment).
 Firebase functionalities will not work. Application cannot start.`;
-  
-  console.error(errorMessage); 
+
+  console.error(errorMessage); // Log the error regardless of environment
+
   if (typeof window !== 'undefined') {
+    // Client-side: Show error in UI and throw to stop execution
     document.body.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word; padding: 20px; background-color: #fff0f0; border: 1px solid red; color: red; font-family: monospace;">${errorMessage}</pre>`;
+    throw new Error(errorMessage);
+  } else {
+    // Server-side: Log an extremely prominent error, but DO NOT THROW.
+    // This is a diagnostic step. If the ISE disappears, missing env vars were the cause.
+    // `db` and `storage` will be uninitialized if this path is taken.
+    console.error("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    console.error("!!! SERVER-SIDE FATAL ERROR: FIREBASE ENVIRONMENT VARIABLES ARE MISSING !!!");
+    console.error(`!!! DETAILS: ${errorMessage}`);
+    console.error("!!! Firebase (db, storage) will NOT be initialized on the server.       !!!");
+    console.error("!!! This will likely lead to further errors if db/storage are accessed.     !!!");
+    console.error("!!! CHECK YOUR SERVER/HOSTING ENVIRONMENT VARIABLES.                     !!!");
+    console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    // Assign to satisfy TypeScript that they are assigned, though they are unusable.
+    // This is part of the diagnostic to see if the original 'throw' was the ISE source.
+    db = undefined as any;
+    storage = undefined as any;
   }
-  throw new Error(errorMessage);
 } else {
+  // All environment variables are present, proceed with initialization
   const completeConfig = firebaseConfigValues as FirebaseConfig;
 
   if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
     console.log("Firebase Init: Attempting to initialize with projectId:", completeConfig.projectId);
   }
-  
+
   if (typeof window !== 'undefined' && completeConfig.projectId !== "gold-maq-control") {
     console.warn("Firebase Init: WARNING - Project ID does NOT match 'gold-maq-control'. Expected: 'gold-maq-control', Got:", completeConfig.projectId);
   }
@@ -62,7 +80,7 @@ Firebase functionalities will not work. Application cannot start.`;
     app = getApp();
   }
   db = getFirestore(app);
-  storage = getStorage(app); // Adicionado
+  storage = getStorage(app);
 }
 
-export { db, storage }; // Exportar storage
+export { db, storage };

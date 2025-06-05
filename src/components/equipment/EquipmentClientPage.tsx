@@ -31,7 +31,6 @@ import React from 'react';
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 
-const NO_CUSTOMER_FORM_VALUE = "";
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
@@ -156,7 +155,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     resolver: zodResolver(EquipmentSchema),
     defaultValues: {
       brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
-      operationalStatus: "Disponível", customerId: NO_CUSTOMER_FORM_VALUE,
+      operationalStatus: "Disponível", customerId: null, // Use null for no customer
       ownerReference: undefined,
       manufactureYear: new Date().getFullYear(),
       customBrand: "", customEquipmentType: "",
@@ -174,26 +173,22 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const { setValue } = form;
 
  useEffect(() => {
-    if (customerIdValue && customerIdValue !== NO_CUSTOMER_FORM_VALUE) {
-      // Cliente está vinculado
-      if (ownerReferenceValue === OWNER_REF_CUSTOMER) {
-        // Máquina é do cliente
+    if (customerIdValue) { // Cliente está vinculado
+      if (ownerReferenceValue === OWNER_REF_CUSTOMER) { // Máquina é do cliente
         if (currentOperationalStatus === 'Locada') {
           setValue('operationalStatus', 'Em Manutenção', { shouldValidate: true });
         }
-        // Não altera outros status ('Disponível', 'Em Manutenção', etc.) automaticamente para máquinas de cliente
-      } else {
-        // Máquina é da Gold Maq e está locada PARA este cliente
+        // Não altera outros status para máquinas de cliente
+      } else { // Máquina é da Gold Maq e está locada PARA este cliente
         if (
           currentOperationalStatus !== 'Em Manutenção' &&
           currentOperationalStatus !== 'Sucata' &&
-          currentOperationalStatus !== 'Locada' // Evita loop se já estiver Locada
+          currentOperationalStatus !== 'Locada'
         ) {
           setValue('operationalStatus', 'Locada', { shouldValidate: true });
         }
       }
-    } else {
-      // Nenhum cliente vinculado
+    } else { // Nenhum cliente vinculado
       if (currentOperationalStatus === 'Locada') {
          if (ownerReferenceValue !== OWNER_REF_CUSTOMER) { // Máquina da Gold Maq que foi desvinculada
             setValue('operationalStatus', 'Disponível', { shouldValidate: true });
@@ -202,7 +197,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
          }
       }
     }
-  }, [customerIdValue, currentOperationalStatus, ownerReferenceValue, setValue, NO_CUSTOMER_FORM_VALUE, OWNER_REF_CUSTOMER]);
+  }, [customerIdValue, currentOperationalStatus, ownerReferenceValue, setValue]);
 
 
   const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
@@ -230,7 +225,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         customBrand: isBrandPredefined ? "" : (equipment.brand === "Outra" || equipment.brand === "_CUSTOM_" ? "" : equipment.brand),
         equipmentType: isEquipmentTypePredefined ? equipment.equipmentType : '_CUSTOM_',
         customEquipmentType: isEquipmentTypePredefined ? "" : equipment.equipmentType,
-        customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
+        customerId: equipment.customerId || null, // Use null if no customerId
         ownerReference: equipment.ownerReference || undefined,
         manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
         towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
@@ -250,7 +245,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       setEditingEquipment(null);
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
-        operationalStatus: "Disponível", customerId: NO_CUSTOMER_FORM_VALUE,
+        operationalStatus: "Disponível", customerId: null, // Use null for no customer
         ownerReference: undefined,
         manufactureYear: new Date().getFullYear(),
         customBrand: "", customEquipmentType: "",
@@ -299,7 +294,6 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     if (formOwnerReferenceFromForm === NO_OWNER_REFERENCE_VALUE || formOwnerReferenceFromForm === null || formOwnerReferenceFromForm === undefined) {
       finalOwnerReference = null;
     } else {
-      // At this point, formOwnerReferenceFromForm should be one of CompanyId or OWNER_REF_CUSTOMER
       finalOwnerReference = formOwnerReferenceFromForm as OwnerReferenceType;
     }
 
@@ -308,7 +302,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
-      customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
+      customerId: formCustomerId, // Already null or a string ID from the form
       ownerReference: finalOwnerReference,
       notes: parsedData.notes || null,
       partsCatalogUrl: newPartsCatalogUrl === undefined ? formData.partsCatalogUrl : newPartsCatalogUrl,
@@ -702,7 +696,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             <FormField control={form.control} name="chassisNumber" render={({ field }) => (
               <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
-
+            
             <FormField
               control={form.control}
               name="ownerReference"
@@ -741,7 +735,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                   <FormLabel>Cliente Associado (Serviço/Locação)</FormLabel>
                   <Select
                     onValueChange={(selectedValue) => field.onChange(selectedValue === NO_CUSTOMER_SELECT_ITEM_VALUE ? null : selectedValue)}
-                    value={field.value || NO_CUSTOMER_FORM_VALUE}
+                    value={field.value || NO_CUSTOMER_SELECT_ITEM_VALUE} 
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -900,3 +894,5 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
+
+    
