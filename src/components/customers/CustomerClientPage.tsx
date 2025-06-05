@@ -370,7 +370,7 @@ export function CustomerClientPage() {
             const linkedEquipment = equipmentList.filter(eq => eq.customerId === customer.id);
             const whatsappNumber = getWhatsAppNumber(customer.phone);
             const whatsappLink = whatsappNumber 
-              ? `https://wa.me/${whatsappNumber}?text=Olá%20${encodeURIComponent(customer.name)},%20entramos%20em%20contato%20referente%20a%20Gold%20Maq.`
+              ? `https://wa.me/${whatsappNumber}?text=Olá%20${encodeURIComponent(customer.name)}`
               : "#";
             const googleMapsUrl = generateGoogleMapsUrl(customer);
             const displayAddress = formatAddressForDisplay(customer);
