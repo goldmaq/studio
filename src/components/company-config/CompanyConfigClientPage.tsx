@@ -92,6 +92,10 @@ const formatAddressForDisplay = (company: Company): string => {
 };
 
 async function fetchCompanyConfigs(): Promise<Company[]> {
+  if (!db) {
+    console.error("fetchCompanyConfigs: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
   const fetchedCompanies: Company[] = [];
   for (const id of companyIds) {
     const docRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
@@ -150,10 +154,29 @@ export function CompanyConfigClientPage() {
   const { data: companies = [], isLoading, isError, error } = useQuery<Company[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchCompanyConfigs,
+    enabled: !!db, // Only run query if db is available
   });
+
+  if (!db) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão com Firebase" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar ao banco de dados.
+          <br />
+          Verifique a configuração do Firebase e sua conexão com a internet.
+        </p>
+      </div>
+    );
+  }
 
   const updateCompanyMutation = useMutation({
     mutationFn: async (companyData: Company) => {
+      if (!db) {
+        console.error("updateCompanyMutation: Firebase DB is not available.");
+        throw new Error("Firebase DB is not available for updating company.");
+      }
       const { id, ...dataToUpdate } = companyData;
       if (!id) throw new Error("ID da empresa é necessário para atualização.");
       const companyRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
@@ -237,7 +260,7 @@ export function CompanyConfigClientPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !isModalOpen) { // Added !isModalOpen to prevent loading screen when modal is open
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -429,3 +452,4 @@ export function CompanyConfigClientPage() {
 
     
     
+
