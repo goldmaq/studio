@@ -155,8 +155,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     resolver: zodResolver(EquipmentSchema),
     defaultValues: {
       brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
-      operationalStatus: "Disponível", customerId: null, // Use null for no customer
-      ownerReference: undefined,
+      operationalStatus: "Disponível", customerId: null, 
+      ownerReference: null, // Default to null for owner reference
       manufactureYear: new Date().getFullYear(),
       customBrand: "", customEquipmentType: "",
       towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
@@ -166,38 +166,6 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       partsCatalogUrl: null, errorCodesUrl: null,
     },
   });
-
-  const customerIdValue = useWatch({ control: form.control, name: 'customerId' });
-  const currentOperationalStatus = useWatch({ control: form.control, name: 'operationalStatus' });
-  const ownerReferenceValue = useWatch({ control: form.control, name: 'ownerReference' });
-  const { setValue } = form;
-
- useEffect(() => {
-    if (customerIdValue) { // Cliente está vinculado
-      if (ownerReferenceValue === OWNER_REF_CUSTOMER) { // Máquina é do cliente
-        if (currentOperationalStatus === 'Locada') {
-          setValue('operationalStatus', 'Em Manutenção', { shouldValidate: true });
-        }
-        // Não altera outros status para máquinas de cliente
-      } else { // Máquina é da Gold Maq e está locada PARA este cliente
-        if (
-          currentOperationalStatus !== 'Em Manutenção' &&
-          currentOperationalStatus !== 'Sucata' &&
-          currentOperationalStatus !== 'Locada'
-        ) {
-          setValue('operationalStatus', 'Locada', { shouldValidate: true });
-        }
-      }
-    } else { // Nenhum cliente vinculado
-      if (currentOperationalStatus === 'Locada') {
-         if (ownerReferenceValue !== OWNER_REF_CUSTOMER) { // Máquina da Gold Maq que foi desvinculada
-            setValue('operationalStatus', 'Disponível', { shouldValidate: true });
-         } else { // Máquina de cliente que foi desvinculada (raro, mas tratar)
-            setValue('operationalStatus', 'Em Manutenção', {shouldValidate: true});
-         }
-      }
-    }
-  }, [customerIdValue, currentOperationalStatus, ownerReferenceValue, setValue]);
 
 
   const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
@@ -225,8 +193,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         customBrand: isBrandPredefined ? "" : (equipment.brand === "Outra" || equipment.brand === "_CUSTOM_" ? "" : equipment.brand),
         equipmentType: isEquipmentTypePredefined ? equipment.equipmentType : '_CUSTOM_',
         customEquipmentType: isEquipmentTypePredefined ? "" : equipment.equipmentType,
-        customerId: equipment.customerId || null, // Use null if no customerId
-        ownerReference: equipment.ownerReference || undefined,
+        customerId: equipment.customerId || null, 
+        ownerReference: equipment.ownerReference || null,
         manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
         towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
         towerClosedHeightMm: equipment.towerClosedHeightMm ?? undefined,
@@ -245,8 +213,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       setEditingEquipment(null);
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
-        operationalStatus: "Disponível", customerId: null, // Use null for no customer
-        ownerReference: undefined,
+        operationalStatus: "Disponível", customerId: null, 
+        ownerReference: null, // Default to null
         manufactureYear: new Date().getFullYear(),
         customBrand: "", customEquipmentType: "",
         towerOpenHeightMm: undefined, towerClosedHeightMm: undefined, nominalCapacityKg: undefined,
@@ -294,6 +262,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     if (formOwnerReferenceFromForm === NO_OWNER_REFERENCE_VALUE || formOwnerReferenceFromForm === null || formOwnerReferenceFromForm === undefined) {
       finalOwnerReference = null;
     } else {
+      // If it's not the "not specified" value, null, or undefined, it should be a valid OwnerReferenceType
       finalOwnerReference = formOwnerReferenceFromForm as OwnerReferenceType;
     }
 
@@ -302,7 +271,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
-      customerId: formCustomerId, // Already null or a string ID from the form
+      customerId: formCustomerId, 
       ownerReference: finalOwnerReference,
       notes: parsedData.notes || null,
       partsCatalogUrl: newPartsCatalogUrl === undefined ? formData.partsCatalogUrl : newPartsCatalogUrl,
@@ -556,8 +525,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
           {equipmentList.map((eq) => {
             const customer = eq.customerId ? customers.find(c => c.id === eq.customerId) : null;
             const ownerDisplay = getOwnerDisplayString(eq.ownerReference, eq.customerId, customers);
-            const ownerIcon = getOwnerIcon(eq.ownerReference);
-            const OwnerIconComponent = ownerIcon;
+            const OwnerIconComponent = getOwnerIcon(eq.ownerReference);
             return (
             <Card
               key={eq.id}
@@ -894,5 +862,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
+
+    
 
     
