@@ -19,7 +19,7 @@ import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db, storage } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy, setDoc, DocumentData } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy, setDoc, type DocumentData } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isBefore, isToday, addDays, parseISO, isValid, format } from 'date-fns';
@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label";
+import { DialogFooter } from "@/components/ui/dialog";
 
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
@@ -80,7 +81,7 @@ async function uploadServiceOrderFile(
 ): Promise<string> {
   const filePath = `service_order_media/${orderId}/${Date.now()}_${file.name}`;
   const fileStorageRef = storageRef(storage, filePath);
-  await uploadBytes(fileStorageRef, fileStorageRef);
+  await uploadBytes(fileStorageRef, file);
   return getDownloadURL(fileStorageRef);
 }
 
@@ -130,15 +131,15 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
   const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("startDate", "desc"), orderBy("orderNumber", "desc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
-    const data = docSnap.data() as DocumentData; // Cast to DocumentData for explicit access
+    const data = docSnap.data() as DocumentData;
     return {
       id: docSnap.id,
-      orderNumber: data.orderNumber || "", // Provide default or ensure it's always there
-      customerId: data.customerId || "",   // Provide default
-      equipmentId: data.equipmentId || "", // Provide default
-      phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'], // Validate and provide default
-      technicianId: data.technicianId || "", // Provide default
-      description: data.description || "", // Provide default
+      orderNumber: data.orderNumber || "N/A",
+      customerId: data.customerId || "N/A",
+      equipmentId: data.equipmentId || "N/A",
+      phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'],
+      technicianId: data.technicianId || "N/A",
+      description: data.description || "N/A",
       serviceType: data.serviceType || "Não especificado",
       customServiceType: data.customServiceType || "",
       vehicleId: data.vehicleId || null,
@@ -147,7 +148,7 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       notes: data.notes || "",
       mediaUrl: data.mediaUrl || null,
       technicalConclusion: data.technicalConclusion || null,
-    } as ServiceOrder; // Assert as ServiceOrder after explicit mapping
+    } as ServiceOrder;
   });
 }
 
@@ -626,8 +627,8 @@ export function ServiceOrderClientPage() {
                 <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Técnico:</span> {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
                 {order.vehicleId && <p className="flex items-center"><VehicleIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Veículo:</span> {isLoadingVehicles ? 'Carregando...' : getVehicleIdentifier(order.vehicleId)}</p>}
                 <p className="flex items-center"><Settings2 className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Tipo Serviço:</span> {order.serviceType}</p>
-                {order.startDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {format(parseISO(order.startDate), 'dd/MM/yyyy')}</p>}
-                {order.endDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Prev.:</span> {format(parseISO(order.endDate), 'dd/MM/yyyy')}</p>}
+                {order.startDate && isValid(parseISO(order.startDate)) && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {format(parseISO(order.startDate), 'dd/MM/yyyy')}</p>}
+                {order.endDate && isValid(parseISO(order.endDate)) && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Prev.:</span> {format(parseISO(order.endDate), 'dd/MM/yyyy')}</p>}
                 <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Problema Relatado:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
                 {order.technicalConclusion && <p className="flex items-start"><Check className="mr-2 mt-0.5 h-4 w-4 text-green-500 flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Técnica:</span> <span className="whitespace-pre-wrap break-words">{order.technicalConclusion}</span></p>}
                 {order.notes && <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Obs.:</span> <span className="whitespace-pre-wrap break-words">{order.notes}</span></p>}
@@ -878,9 +879,6 @@ export function ServiceOrderClientPage() {
               <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais, peças utilizadas, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
             
-            {/* Botões de Ação no Rodapé do FormModal são gerenciados pelo FormModal */}
-            {/* A lógica de submit está no form e o FormModal provê os botões */}
-            {/* O botão de concluir OS precisa ser adicionado aqui dentro do form para ter acesso ao contexto ou ter sua lógica separada */}
              <div className="hidden">
                 <Button type="submit" form="service-order-form" id="hidden-submit-button" />
             </div>
@@ -950,5 +948,3 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
-
-    
