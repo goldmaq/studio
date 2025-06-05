@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import type { Equipment, Customer } from "@/types"; 
-import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, fuelTypeOptions } from "@/types";
+import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, fuelTypeOptions } from "@/types"; // Import options from types
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -24,20 +24,18 @@ import { Textarea } from "@/components/ui/textarea";
 
 
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
-const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes"; // Para buscar clientes
+const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes"; 
 
-// Constantes para SelectItem de cliente
 const NO_CUSTOMER_FORM_VALUE = ""; 
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_"; 
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 
-const operationalStatusIcons = {
+const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
   Operacional: <CheckCircle className="h-4 w-4 text-green-500" />,
   'Precisa de Reparo': <AlertIcon className="h-4 w-4 text-yellow-500" />, 
   'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
 };
 
-// Função helper para converter para null ou number
 const parseNumericToNullOrNumber = (value: any): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const num = Number(value);
@@ -53,7 +51,6 @@ async function fetchEquipment(): Promise<Equipment[]> {
     return { 
       id: doc.id, 
       ...data,
-      // Garante que campos numéricos opcionais sejam numbers ou null
       manufactureYear: data.manufactureYear === undefined ? null : data.manufactureYear,
       towerOpenHeightMm: data.towerOpenHeightMm === undefined ? null : data.towerOpenHeightMm,
       towerClosedHeightMm: data.towerClosedHeightMm === undefined ? null : data.towerClosedHeightMm,
@@ -66,6 +63,8 @@ async function fetchEquipment(): Promise<Equipment[]> {
       lastPreventiveMaintenance: data.lastPreventiveMaintenance || null,
       nextPreventiveMaintenance: data.nextPreventiveMaintenance || null,
       hourMeter: data.hourMeter === undefined ? null : data.hourMeter,
+      customerId: data.customerId === undefined ? null : data.customerId,
+      fuelType: data.fuelType === undefined ? null : data.fuelType,
     } as Equipment;
   });
 }
@@ -95,7 +94,6 @@ export function EquipmentClientPage() {
       brand: "", model: "", chassisNumber: "", equipmentType: "", 
       operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
       manufactureYear: new Date().getFullYear(),
-      // Inicializando campos opcionais específicos como vazios ou default
       customBrand: "", customModel: "", customEquipmentType: "",
       towerType: undefined, towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
       forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
@@ -118,8 +116,8 @@ export function EquipmentClientPage() {
 
   const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id'> => {
     const { 
-      customBrand, customModel, customEquipmentType, // Campos a serem removidos
-      customerId: formCustomerId, // Renomear para evitar conflito
+      customBrand, customModel, customEquipmentType, 
+      customerId: formCustomerId, 
       ...restOfData 
     } = formData;
   
@@ -128,8 +126,7 @@ export function EquipmentClientPage() {
       brand: restOfData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : restOfData.brand,
       model: restOfData.model === '_CUSTOM_' ? customModel || "Não especificado" : restOfData.model,
       equipmentType: restOfData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : restOfData.equipmentType,
-      customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null) ? null : formCustomerId,
-      // Campos numéricos opcionais
+      customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
       towerOpenHeightMm: parseNumericToNullOrNumber(restOfData.towerOpenHeightMm),
       towerClosedHeightMm: parseNumericToNullOrNumber(restOfData.towerClosedHeightMm),
@@ -140,10 +137,10 @@ export function EquipmentClientPage() {
       turningRadiusMm: parseNumericToNullOrNumber(restOfData.turningRadiusMm),
       monthlyRentalValue: parseNumericToNullOrNumber(restOfData.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(restOfData.hourMeter),
-      // Campos de data opcionais (devem ser strings no formato YYYY-MM-DD ou null)
       acquisitionDate: restOfData.acquisitionDate || null,
       lastPreventiveMaintenance: restOfData.lastPreventiveMaintenance || null,
       nextPreventiveMaintenance: restOfData.nextPreventiveMaintenance || null,
+      fuelType: restOfData.fuelType || null,
     };
   };
 
@@ -198,19 +195,16 @@ export function EquipmentClientPage() {
   const openModal = (equipment?: Equipment) => {
     if (equipment) {
       setEditingEquipment(equipment);
-      // Ajusta os valores para o formulário, incluindo campos customizados
       const defaultValues = {
         ...equipment,
-        brand: equipment.brand, // Assumindo que o brand já está correto
+        brand: equipment.brand, 
         model: equipment.model,
         equipmentType: equipment.equipmentType,
-        customBrand: "", // Limpa para o caso de edição
+        customBrand: "", 
         customModel: "",
         customEquipmentType: "",
         customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
         manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
-        // Convertendo null para undefined para campos de formulário, se necessário, ou string vazia.
-        // Zod fará a coerção correta ao submeter.
         towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
         towerClosedHeightMm: equipment.towerClosedHeightMm ?? undefined,
         totalWidthMm: equipment.totalWidthMm ?? undefined,
@@ -224,6 +218,7 @@ export function EquipmentClientPage() {
         lastPreventiveMaintenance: equipment.lastPreventiveMaintenance || undefined,
         nextPreventiveMaintenance: equipment.nextPreventiveMaintenance || undefined,
         notes: equipment.notes || "",
+        fuelType: equipment.fuelType || undefined,
       };
       form.reset(defaultValues);
       setShowCustomFields({ brand: false, model: false, equipmentType: false });
@@ -368,7 +363,6 @@ export function EquipmentClientPage() {
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="equipment-form" className="space-y-4">
-            {/* Informações Básicas */}
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="brand" render={({ field }) => (
@@ -402,7 +396,7 @@ export function EquipmentClientPage() {
                   {showCustomFields.brand && (
                     <FormField control={form.control} name="customBrand" render={({ field: customField }) => (
                       <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite a marca" {...customField} /></FormControl>
+                        <FormControl><Input placeholder="Digite a marca" {...customField} value={customField.value ?? ""} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -417,19 +411,18 @@ export function EquipmentClientPage() {
                    <Select onValueChange={(value) => handleSelectChange('model', value)} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione ou digite" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      {/* Opções podem ser adicionadas dinamicamente ou deixadas para digitação */}
                        <SelectItem value="_CUSTOM_">Digitar Modelo...</SelectItem>
                     </SelectContent>
                   </Select>
                   {showCustomFields.model ? (
                      <FormField control={form.control} name="customModel" render={({ field: customField }) => (
                       <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite o modelo" {...customField} /></FormControl>
+                        <FormControl><Input placeholder="Digite o modelo" {...customField} value={customField.value ?? ""} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
                   ) : (field.value !== '_CUSTOM_' &&
-                    <FormControl><Input placeholder="Ex: 8FGCU25" {...field} disabled={field.value !== '_CUSTOM_'} className={field.value === '_CUSTOM_' ? 'hidden': 'mt-2'}/></FormControl>
+                    <FormControl><Input placeholder="Ex: 8FGCU25" {...field} disabled={field.value === '_CUSTOM_'} value={field.value ?? ""} className={field.value === '_CUSTOM_' ? 'hidden': 'mt-2'}/></FormControl>
                   )}
                   <FormMessage />
                 </FormItem>
@@ -454,7 +447,7 @@ export function EquipmentClientPage() {
                   {showCustomFields.equipmentType && (
                     <FormField control={form.control} name="customEquipmentType" render={({ field: customField }) => (
                      <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite o tipo" {...customField} /></FormControl>
+                        <FormControl><Input placeholder="Digite o tipo" {...customField} value={customField.value ?? ""} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -469,7 +462,7 @@ export function EquipmentClientPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="operationalStatus" render={({ field }) => (
                 <FormItem><FormLabel>Status Operacional</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
                     <SelectContent>
                       {operationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
@@ -481,7 +474,7 @@ export function EquipmentClientPage() {
                 <FormItem>
                   <FormLabel>Cliente Associado (Opcional)</FormLabel>
                   <Select
-                    onValueChange={(selectedValue) => field.onChange(selectedValue === NO_CUSTOMER_SELECT_ITEM_VALUE ? NO_CUSTOMER_FORM_VALUE : selectedValue)}
+                    onValueChange={(selectedValue) => field.onChange(selectedValue === NO_CUSTOMER_SELECT_ITEM_VALUE ? null : selectedValue)}
                     value={field.value || NO_CUSTOMER_FORM_VALUE}
                   >
                     <FormControl>
@@ -509,7 +502,6 @@ export function EquipmentClientPage() {
               )} />
             </div>
             
-            {/* Especificações Técnicas */}
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <FormField control={form.control} name="towerType" render={({ field }) => (
@@ -544,7 +536,6 @@ export function EquipmentClientPage() {
               )} />
             </div>
 
-             {/* Motor e Bateria */}
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Motor e Energia (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField control={form.control} name="engineType" render={({ field }) => (
@@ -568,7 +559,6 @@ export function EquipmentClientPage() {
                 )} />
             </div>
             
-            {/* Informações Adicionais */}
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Informações Adicionais (Opcional)</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField control={form.control} name="hourMeter" render={({ field }) => (
@@ -596,4 +586,3 @@ export function EquipmentClientPage() {
     </>
   );
 }
-

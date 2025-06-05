@@ -4,15 +4,15 @@ export interface Customer {
   name: string;
   cnpj: string;
   email: string;
-  phone?: string; // Novo campo para telefone
-  contactName?: string; // Novo campo para nome de contato
+  phone?: string; 
+  contactName?: string; 
   cep?: string | null;
   street: string;
   number?: string;
   complement?: string;
   neighborhood: string;
   city: string;
-  state: string; // UF / Estado
+  state: string; 
   preferredTechnician?: string;
   notes?: string;
 }
@@ -23,9 +23,32 @@ export interface Equipment {
   model: string;
   chassisNumber: string;
   equipmentType: string;
-  manufactureYear: number;
+  manufactureYear: number | null;
   operationalStatus: 'Operacional' | 'Precisa de Reparo' | 'Fora de Serviço';
-  customerId?: string;
+  customerId?: string | null;
+  customBrand?: string;
+  customModel?: string;
+  customEquipmentType?: string;
+  towerType?: string | null;
+  towerOpenHeightMm?: number | null;
+  towerClosedHeightMm?: number | null;
+  forkSize?: string | null;
+  totalWidthMm?: number | null;
+  totalLengthMm?: number | null;
+  machineWeightKg?: number | null;
+  color?: string | null;
+  nominalCapacityKg?: number | null;
+  turningRadiusMm?: number | null;
+  engineType?: string | null;
+  fuelType?: typeof fuelTypeOptions[number] | null;
+  batteryVoltage?: string | null;
+  batteryAmpHour?: string | null;
+  monthlyRentalValue?: number | null;
+  acquisitionDate?: string | null; 
+  lastPreventiveMaintenance?: string | null; 
+  nextPreventiveMaintenance?: string | null; 
+  hourMeter?: number | null;
+  notes?: string | null;
 }
 
 export interface ServiceOrder {
@@ -77,7 +100,6 @@ export interface Vehicle {
   status: 'Disponível' | 'Em Uso' | 'Manutenção';
 }
 
-// Schemas for react-hook-form validation using Zod
 import { z } from 'zod';
 
 export const CustomerSchema = z.object({
@@ -102,14 +124,52 @@ export const CustomerSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const equipmentTypeOptions = [
+  'Empilhadeira Contrabalançada GLP', 
+  'Empilhadeira Contrabalançada Elétrica', 
+  'Empilhadeira Retrátil', 
+  'Transpaleteira Elétrica', 
+  'Rebocador Industrial', 
+  'Plataforma Elevatória Tesoura', 
+  'Plataforma Elevatória Articulada',
+  'Outro (Manual)'
+] as const;
+
+export const operationalStatusOptions = ['Operacional', 'Precisa de Reparo', 'Fora de Serviço'] as const;
+
+export const fuelTypeOptions = ['Elétrico', 'GLP', 'Diesel', 'Gasolina', 'Não Aplicável'] as const;
+
 export const EquipmentSchema = z.object({
   brand: z.string().min(1, "Marca é obrigatória"),
   model: z.string().min(1, "Modelo é obrigatório"),
   chassisNumber: z.string().min(1, "Número do chassi é obrigatório"),
-  equipmentType: z.string().min(1, "Tipo de equipamento é obrigatório"),
-  manufactureYear: z.coerce.number().min(1900, "Ano inválido").max(new Date().getFullYear() + 1, "Ano inválido"),
-  operationalStatus: z.enum(['Operacional', 'Precisa de Reparo', 'Fora de Serviço']),
-  customerId: z.string().optional(),
+  equipmentType: z.string().min(1, "Tipo de equipamento é obrigatório"), 
+  manufactureYear: z.coerce.number().min(1900, "Ano inválido").max(new Date().getFullYear() + 1, "Ano inválido").nullable(),
+  operationalStatus: z.enum(operationalStatusOptions),
+  customerId: z.string().nullable().optional(), 
+  customBrand: z.string().optional(),
+  customModel: z.string().optional(),
+  customEquipmentType: z.string().optional(),
+  towerType: z.string().optional().nullable(),
+  towerOpenHeightMm: z.coerce.number().positive("Deve ser positivo").optional().nullable(),
+  towerClosedHeightMm: z.coerce.number().positive("Deve ser positivo").optional().nullable(),
+  forkSize: z.string().optional().nullable(),
+  totalWidthMm: z.coerce.number().positive("Deve ser positivo").optional().nullable(),
+  totalLengthMm: z.coerce.number().positive("Deve ser positivo").optional().nullable(),
+  machineWeightKg: z.coerce.number().positive("Deve ser positivo").optional().nullable(),
+  color: z.string().optional().nullable(),
+  nominalCapacityKg: z.coerce.number().positive("Deve ser positivo").optional().nullable(),
+  turningRadiusMm: z.coerce.number().positive("Deve ser positivo").optional().nullable(),
+  engineType: z.string().optional().nullable(),
+  fuelType: z.enum(fuelTypeOptions).optional().nullable(),
+  batteryVoltage: z.string().optional().nullable(),
+  batteryAmpHour: z.string().optional().nullable(),
+  monthlyRentalValue: z.coerce.number().min(0, "Valor deve ser positivo ou zero").optional().nullable(),
+  acquisitionDate: z.string().optional().nullable(), 
+  lastPreventiveMaintenance: z.string().optional().nullable(),
+  nextPreventiveMaintenance: z.string().optional().nullable(),
+  hourMeter: z.coerce.number().min(0, "Horímetro deve ser positivo ou zero").optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
 export const TechnicianSchema = z.object({
