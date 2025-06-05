@@ -5,14 +5,14 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIcon, X, Loader2 } from "lucide-react";
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIcon, X, Loader2, CarFront as VehicleIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { ServiceOrder } from "@/types";
+import type { ServiceOrder, Customer, Equipment, Technician, Vehicle } from "@/types";
 import { ServiceOrderSchema } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
@@ -32,6 +32,10 @@ const phaseIcons = {
 };
 
 const FIRESTORE_COLLECTION_NAME = "ordensDeServico";
+const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
+const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
+const FIRESTORE_TECHNICIAN_COLLECTION_NAME = "tecnicos";
+const FIRESTORE_VEHICLE_COLLECTION_NAME = "veiculos";
 
 const formatDateForInput = (date: any): string => {
   if (!date) return "";
@@ -52,16 +56,13 @@ const formatDateForInput = (date: any): string => {
   return "";
 };
 
-
 const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
   if (!dateString) return null;
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return null;
-  
   const adjustedDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   return Timestamp.fromDate(adjustedDate);
 };
-
 
 async function fetchServiceOrders(): Promise<ServiceOrder[]> {
   const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("startDate", "desc"), orderBy("orderNumber", "desc"));
@@ -73,8 +74,33 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       ...data,
       startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
       endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
+      vehicleId: data.vehicleId || null,
     } as ServiceOrder;
   });
+}
+
+async function fetchCustomers(): Promise<Customer[]> {
+  const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
+}
+
+async function fetchEquipment(): Promise<Equipment[]> {
+  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
+}
+
+async function fetchTechnicians(): Promise<Technician[]> {
+  const q = query(collection(db, FIRESTORE_TECHNICIAN_COLLECTION_NAME), orderBy("name", "asc"));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
+}
+
+async function fetchVehicles(): Promise<Vehicle[]> {
+  const q = query(collection(db, FIRESTORE_VEHICLE_COLLECTION_NAME), orderBy("model", "asc"));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Vehicle));
 }
 
 export function ServiceOrderClientPage() {
@@ -93,9 +119,29 @@ export function ServiceOrderClientPage() {
     },
   });
 
-  const { data: serviceOrders = [], isLoading, isError, error } = useQuery<ServiceOrder[], Error>({
+  const { data: serviceOrders = [], isLoading: isLoadingServiceOrders, isError: isErrorServiceOrders, error: errorServiceOrders } = useQuery<ServiceOrder[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchServiceOrders,
+  });
+
+  const { data: customers = [], isLoading: isLoadingCustomers } = useQuery<Customer[], Error>({
+    queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME],
+    queryFn: fetchCustomers,
+  });
+
+  const { data: equipmentList = [], isLoading: isLoadingEquipment } = useQuery<Equipment[], Error>({
+    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
+    queryFn: fetchEquipment,
+  });
+
+  const { data: technicians = [], isLoading: isLoadingTechnicians } = useQuery<Technician[], Error>({
+    queryKey: [FIRESTORE_TECHNICIAN_COLLECTION_NAME],
+    queryFn: fetchTechnicians,
+  });
+
+  const { data: vehicles = [], isLoading: isLoadingVehicles } = useQuery<Vehicle[], Error>({
+    queryKey: [FIRESTORE_VEHICLE_COLLECTION_NAME],
+    queryFn: fetchVehicles,
   });
 
   const addServiceOrderMutation = useMutation({
@@ -106,6 +152,7 @@ export function ServiceOrderClientPage() {
         endDate: convertToTimestamp(newOrderData.endDate),
         estimatedLaborCost: Number(newOrderData.estimatedLaborCost),
         actualLaborCost: newOrderData.actualLaborCost ? Number(newOrderData.actualLaborCost) : undefined,
+        vehicleId: newOrderData.vehicleId || null,
       };
       return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), dataToSave);
     },
@@ -129,6 +176,7 @@ export function ServiceOrderClientPage() {
         endDate: convertToTimestamp(orderData.endDate),
         estimatedLaborCost: Number(orderData.estimatedLaborCost),
         actualLaborCost: orderData.actualLaborCost ? Number(orderData.actualLaborCost) : undefined,
+        vehicleId: orderData.vehicleId || null,
       };
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
       return updateDoc(orderRef, dataToSave);
@@ -167,6 +215,7 @@ export function ServiceOrderClientPage() {
         endDate: formatDateForInput(order.endDate),
         estimatedLaborCost: Number(order.estimatedLaborCost) || 0,
         actualLaborCost: order.actualLaborCost ? Number(order.actualLaborCost) : undefined,
+        vehicleId: order.vehicleId || "", // Garantir que seja string vazia se null/undefined
       });
     } else {
       setEditingOrder(null);
@@ -191,6 +240,7 @@ export function ServiceOrderClientPage() {
       ...values,
       estimatedLaborCost: Number(values.estimatedLaborCost),
       actualLaborCost: values.actualLaborCost ? Number(values.actualLaborCost) : undefined,
+      vehicleId: values.vehicleId || null, // Enviar null se string vazia
     };
     if (editingOrder && editingOrder.id) {
       updateServiceOrderMutation.mutate({ ...orderData, id: editingOrder.id });
@@ -208,26 +258,36 @@ export function ServiceOrderClientPage() {
   };
   
   const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending;
+  const isLoadingPageData = isLoadingServiceOrders || isLoadingCustomers || isLoadingEquipment || isLoadingTechnicians || isLoadingVehicles;
 
-  if (isLoading) {
+  if (isLoadingPageData && !isModalOpen) { 
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2">Carregando ordens de serviço...</p>
+        <p className="ml-2">Carregando dados...</p>
       </div>
     );
   }
   
-  if (isError) {
+  if (isErrorServiceOrders) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
         <AlertIcon className="h-12 w-12 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Ordens de Serviço</h2>
         <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
-        <p className="text-sm mt-2">Detalhe: {error?.message}</p>
+        <p className="text-sm mt-2">Detalhe: {errorServiceOrders?.message}</p>
       </div>
     );
   }
+
+  // Helper para encontrar nomes a partir de IDs
+  const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || id;
+  const getEquipmentIdentifier = (id: string) => {
+    const eq = equipmentList.find(e => e.id === id);
+    return eq ? `${eq.brand} ${eq.model}` : id;
+  };
+  const getTechnicianName = (id: string) => technicians.find(t => t.id === id)?.name || id;
+
 
   return (
     <>
@@ -240,7 +300,7 @@ export function ServiceOrderClientPage() {
         }
       />
 
-      {serviceOrders.length === 0 && !isLoading ? (
+      {serviceOrders.length === 0 && !isLoadingServiceOrders ? (
         <DataTablePlaceholder
           icon={ClipboardList}
           title="Nenhuma Ordem de Serviço Ainda"
@@ -263,16 +323,15 @@ export function ServiceOrderClientPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> ID Cli.: {order.customerId}</p>
-                <p className="flex items-center"><Construction className="mr-2 h-4 w-4 text-primary" /> ID Equip.: {order.equipmentId}</p>
-                <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> ID Téc.: {order.technicianId}</p>
+                <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Cli.: {isLoadingCustomers ? 'Carregando...' : getCustomerName(order.customerId)}</p>
+                <p className="flex items-center"><Construction className="mr-2 h-4 w-4 text-primary" /> Equip.: {isLoadingEquipment ? 'Carregando...' : getEquipmentIdentifier(order.equipmentId)}</p>
+                <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> Téc.: {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
                 <p className="flex items-center"><Settings2 className="mr-2 h-4 w-4 text-primary" /> Serviço: {order.natureOfService}</p>
                 <p className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Custo Est.: R$ {Number(order.estimatedLaborCost).toFixed(2)}</p>
                 {order.startDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary" /> Início: {formatDateForInput(order.startDate)}</p>}
                 <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Desc.: {order.description}</p>
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                {/* Botão Editar removido */}
               </CardFooter>
             </Card>
           ))}
@@ -297,12 +356,43 @@ export function ServiceOrderClientPage() {
               <FormField control={form.control} name="orderNumber" render={({ field }) => (
                 <FormItem><FormLabel>Número da Ordem</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
+              
               <FormField control={form.control} name="customerId" render={({ field }) => (
-                <FormItem><FormLabel>ID do Cliente</FormLabel><FormControl><Input placeholder="Selecione o Cliente" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Cliente</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl><SelectTrigger>
+                      <SelectValue placeholder={isLoadingCustomers ? "Carregando..." : "Selecione o Cliente"} />
+                    </SelectTrigger></FormControl>
+                    <SelectContent>
+                      {isLoadingCustomers ? <SelectItem value="loading" disabled>Carregando...</SelectItem> : 
+                       customers.map(customer => (
+                        <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
               )} />
+
               <FormField control={form.control} name="equipmentId" render={({ field }) => (
-                <FormItem><FormLabel>ID do Equipamento</FormLabel><FormControl><Input placeholder="Selecione o Equipamento" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Equipamento</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl><SelectTrigger>
+                      <SelectValue placeholder={isLoadingEquipment ? "Carregando..." : "Selecione o Equipamento"} />
+                    </SelectTrigger></FormControl>
+                    <SelectContent>
+                      {isLoadingEquipment ? <SelectItem value="loading" disabled>Carregando...</SelectItem> :
+                       equipmentList.map(eq => (
+                        <SelectItem key={eq.id} value={eq.id}>{eq.brand} {eq.model} (Chassi: {eq.chassisNumber})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
               )} />
+
               <FormField control={form.control} name="phase" render={({ field }) => (
                 <FormItem><FormLabel>Fase</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
@@ -311,15 +401,53 @@ export function ServiceOrderClientPage() {
                   </Select><FormMessage />
                 </FormItem>
               )} />
+
               <FormField control={form.control} name="technicianId" render={({ field }) => (
-                <FormItem><FormLabel>ID do Técnico</FormLabel><FormControl><Input placeholder="Atribuir Técnico" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Técnico</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl><SelectTrigger>
+                      <SelectValue placeholder={isLoadingTechnicians ? "Carregando..." : "Atribuir Técnico"} />
+                    </SelectTrigger></FormControl>
+                    <SelectContent>
+                      {isLoadingTechnicians ? <SelectItem value="loading" disabled>Carregando...</SelectItem> :
+                       technicians.map(tech => (
+                        <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
               )} />
+              
               <FormField control={form.control} name="natureOfService" render={({ field }) => (
                 <FormItem><FormLabel>Natureza do Serviço</FormLabel><FormControl><Input placeholder="ex: Manutenção Preventiva" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
+
               <FormField control={form.control} name="vehicleId" render={({ field }) => (
-                <FormItem><FormLabel>ID do Veículo (Opcional)</FormLabel><FormControl><Input placeholder="Selecione o Veículo" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Veículo (Opcional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl><SelectTrigger>
+                      <SelectValue placeholder={isLoadingVehicles ? "Carregando..." : "Selecione o Veículo"} />
+                    </SelectTrigger></FormControl>
+                    <SelectContent>
+                      {isLoadingVehicles ? (
+                        <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                       ) : (
+                        <>
+                          <SelectItem value="">Nenhum</SelectItem>
+                          {vehicles.map(vehicle => (
+                            <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.model} ({vehicle.licensePlate})</SelectItem>
+                          ))}
+                        </>
+                       )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
               )} />
+
               <FormField control={form.control} name="estimatedLaborCost" render={({ field }) => (
                 <FormItem><FormLabel>Custo Estimado da Mão de Obra</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
               )} />
@@ -345,4 +473,3 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
-

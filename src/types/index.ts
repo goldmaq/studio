@@ -22,11 +22,9 @@ export const equipmentTypeOptions = [
   'Empilhadeira Contrabalançada Elétrica', 
   'Empilhadeira Retrátil', 
   'Transpaleteira Elétrica', 
-  'Plataforma Elevatória Tesoura',
 ] as const;
 
 export const operationalStatusOptions = ['Disponível', 'Locada', 'Em Manutenção', 'Sucata'] as const;
-// fuelTypeOptions foi removido
 
 export interface Equipment {
   id:string;
@@ -61,7 +59,7 @@ export interface ServiceOrder {
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
   technicianId: string;
   natureOfService: string;
-  vehicleId?: string;
+  vehicleId?: string | null; // Permitir null para veículo
   estimatedLaborCost: number;
   actualLaborCost?: number;
   startDate?: string; 
@@ -174,7 +172,7 @@ export const ServiceOrderSchema = z.object({
   phase: z.enum(['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada']),
   technicianId: z.string().min(1, "Técnico é obrigatório"),
   natureOfService: z.string().min(1, "Natureza do serviço é obrigatória"),
-  vehicleId: z.string().optional(),
+  vehicleId: z.string().nullable().optional(), // Permitir null ou string vazia para veículo
   estimatedLaborCost: z.coerce.number().min(0, "Custo estimado deve ser positivo"),
   actualLaborCost: z.coerce.number().min(0, "Custo real deve ser positivo").optional(),
   startDate: z.string().optional(),
