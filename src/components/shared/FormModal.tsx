@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
-import { Trash2, Loader2 } from "lucide-react";
+import { Trash2, Loader2, Save } from "lucide-react"; // Added Save icon
 
 interface FormModalProps<T> {
   isOpen: boolean;
@@ -25,6 +25,8 @@ interface FormModalProps<T> {
   onDeleteConfirm?: () => void;
   isDeleting?: boolean;
   deleteButtonLabel?: string;
+  submitButtonLabel?: string; // New prop for submit button text
+  disableSubmit?: boolean; // New prop to disable submit button
 }
 
 export function FormModal<T>({
@@ -39,6 +41,8 @@ export function FormModal<T>({
   onDeleteConfirm,
   isDeleting,
   deleteButtonLabel,
+  submitButtonLabel, // Use new prop
+  disableSubmit, // Use new prop
 }: FormModalProps<T>) {
   const disableActions = isSubmitting || isDeleting;
 
@@ -50,14 +54,15 @@ export function FormModal<T>({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         
-        <div className="py-4 max-h-[60vh] overflow-y-auto pr-2">
+        <div className="py-4 max-h-[70vh] overflow-y-auto pr-2"> {/* Increased max-h */}
           {children}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between pt-4">
+        <DialogFooter className="gap-2 sm:justify-between pt-4 border-t mt-4"> {/* Added border-t and mt-4 */}
           <div className="flex-grow-0">
             {editingItem && onDeleteConfirm && (
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={onDeleteConfirm}
@@ -74,11 +79,21 @@ export function FormModal<T>({
             )}
           </div>
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={onClose} disabled={disableActions}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={disableActions}>
               Cancelar
             </Button>
-            <Button type="submit" form={formId} disabled={disableActions} className="bg-primary hover:bg-primary/90">
-              {isSubmitting ? (isDeleting ? "Processando..." : "Salvando...") : (editingItem ? "Salvar Alterações" : "Criar")}
+            <Button 
+              type="submit" 
+              form={formId} 
+              disabled={disableActions || disableSubmit} // Use disableSubmit here
+              className="bg-primary hover:bg-primary/90"
+            >
+              {isSubmitting ? (
+                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                 <Save className="mr-2 h-4 w-4" /> 
+              )}
+              {isSubmitting ? (isDeleting ? "Processando..." : "Salvando...") : (submitButtonLabel || (editingItem ? "Salvar Alterações" : "Criar"))}
             </Button>
           </div>
         </DialogFooter>

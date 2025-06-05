@@ -142,12 +142,11 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'],
       technicianId: data.technicianId || null,
       serviceType: data.serviceType || "Não especificado",
-      // customServiceType é omitido aqui porque não existe na interface ServiceOrder, mas é tratado em prepareDataForFirestore
       vehicleId: data.vehicleId || null,
       startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
       endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
       description: data.description || "N/A",
-      notes: data.notes || undefined, // Garante que notes seja string ou undefined
+      notes: data.notes || undefined,
       mediaUrl: data.mediaUrl || null,
       technicalConclusion: data.technicalConclusion || null,
     } as ServiceOrder;
@@ -502,6 +501,16 @@ export function ServiceOrderClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
+    if (editingOrder?.phase === 'Concluída' && editingOrder?.id) {
+        // Se a OS já está concluída, apenas permita salvar 'notes'.
+        // A mutação de updateServiceOrderMutation já lida com todos os campos.
+        // Se quisermos restringir mais, podemos criar uma nova mutação ou ajustar 'prepareDataForFirestore'
+        // para apenas incluir 'notes' e o ID quando a fase for 'Concluída'.
+        // Por simplicidade, deixaremos a mutação de update tratar, e o fieldset desabilitado impede a maioria das edições.
+        updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, file: mediaFile, currentOrder: editingOrder });
+        return;
+    }
+
     if (editingOrder && editingOrder.id) {
       updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, file: mediaFile, currentOrder: editingOrder });
     } else {
@@ -535,7 +544,7 @@ export function ServiceOrderClientPage() {
 
   const handleOpenConclusionModal = () => {
     if (editingOrder) {
-      setTechnicalConclusionText(editingOrder.technicalConclusion || "");
+      setTechnicalConclusionText(editingOrder.technicalConclusion || ""); // Preenche com a conclusão existente se houver
       setIsConclusionModalOpen(true);
     }
   };
@@ -549,7 +558,7 @@ export function ServiceOrderClientPage() {
       concludeServiceOrderMutation.mutate({
         orderId: editingOrder.id,
         conclusionText: technicalConclusionText,
-        currentEndDate: editingOrder.endDate,
+        currentEndDate: form.getValues("endDate"), // Pega a data de conclusão do formulário, se preenchida
       });
     }
   };
@@ -687,10 +696,12 @@ export function ServiceOrderClientPage() {
         onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteServiceOrderMutation.isPending}
         deleteButtonLabel="Excluir OS"
+        submitButtonLabel={editingOrder ? "Salvar Alterações" : "Criar OS"}
+        disableSubmit={editingOrder?.phase === 'Concluída'}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
-            <fieldset disabled={isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada'}>
+            <fieldset disabled={editingOrder?.phase === 'Concluída' && editingOrder?.phase !== 'Cancelada'}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="orderNumber" render={({ field }) => (
                   <FormItem>
@@ -885,57 +896,42 @@ export function ServiceOrderClientPage() {
                 <FormMessage />
               </FormItem>
             </fieldset>
+            
+            {/* Botão Concluir OS - Visível apenas se editando e OS não concluída/cancelada */}
+            {editingOrder && !isOrderConcludedOrCancelled && editingOrder.phase !== 'Cancelada' && (
+              <div className="pt-4">
+                <Button type="button" variant="outline" onClick={handleOpenConclusionModal} disabled={isMutating} className="w-full sm:w-auto">
+                  <Check className="mr-2 h-4 w-4" /> Concluir OS
+                </Button>
+              </div>
+            )}
 
-            <FormField control={form.control} name="technicalConclusion" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Conclusão Técnica</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder={editingOrder?.phase === 'Concluída' || editingOrder?.phase === 'Cancelada' ? (field.value ? "" : "Nenhuma conclusão técnica registrada.") : "Será preenchido ao concluir a OS."}
-                    {...field}
-                    value={field.value ?? ""}
-                    readOnly={!isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada'} 
-                    disabled={!isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada'}
-                    rows={3}
-                  />
-                </FormControl>
-                 {!isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada' && <FormDescription>Este campo será habilitado ao concluir a OS.</FormDescription>}
-                <FormMessage />
-              </FormItem>
-            )} />
-
+            {/* Campo Conclusão Técnica - Visível apenas se OS concluída/cancelada e somente leitura */}
+            {editingOrder && isOrderConcludedOrCancelled && (
+              <FormField control={form.control} name="technicalConclusion" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Conclusão Técnica</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Nenhuma conclusão técnica registrada."
+                      {...field}
+                      value={field.value ?? ""}
+                      readOnly
+                      rows={3}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+            
+            {/* Campo Observações - Editável mesmo se OS concluída/cancelada */}
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais, peças utilizadas, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
             
-             <div className="hidden">
-                <Button type="submit" form="service-order-form" id="hidden-submit-button" />
-            </div>
           </form>
         </Form>
-         <DialogFooter className="gap-2 sm:justify-between pt-4 border-t mt-4">
-            <div>
-                {editingOrder && !isOrderConcludedOrCancelled && editingOrder.phase !== 'Cancelada' && (
-                    <Button type="button" variant="outline" onClick={handleOpenConclusionModal} disabled={isMutating}>
-                        <Check className="mr-2 h-4 w-4" /> Concluir OS
-                    </Button>
-                )}
-            </div>
-            <div className="flex gap-2 justify-end">
-                 <Button variant="ghost" onClick={closeModal} disabled={isMutating}>
-                    Cancelar
-                </Button>
-                <Button 
-                    type="button" 
-                    onClick={() => document.getElementById('hidden-submit-button')?.click()} 
-                    disabled={isMutating} 
-                    className="bg-primary hover:bg-primary/90"
-                >
-                    {isMutating ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />}
-                    {editingOrder ? "Salvar Alterações" : "Criar OS"}
-                </Button>
-            </div>
-        </DialogFooter>
       </FormModal>
 
       <AlertDialog open={isConclusionModalOpen} onOpenChange={setIsConclusionModalOpen}>
@@ -976,3 +972,4 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
+
