@@ -8,13 +8,13 @@ import type { ReactNode } from "react";
 import {
   LayoutDashboard,
   Users,
-  Construction,
+  Construction, // Will be kept for "Máquinas" as it's a generic construction icon
   ClipboardList,
   HardHat,
   CarFront,
   SlidersHorizontal,
   Settings,
-  PackageSearch, // Ícone para Equipamentos Auxiliares
+  PackageSearch,
 } from "lucide-react";
 import {
   SidebarProvider,
@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-// import { Logo } from "@/components/icons/Logo"; // Replaced by Image
 
 interface NavItem {
   href: string;
@@ -41,7 +40,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/", icon: LayoutDashboard, label: "Painel" },
   { href: "/customers", icon: Users, label: "Clientes" },
-  { href: "/equipment", icon: Construction, label: "Equipamentos" },
+  { href: "/maquinas", icon: Construction, label: "Máquinas" }, // Changed label here
   { href: "/auxiliary-equipment", icon: PackageSearch, label: "Equip. Auxiliares" },
   { href: "/service-orders", icon: ClipboardList, label: "Ordens de Serviço" },
   { href: "/technicians", icon: HardHat, label: "Técnicos" },
@@ -68,8 +67,6 @@ function MainSidebar() {
               width={120} 
               height={30} 
               className="transition-all duration-300 ease-in-out" 
-              // priority prop removed to make it less critical if image source is problematic
-              // Ensure '/images/logo.png' exists in your 'public/images/' folder.
             />
           ) : (
             <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />
