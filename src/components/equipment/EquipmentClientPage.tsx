@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, HandCoins, CalendarClock, History, PackageOpen, Car, ShieldAlert, Trash2 } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, HandCoins, CalendarClock, History, PackageOpen, Car, ShieldAlert, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,9 +32,9 @@ const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
   Disponível: <CheckCircle className="h-4 w-4 text-green-500" />,
-  Locada: <PackageOpen className="h-4 w-4 text-blue-500" />,
-  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-yellow-500" />,
-  Sucata: <Trash2 className="h-4 w-4 text-red-500" />,
+  Locada: <Package className="h-4 w-4 text-blue-500" />, // Usando Package para Locada
+  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-red-500" />, // Vermelho para Manutenção
+  Sucata: <Trash2 className="h-4 w-4 text-red-500" />, // Vermelho para Sucata
 };
 
 const parseNumericToNullOrNumber = (value: any): number | null => {
@@ -61,7 +61,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
       brand: data.brand || "Marca Desconhecida",
       model: data.model || "Modelo Desconhecido",
       chassisNumber: data.chassisNumber || "N/A",
-      equipmentType: (equipmentTypeOptions.includes(data.equipmentType as any) || typeof data.equipmentType === 'string') ? data.equipmentType : "Empilhadeira Contrabalançada GLP", // Default to a valid option or handle custom
+      equipmentType: (equipmentTypeOptions.includes(data.equipmentType as any) || typeof data.equipmentType === 'string') ? data.equipmentType : "Empilhadeira Contrabalançada GLP",
       manufactureYear: parseNumericToNullOrNumber(data.manufactureYear),
       operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Disponível",
       customerId: data.customerId || null,
@@ -146,15 +146,15 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     if (equipment) {
       setEditingEquipment(equipment);
 
-      const isBrandPredefinedOrSpecial = predefinedBrandOptionsList.includes(equipment.brand);
-      const isEquipmentTypePredefined = equipmentTypeOptions.includes(equipment.equipmentType as any) || equipment.equipmentType === "";
+      const isBrandPredefined = predefinedBrandOptionsList.includes(equipment.brand) && equipment.brand !== "Outra";
+      const isEquipmentTypePredefined = equipmentTypeOptions.includes(equipment.equipmentType as any);
 
 
       const defaultValues = {
         ...equipment,
         model: equipment.model || "",
-        brand: isBrandPredefinedOrSpecial && equipment.brand !== "Outra" ? equipment.brand : '_CUSTOM_',
-        customBrand: isBrandPredefinedOrSpecial && equipment.brand !== "Outra" ? "" : (equipment.brand === "Outra" || equipment.brand === "_CUSTOM_" ? "" : equipment.brand),
+        brand: isBrandPredefined ? equipment.brand : '_CUSTOM_',
+        customBrand: isBrandPredefined ? "" : (equipment.brand === "Outra" || equipment.brand === "_CUSTOM_" ? "" : equipment.brand),
         equipmentType: isEquipmentTypePredefined ? equipment.equipmentType : '_CUSTOM_',
         customEquipmentType: isEquipmentTypePredefined ? "" : equipment.equipmentType,
         customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
@@ -171,7 +171,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       };
       form.reset(defaultValues);
       setShowCustomFields({
-          brand: !isBrandPredefinedOrSpecial || equipment.brand === "Outra",
+          brand: !isBrandPredefined,
           equipmentType: !isEquipmentTypePredefined,
       });
 
@@ -557,3 +557,5 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
+
+    
