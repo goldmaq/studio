@@ -41,9 +41,8 @@ export interface Equipment {
   manufactureYear: number | null;
   operationalStatus: typeof operationalStatusOptions[number];
   customerId?: string | null;
-  customBrand?: string;
-  customModel?: string;
-  customEquipmentType?: string;
+  customBrand?: string; // Kept for form handling, not directly part of core Equipment data model
+  customEquipmentType?: string; // Kept for form handling
   towerType?: string | null;
   towerOpenHeightMm?: number | null;
   towerClosedHeightMm?: number | null;
@@ -138,14 +137,14 @@ export const CustomerSchema = z.object({
 
 export const EquipmentSchema = z.object({
   brand: z.string().min(1, "Marca é obrigatória"),
-  model: z.string().min(1, "Modelo é obrigatório"),
+  model: z.string().min(1, "Modelo é obrigatório"), // Model is now direct
   chassisNumber: z.string().min(1, "Número do chassi é obrigatório"),
   equipmentType: z.string().min(1, "Tipo de equipamento é obrigatório"), 
   manufactureYear: z.coerce.number().min(1900, "Ano inválido").max(new Date().getFullYear() + 1, "Ano inválido").nullable(),
   operationalStatus: z.enum(operationalStatusOptions),
   customerId: z.string().nullable().optional(), 
   customBrand: z.string().optional(),
-  customModel: z.string().optional(),
+  // customModel removed
   customEquipmentType: z.string().optional(),
   towerType: z.string().optional().nullable(),
   towerOpenHeightMm: z.coerce.number().positive("Deve ser positivo").optional().nullable(),

@@ -42,6 +42,12 @@ const parseNumericToNullOrNumber = (value: any): number | null => {
   return isNaN(num) ? null : num;
 };
 
+const predefinedBrandOptionsList = [
+  "Toyota", "Hyster", "Yale", "Still", "Linde", "Clark", "Mitsubishi", "Nissan", 
+  "Komatsu", "Crown", "Raymond", "Doosan", "Hyundai", "Caterpillar", 
+  "Jungheinrich", "Hangcha", "Heli", "EP", "Outra"
+];
+
 
 async function fetchEquipment(): Promise<Equipment[]> {
   const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
@@ -49,35 +55,33 @@ async function fetchEquipment(): Promise<Equipment[]> {
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data();
     
-    // Explicitly map fields to the Equipment type
     const equipmentData: Equipment = {
       id: docSnap.id,
       brand: data.brand || "Marca Desconhecida",
       model: data.model || "Modelo Desconhecido",
       chassisNumber: data.chassisNumber || "N/A",
       equipmentType: (equipmentTypeOptions.includes(data.equipmentType as any) || typeof data.equipmentType === 'string') ? data.equipmentType : "Outro (Manual)",
-      manufactureYear: data.manufactureYear !== undefined && !isNaN(Number(data.manufactureYear)) ? Number(data.manufactureYear) : null,
+      manufactureYear: parseNumericToNullOrNumber(data.manufactureYear),
       operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Operacional",
-      customerId: data.customerId === undefined ? null : data.customerId,
+      customerId: data.customerId || null,
       
-      towerType: data.towerType === undefined ? null : data.towerType,
-      towerOpenHeightMm: data.towerOpenHeightMm !== undefined && !isNaN(Number(data.towerOpenHeightMm)) ? Number(data.towerOpenHeightMm) : null,
-      towerClosedHeightMm: data.towerClosedHeightMm !== undefined && !isNaN(Number(data.towerClosedHeightMm)) ? Number(data.towerClosedHeightMm) : null,
-      forkSize: data.forkSize === undefined ? null : data.forkSize,
-      totalWidthMm: data.totalWidthMm !== undefined && !isNaN(Number(data.totalWidthMm)) ? Number(data.totalWidthMm) : null,
-      totalLengthMm: data.totalLengthMm !== undefined && !isNaN(Number(data.totalLengthMm)) ? Number(data.totalLengthMm) : null,
-      machineWeightKg: data.machineWeightKg !== undefined && !isNaN(Number(data.machineWeightKg)) ? Number(data.machineWeightKg) : null,
-      color: data.color === undefined ? null : data.color,
-      nominalCapacityKg: data.nominalCapacityKg !== undefined && !isNaN(Number(data.nominalCapacityKg)) ? Number(data.nominalCapacityKg) : null,
-      turningRadiusMm: data.turningRadiusMm !== undefined && !isNaN(Number(data.turningRadiusMm)) ? Number(data.turningRadiusMm) : null,
-      engineType: data.engineType === undefined ? null : data.engineType,
+      towerType: data.towerType || null,
+      towerOpenHeightMm: parseNumericToNullOrNumber(data.towerOpenHeightMm),
+      towerClosedHeightMm: parseNumericToNullOrNumber(data.towerClosedHeightMm),
+      forkSize: data.forkSize || null,
+      totalWidthMm: parseNumericToNullOrNumber(data.totalWidthMm),
+      totalLengthMm: parseNumericToNullOrNumber(data.totalLengthMm),
+      machineWeightKg: parseNumericToNullOrNumber(data.machineWeightKg),
+      color: data.color || null,
+      nominalCapacityKg: parseNumericToNullOrNumber(data.nominalCapacityKg),
+      turningRadiusMm: parseNumericToNullOrNumber(data.turningRadiusMm),
+      engineType: data.engineType || null,
       fuelType: fuelTypeOptions.includes(data.fuelType as any) ? data.fuelType : null,
-      batteryVoltage: data.batteryVoltage === undefined ? null : data.batteryVoltage,
-      batteryAmpHour: data.batteryAmpHour === undefined ? null : data.batteryAmpHour,
-      monthlyRentalValue: data.monthlyRentalValue !== undefined && !isNaN(Number(data.monthlyRentalValue)) ? Number(data.monthlyRentalValue) : null,
-      hourMeter: data.hourMeter !== undefined && !isNaN(Number(data.hourMeter)) ? Number(data.hourMeter) : null,
-      notes: data.notes === undefined ? null : data.notes,
-      // customBrand, customModel, customEquipmentType are form-only, not directly stored typically
+      batteryVoltage: data.batteryVoltage || null,
+      batteryAmpHour: data.batteryAmpHour || null,
+      monthlyRentalValue: parseNumericToNullOrNumber(data.monthlyRentalValue),
+      hourMeter: parseNumericToNullOrNumber(data.hourMeter),
+      notes: data.notes || null,
     };
     return equipmentData;
   });
@@ -102,7 +106,6 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const [showCustomFields, setShowCustomFields] = useState({
     brand: false,
-    model: false,
     equipmentType: false,
   });
 
@@ -112,7 +115,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       brand: "", model: "", chassisNumber: "", equipmentType: "",
       operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
       manufactureYear: new Date().getFullYear(),
-      customBrand: "", customModel: "", customEquipmentType: "",
+      customBrand: "", customEquipmentType: "", // customModel removed
       towerType: undefined, towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
       forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
       color: undefined, nominalCapacityKg: undefined, turningRadiusMm: undefined,
@@ -134,18 +137,17 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const openModal = useCallback((equipment?: Equipment) => {
     if (equipment) {
       setEditingEquipment(equipment);
+
+      const isBrandPredefinedOrSpecial = predefinedBrandOptionsList.includes(equipment.brand);
+      const isEquipmentTypePredefined = equipmentTypeOptions.includes(equipment.equipmentType as any);
+
       const defaultValues = {
-        ...equipment, // Spread known fields from the Equipment type
-        // Ensure custom fields are reset or based on whether the main field is '_CUSTOM_'
-        brand: equipmentTypeOptions.includes(equipment.brand as any) || equipment.brand === '_CUSTOM_' ? equipment.brand : '_CUSTOM_',
-        customBrand: equipmentTypeOptions.includes(equipment.brand as any) ? "" : equipment.brand,
-
-        model: equipment.model === '_CUSTOM_' || !equipment.model ? equipment.model : equipment.model, // Adjust if models are in a predefined list
-        customModel: equipment.model === '_CUSTOM_' ? equipment.customModel || equipment.model : "", // This logic might need refinement based on how custom models are stored
-
-        equipmentType: equipmentTypeOptions.includes(equipment.equipmentType as any) || equipment.equipmentType === '_CUSTOM_' ? equipment.equipmentType : '_CUSTOM_',
-        customEquipmentType: equipmentTypeOptions.includes(equipment.equipmentType as any) ? "" : equipment.equipmentType,
-
+        ...equipment,
+        model: equipment.model || "", // Model is now direct
+        brand: isBrandPredefinedOrSpecial && equipment.brand !== "Outra" ? equipment.brand : '_CUSTOM_',
+        customBrand: isBrandPredefinedOrSpecial && equipment.brand !== "Outra" ? "" : (equipment.brand === "Outra" || equipment.brand === "_CUSTOM_" ? "" : equipment.brand),
+        equipmentType: isEquipmentTypePredefined ? equipment.equipmentType : '_CUSTOM_',
+        customEquipmentType: isEquipmentTypePredefined ? "" : equipment.equipmentType,
         customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
         manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
         towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
@@ -162,9 +164,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       };
       form.reset(defaultValues);
       setShowCustomFields({
-          brand: !equipmentTypeOptions.includes(equipment.brand as any) && equipment.brand !== '_CUSTOM_',
-          model: defaultValues.model === '_CUSTOM_', // Example, needs specific logic if models are predefined
-          equipmentType: !equipmentTypeOptions.includes(equipment.equipmentType as any) && equipment.equipmentType !== '_CUSTOM_',
+          brand: !isBrandPredefinedOrSpecial || equipment.brand === "Outra",
+          equipmentType: !isEquipmentTypePredefined,
       });
 
     } else {
@@ -173,41 +174,38 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         brand: "", model: "", chassisNumber: "", equipmentType: "",
         operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
         manufactureYear: new Date().getFullYear(),
-        customBrand: "", customModel: "", customEquipmentType: "",
+        customBrand: "", customEquipmentType: "", // customModel removed
         towerType: undefined, towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
         forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
         color: undefined, nominalCapacityKg: undefined, turningRadiusMm: undefined,
         engineType: undefined, fuelType: undefined, batteryVoltage: undefined, batteryAmpHour: undefined,
         notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
       });
-      setShowCustomFields({ brand: false, model: false, equipmentType: false });
+      setShowCustomFields({ brand: false, equipmentType: false });
     }
     setIsModalOpen(true);
   }, [form]);
 
   useEffect(() => {
-    if (equipmentIdFromUrl) {
-      if (!isLoadingEquipment && equipmentList.length > 0) {
-        const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdFromUrl);
-        if (equipmentToEdit) {
-          openModal(equipmentToEdit);
-          if (typeof window !== "undefined") {
-            window.history.replaceState(null, '', '/equipment');
-          }
+    if (equipmentIdFromUrl && !isLoadingEquipment && equipmentList.length > 0) {
+      const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdFromUrl);
+      if (equipmentToEdit) {
+        openModal(equipmentToEdit);
+        if (typeof window !== "undefined") {
+           window.history.replaceState(null, '', '/equipment');
         }
       }
     }
   }, [equipmentIdFromUrl, equipmentList, isLoadingEquipment, openModal]);
 
 
-  const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id'> => {
+  const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id' | 'customBrand' | 'customEquipmentType'> => {
     const {
-      customBrand, customModel, customEquipmentType,
+      customBrand, customEquipmentType, // customModel removed
       customerId: formCustomerId,
       ...restOfData
     } = formData;
 
-    // Ensure numeric fields that might be empty strings from the form are converted to null or number
     const parsedData = {
       ...restOfData,
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
@@ -225,11 +223,10 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     return {
       ...parsedData,
       brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
-      model: parsedData.model === '_CUSTOM_' ? customModel || "Não especificado" : parsedData.model, // Assuming model also has _CUSTOM_ logic
+      model: parsedData.model, // Model is now direct
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
       customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
       fuelType: parsedData.fuelType || null,
-      // Explicitly set other optional fields to null if they are empty string or undefined, if necessary by schema
       notes: parsedData.notes || null,
       towerType: parsedData.towerType || null,
       forkSize: parsedData.forkSize || null,
@@ -292,7 +289,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     setIsModalOpen(false);
     setEditingEquipment(null);
     form.reset();
-    setShowCustomFields({ brand: false, model: false, equipmentType: false });
+    setShowCustomFields({ brand: false, equipmentType: false }); // model removed
   };
 
   const onSubmit = async (values: z.infer<typeof EquipmentSchema>) => {
@@ -311,11 +308,11 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     }
   };
 
-  const handleSelectChange = (field: 'brand' | 'model' | 'equipmentType', value: string) => {
+  const handleSelectChange = (field: 'brand' | 'equipmentType', value: string) => { // model removed
     form.setValue(field, value);
     setShowCustomFields(prev => ({ ...prev, [field]: value === '_CUSTOM_' }));
     if (value !== '_CUSTOM_') {
-        form.setValue(field === 'brand' ? 'customBrand' : field === 'model' ? 'customModel' : 'customEquipmentType', "");
+        form.setValue(field === 'brand' ? 'customBrand' : 'customEquipmentType', "");
     }
   };
 
@@ -417,25 +414,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                   <Select onValueChange={(value) => handleSelectChange('brand', value)} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione ou digite" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      <SelectItem value="Toyota">Toyota</SelectItem>
-                      <SelectItem value="Hyster">Hyster</SelectItem>
-                      <SelectItem value="Yale">Yale</SelectItem>
-                      <SelectItem value="Still">Still</SelectItem>
-                      <SelectItem value="Linde">Linde</SelectItem>
-                      <SelectItem value="Clark">Clark</SelectItem>
-                      <SelectItem value="Mitsubishi">Mitsubishi</SelectItem>
-                      <SelectItem value="Nissan">Nissan</SelectItem>
-                      <SelectItem value="Komatsu">Komatsu</SelectItem>
-                      <SelectItem value="Crown">Crown</SelectItem>
-                      <SelectItem value="Raymond">Raymond</SelectItem>
-                      <SelectItem value="Doosan">Doosan</SelectItem>
-                      <SelectItem value="Hyundai">Hyundai</SelectItem>
-                      <SelectItem value="Caterpillar">Caterpillar</SelectItem>
-                      <SelectItem value="Jungheinrich">Jungheinrich</SelectItem>
-                      <SelectItem value="Hangcha">Hangcha</SelectItem>
-                      <SelectItem value="Heli">Heli</SelectItem>
-                      <SelectItem value="EP">EP</SelectItem>
-                      <SelectItem value="Outra">Outra (Especificar)</SelectItem>
+                      {predefinedBrandOptionsList.map(option => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
                       <SelectItem value="_CUSTOM_">Digitar Marca...</SelectItem>
                     </SelectContent>
                   </Select>
@@ -454,22 +435,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
               <FormField control={form.control} name="model" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Modelo</FormLabel>
-                   <Select onValueChange={(value) => handleSelectChange('model', value)} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione ou digite" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                       <SelectItem value="_CUSTOM_">Digitar Modelo...</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {showCustomFields.model ? (
-                     <FormField control={form.control} name="customModel" render={({ field: customField }) => (
-                      <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite o modelo" {...customField} value={customField.value ?? ""} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  ) : (field.value !== '_CUSTOM_' &&
-                    <FormControl><Input placeholder="Ex: 8FGCU25" {...field} disabled={field.value === '_CUSTOM_'} value={field.value ?? ""} className={field.value === '_CUSTOM_' ? 'hidden': 'mt-2'}/></FormControl>
-                  )}
+                  <FormControl><Input placeholder="Ex: 8FGCU25, S25" {...field} value={field.value ?? ""} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
