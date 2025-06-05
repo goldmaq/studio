@@ -321,6 +321,8 @@ export function CustomerClientPage() {
                   <Mail className="mr-2 h-4 w-4 text-primary" />
                   <a 
                     href={`mailto:${customer.email}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
                     className="hover:underline text-primary"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -532,6 +534,8 @@ export function CustomerClientPage() {
     </>
   );
 }
+
+    
 
     
 
