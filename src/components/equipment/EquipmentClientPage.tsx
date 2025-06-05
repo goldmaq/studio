@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react"; // Added useCallback
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -79,7 +79,7 @@ async function fetchCustomers(): Promise<Customer[]> {
 export function EquipmentClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const router = useRouter();
+  const router = useRouter(); // Keep router if used elsewhere, but not for this specific replace
   const searchParams = useSearchParams();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -174,11 +174,13 @@ export function EquipmentClientPage() {
         const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdToOpen);
         if (equipmentToEdit) {
           openModal(equipmentToEdit);
-          router.replace('/equipment', { shallow: true });
+          if (typeof window !== "undefined") {
+            window.history.replaceState(null, '', '/equipment');
+          }
         }
       }
     }
-  }, [searchParams, equipmentList, isLoadingEquipment, router, openModal]);
+  }, [searchParams, equipmentList, isLoadingEquipment, openModal]);
 
 
   const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id'> => {
@@ -603,5 +605,3 @@ export function EquipmentClientPage() {
     </>
   );
 }
-
-    
