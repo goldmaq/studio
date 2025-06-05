@@ -5,7 +5,8 @@ import { useState, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, PackageSearch, Edit, Trash2, Tag, CheckCircle, Construction, Link as LinkIcon, FileText, Package, ShieldAlert, Loader2, AlertTriangle, Box, BatteryCharging, Anchor } from "lucide-react";
+import { PlusCircle, PackageSearch, Edit, Trash2, Tag, CheckCircle, Construction, Link as LinkIconLI, FileText, Package, ShieldAlert, Loader2, AlertTriangle, Box, BatteryCharging, Anchor } from "lucide-react";
+import type { LucideIcon } from "lucide-react"; // Import LucideIcon
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -39,13 +40,15 @@ const statusIcons: Record<typeof auxiliaryEquipmentStatusOptions[number], JSX.El
   Sucata: <Trash2 className="h-4 w-4 text-red-500" />,
 };
 
-const typeIcons: Record<typeof auxiliaryEquipmentTypeOptions[number] | string, JSX.Element> = {
-  Bateria: <BatteryCharging className="h-4 w-4 text-primary" />,
-  Carregador: <Box className="h-4 w-4 text-primary" />, // Placeholder, idealmente um ícone de tomada ou carregador
-  Berço: <Anchor className="h-4 w-4 text-primary" />, // Placeholder
-  Cabo: <LinkIcon className="h-4 w-4 text-primary" />,
-  Outro: <PackageSearch className="h-4 w-4 text-primary" />,
+// Store component constructors, not JSX elements
+const typeIcons: Record<string, LucideIcon> = {
+  Bateria: BatteryCharging,
+  Carregador: Box,
+  Berço: Anchor,
+  Cabo: LinkIconLI,
+  Outro: PackageSearch,
 };
+
 
 async function fetchAuxiliaryEquipment(): Promise<AuxiliaryEquipment[]> {
   const q = query(collection(db, FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME), orderBy("name", "asc"));
@@ -255,7 +258,7 @@ export function AuxiliaryEquipmentClientPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {auxEquipmentList.map((item) => {
-            const TypeIcon = typeIcons[item.type] || PackageSearch;
+            const SpecificTypeIcon = typeIcons[item.type] || PackageSearch;
             return (
             <Card
               key={item.id}
@@ -264,7 +267,7 @@ export function AuxiliaryEquipmentClientPage() {
             >
               <CardHeader>
                 <CardTitle className="font-headline text-xl text-primary flex items-center">
-                  <TypeIcon className="mr-2 h-5 w-5" /> {item.name}
+                  <SpecificTypeIcon className="mr-2 h-5 w-5" /> {item.name}
                 </CardTitle>
                 <CardDescription>Tipo: {item.type}</CardDescription>
               </CardHeader>
@@ -290,7 +293,7 @@ export function AuxiliaryEquipmentClientPage() {
                 </p>
                 {item.linkedEquipmentId && (
                   <p className="flex items-center">
-                    <LinkIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                    <LinkIconLI className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
                     <span className="font-medium text-muted-foreground mr-1">Vinculado a:</span>
                     {isLoadingMainEq ? <Loader2 className="h-3 w-3 animate-spin" /> : getLinkedEquipmentName(item.linkedEquipmentId)}
                   </p>
@@ -403,3 +406,5 @@ export function AuxiliaryEquipmentClientPage() {
     </>
   );
 }
+
+    

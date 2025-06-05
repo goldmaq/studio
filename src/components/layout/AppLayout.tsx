@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/icons/Logo";
+// import { Logo } from "@/components/icons/Logo"; // Replaced by Image
 
 interface NavItem {
   href: string;
@@ -68,7 +68,8 @@ function MainSidebar() {
               width={120} 
               height={30} 
               className="transition-all duration-300 ease-in-out" 
-              priority 
+              // priority prop removed to make it less critical if image source is problematic
+              // Ensure '/images/logo.png' exists in your 'public/images/' folder.
             />
           ) : (
             <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />

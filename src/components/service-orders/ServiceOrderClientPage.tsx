@@ -701,7 +701,7 @@ export function ServiceOrderClientPage() {
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
-            <fieldset disabled={editingOrder?.phase === 'Concluída' && editingOrder?.phase !== 'Cancelada'}>
+            <fieldset disabled={editingOrder?.phase === 'Concluída' || editingOrder?.phase === 'Cancelada'}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="orderNumber" render={({ field }) => (
                   <FormItem>

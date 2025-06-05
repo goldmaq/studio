@@ -1,6 +1,8 @@
 
+console.log("Firebase.ts: Module loading. NODE_ENV:", process.env.NODE_ENV, "Window defined:", typeof window !== 'undefined');
+
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore"; // Caminho corrigido
+import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 interface FirebaseConfig {
@@ -27,41 +29,64 @@ const requiredKeys: Array<keyof FirebaseConfig> = [
 
 const missingEnvVarKeys: string[] = requiredKeys.filter(key => !firebaseConfigValues[key]);
 
-let app: FirebaseApp;
-let db: Firestore;
-let storage: FirebaseStorage;
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
+let storage: FirebaseStorage | null = null;
 
 if (missingEnvVarKeys.length > 0) {
   const errorMessage = `Firebase Fatal Error: Essential Firebase configuration is missing for the following keys: ${missingEnvVarKeys.join(", ")}.
 Please ensure these environment variables are set.
 - If running locally, check your .env.local file.
 - If deployed, check your hosting provider's environment variable settings.
-Application cannot start without these Firebase credentials.`;
+Application may not function correctly without these Firebase credentials.`;
 
   console.error("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-  console.error("!!! FATAL ERROR: FIREBASE ENVIRONMENT VARIABLES ARE MISSING !!!");
+  console.error("!!! FIREBASE FATAL ERROR: ENVIRONMENT VARIABLES ARE MISSING !!!");
   console.error(`!!! Details: ${errorMessage}`);
   console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-  throw new Error(errorMessage);
+  // Not throwing an error here to allow the app to attempt to run and potentially show client-side errors or partial functionality
+  // However, db and storage will remain null.
 } else {
-  // All environment variables are present, proceed with initialization
   const completeConfig = firebaseConfigValues as FirebaseConfig;
 
   if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-    console.log("Firebase Init: Attempting to initialize with projectId:", completeConfig.projectId);
+    console.log("Firebase.ts: Attempting to initialize with projectId:", completeConfig.projectId);
   }
   
   if (typeof window !== 'undefined' && completeConfig.projectId !== "gold-maq-control" && process.env.NODE_ENV !== 'production') {
-     console.warn("Firebase Init: WARNING - Project ID does NOT match 'gold-maq-control'. Expected: 'gold-maq-control', Got:", completeConfig.projectId);
+     console.warn("Firebase.ts: WARNING - Project ID does NOT match 'gold-maq-control'. Expected: 'gold-maq-control', Got:", completeConfig.projectId);
   }
 
-  if (!getApps().length) {
-    app = initializeApp(completeConfig);
-  } else {
-    app = getApp();
+  try {
+    console.log("Firebase.ts: Checking existing Firebase apps...");
+    if (!getApps().length) {
+      console.log("Firebase.ts: No existing Firebase app found. Initializing new app...");
+      app = initializeApp(completeConfig);
+      console.log("Firebase.ts: New Firebase app initialized.");
+    } else {
+      console.log("Firebase.ts: Existing Firebase app found. Getting app instance...");
+      app = getApp();
+      console.log("Firebase.ts: Existing Firebase app instance retrieved.");
+    }
+
+    console.log("Firebase.ts: Getting Firestore instance...");
+    db = getFirestore(app);
+    console.log("Firebase.ts: Firestore instance retrieved.");
+
+    console.log("Firebase.ts: Getting Storage instance...");
+    storage = getStorage(app);
+    console.log("Firebase.ts: Storage instance retrieved.");
+
+    if (app) {
+      console.log("Firebase.ts: Firebase initialized successfully. Project ID:", app.options.projectId);
+    } else {
+      console.error("Firebase.ts: CRITICAL - Firebase app object is null after initialization attempt.");
+    }
+
+  } catch (error) {
+    console.error("Firebase.ts: CRITICAL ERROR DURING FIREBASE INITIALIZATION OR SERVICE RETRIEVAL:", error);
+    // app, db, storage will remain null if an error occurs here.
   }
-  db = getFirestore(app);
-  storage = getStorage(app);
 }
 
-export { db, storage };
+export { db, storage, app };
