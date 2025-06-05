@@ -3,16 +3,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, DraftingCompass, Warehouse, FileText, Palette, Thermometer, Weight, Ruler, TowerControl, Power, Fuel, Coins, HandCoins, CalendarClock, History } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, HandCoins, CalendarClock, History, PackageOpen, Car, ShieldAlert, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import type { Equipment, Customer } from "@/types";
-import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions, fuelTypeOptions } from "@/types";
+import { EquipmentSchema, equipmentTypeOptions, operationalStatusOptions } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -31,9 +31,10 @@ const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
-  Operacional: <CheckCircle className="h-4 w-4 text-green-500" />,
-  'Precisa de Reparo': <AlertIconLI className="h-4 w-4 text-yellow-500" />,
-  'Fora de Serviço': <XCircle className="h-4 w-4 text-red-500" />,
+  Disponível: <CheckCircle className="h-4 w-4 text-green-500" />,
+  Locada: <PackageOpen className="h-4 w-4 text-blue-500" />,
+  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-yellow-500" />,
+  Sucata: <Trash2 className="h-4 w-4 text-red-500" />,
 };
 
 const parseNumericToNullOrNumber = (value: any): number | null => {
@@ -60,25 +61,19 @@ async function fetchEquipment(): Promise<Equipment[]> {
       brand: data.brand || "Marca Desconhecida",
       model: data.model || "Modelo Desconhecido",
       chassisNumber: data.chassisNumber || "N/A",
-      equipmentType: (equipmentTypeOptions.includes(data.equipmentType as any) || typeof data.equipmentType === 'string') ? data.equipmentType : "Outro (Manual)",
+      equipmentType: (equipmentTypeOptions.includes(data.equipmentType as any) || typeof data.equipmentType === 'string') ? data.equipmentType : "Empilhadeira Contrabalançada GLP", // Default to a valid option or handle custom
       manufactureYear: parseNumericToNullOrNumber(data.manufactureYear),
-      operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Operacional",
+      operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Disponível",
       customerId: data.customerId || null,
       
-      towerType: data.towerType || null,
       towerOpenHeightMm: parseNumericToNullOrNumber(data.towerOpenHeightMm),
       towerClosedHeightMm: parseNumericToNullOrNumber(data.towerClosedHeightMm),
-      forkSize: data.forkSize || null,
-      totalWidthMm: parseNumericToNullOrNumber(data.totalWidthMm),
-      totalLengthMm: parseNumericToNullOrNumber(data.totalLengthMm),
-      machineWeightKg: parseNumericToNullOrNumber(data.machineWeightKg),
-      color: data.color || null,
       nominalCapacityKg: parseNumericToNullOrNumber(data.nominalCapacityKg),
-      turningRadiusMm: parseNumericToNullOrNumber(data.turningRadiusMm),
-      engineType: data.engineType || null,
-      fuelType: fuelTypeOptions.includes(data.fuelType as any) ? data.fuelType : null,
-      batteryVoltage: data.batteryVoltage || null,
-      batteryAmpHour: data.batteryAmpHour || null,
+
+      batteryBoxWidthMm: parseNumericToNullOrNumber(data.batteryBoxWidthMm),
+      batteryBoxHeightMm: parseNumericToNullOrNumber(data.batteryBoxHeightMm),
+      batteryBoxDepthMm: parseNumericToNullOrNumber(data.batteryBoxDepthMm),
+      
       monthlyRentalValue: parseNumericToNullOrNumber(data.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(data.hourMeter),
       notes: data.notes || null,
@@ -112,17 +107,30 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const form = useForm<z.infer<typeof EquipmentSchema>>({
     resolver: zodResolver(EquipmentSchema),
     defaultValues: {
-      brand: "", model: "", chassisNumber: "", equipmentType: "",
-      operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
+      brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
+      operationalStatus: "Disponível", customerId: NO_CUSTOMER_FORM_VALUE,
       manufactureYear: new Date().getFullYear(),
-      customBrand: "", customEquipmentType: "", // customModel removed
-      towerType: undefined, towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
-      forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
-      color: undefined, nominalCapacityKg: undefined, turningRadiusMm: undefined,
-      engineType: undefined, fuelType: undefined, batteryVoltage: undefined, batteryAmpHour: undefined,
+      customBrand: "", customEquipmentType: "",
+      towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
+      nominalCapacityKg: undefined,
+      batteryBoxWidthMm: undefined, batteryBoxHeightMm: undefined, batteryBoxDepthMm: undefined,
       notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
     },
   });
+
+  const customerIdValue = useWatch({ control: form.control, name: 'customerId' });
+  const currentOperationalStatus = useWatch({ control: form.control, name: 'operationalStatus' });
+
+  useEffect(() => {
+    if (customerIdValue && customerIdValue !== NO_CUSTOMER_FORM_VALUE) {
+      if (currentOperationalStatus !== 'Em Manutenção' && currentOperationalStatus !== 'Sucata') {
+        form.setValue('operationalStatus', 'Locada');
+      }
+    } else if (currentOperationalStatus === 'Locada') {
+      form.setValue('operationalStatus', 'Disponível');
+    }
+  }, [customerIdValue, currentOperationalStatus, form]);
+
 
   const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
     queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
@@ -139,11 +147,12 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       setEditingEquipment(equipment);
 
       const isBrandPredefinedOrSpecial = predefinedBrandOptionsList.includes(equipment.brand);
-      const isEquipmentTypePredefined = equipmentTypeOptions.includes(equipment.equipmentType as any);
+      const isEquipmentTypePredefined = equipmentTypeOptions.includes(equipment.equipmentType as any) || equipment.equipmentType === "";
+
 
       const defaultValues = {
         ...equipment,
-        model: equipment.model || "", // Model is now direct
+        model: equipment.model || "",
         brand: isBrandPredefinedOrSpecial && equipment.brand !== "Outra" ? equipment.brand : '_CUSTOM_',
         customBrand: isBrandPredefinedOrSpecial && equipment.brand !== "Outra" ? "" : (equipment.brand === "Outra" || equipment.brand === "_CUSTOM_" ? "" : equipment.brand),
         equipmentType: isEquipmentTypePredefined ? equipment.equipmentType : '_CUSTOM_',
@@ -152,15 +161,13 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
         towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
         towerClosedHeightMm: equipment.towerClosedHeightMm ?? undefined,
-        totalWidthMm: equipment.totalWidthMm ?? undefined,
-        totalLengthMm: equipment.totalLengthMm ?? undefined,
-        machineWeightKg: equipment.machineWeightKg ?? undefined,
         nominalCapacityKg: equipment.nominalCapacityKg ?? undefined,
-        turningRadiusMm: equipment.turningRadiusMm ?? undefined,
+        batteryBoxWidthMm: equipment.batteryBoxWidthMm ?? undefined,
+        batteryBoxHeightMm: equipment.batteryBoxHeightMm ?? undefined,
+        batteryBoxDepthMm: equipment.batteryBoxDepthMm ?? undefined,
         monthlyRentalValue: equipment.monthlyRentalValue ?? undefined,
         hourMeter: equipment.hourMeter ?? undefined,
         notes: equipment.notes || "",
-        fuelType: equipment.fuelType || undefined,
       };
       form.reset(defaultValues);
       setShowCustomFields({
@@ -171,14 +178,13 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     } else {
       setEditingEquipment(null);
       form.reset({
-        brand: "", model: "", chassisNumber: "", equipmentType: "",
-        operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
+        brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
+        operationalStatus: "Disponível", customerId: NO_CUSTOMER_FORM_VALUE,
         manufactureYear: new Date().getFullYear(),
-        customBrand: "", customEquipmentType: "", // customModel removed
-        towerType: undefined, towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
-        forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
-        color: undefined, nominalCapacityKg: undefined, turningRadiusMm: undefined,
-        engineType: undefined, fuelType: undefined, batteryVoltage: undefined, batteryAmpHour: undefined,
+        customBrand: "", customEquipmentType: "",
+        towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
+        nominalCapacityKg: undefined,
+        batteryBoxWidthMm: undefined, batteryBoxHeightMm: undefined, batteryBoxDepthMm: undefined,
         notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
       });
       setShowCustomFields({ brand: false, equipmentType: false });
@@ -201,7 +207,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id' | 'customBrand' | 'customEquipmentType'> => {
     const {
-      customBrand, customEquipmentType, // customModel removed
+      customBrand, customEquipmentType, 
       customerId: formCustomerId,
       ...restOfData
     } = formData;
@@ -211,11 +217,10 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
       towerOpenHeightMm: parseNumericToNullOrNumber(restOfData.towerOpenHeightMm),
       towerClosedHeightMm: parseNumericToNullOrNumber(restOfData.towerClosedHeightMm),
-      totalWidthMm: parseNumericToNullOrNumber(restOfData.totalWidthMm),
-      totalLengthMm: parseNumericToNullOrNumber(restOfData.totalLengthMm),
-      machineWeightKg: parseNumericToNullOrNumber(restOfData.machineWeightKg),
       nominalCapacityKg: parseNumericToNullOrNumber(restOfData.nominalCapacityKg),
-      turningRadiusMm: parseNumericToNullOrNumber(restOfData.turningRadiusMm),
+      batteryBoxWidthMm: parseNumericToNullOrNumber(restOfData.batteryBoxWidthMm),
+      batteryBoxHeightMm: parseNumericToNullOrNumber(restOfData.batteryBoxHeightMm),
+      batteryBoxDepthMm: parseNumericToNullOrNumber(restOfData.batteryBoxDepthMm),
       monthlyRentalValue: parseNumericToNullOrNumber(restOfData.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(restOfData.hourMeter),
     };
@@ -223,17 +228,10 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     return {
       ...parsedData,
       brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
-      model: parsedData.model, // Model is now direct
+      model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
       customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
-      fuelType: parsedData.fuelType || null,
       notes: parsedData.notes || null,
-      towerType: parsedData.towerType || null,
-      forkSize: parsedData.forkSize || null,
-      color: parsedData.color || null,
-      engineType: parsedData.engineType || null,
-      batteryVoltage: parsedData.batteryVoltage || null,
-      batteryAmpHour: parsedData.batteryAmpHour || null,
     };
   };
 
@@ -289,7 +287,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     setIsModalOpen(false);
     setEditingEquipment(null);
     form.reset();
-    setShowCustomFields({ brand: false, equipmentType: false }); // model removed
+    setShowCustomFields({ brand: false, equipmentType: false });
   };
 
   const onSubmit = async (values: z.infer<typeof EquipmentSchema>) => {
@@ -308,7 +306,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     }
   };
 
-  const handleSelectChange = (field: 'brand' | 'equipmentType', value: string) => { // model removed
+  const handleSelectChange = (field: 'brand' | 'equipmentType', value: string) => {
     form.setValue(field, value);
     setShowCustomFields(prev => ({ ...prev, [field]: value === '_CUSTOM_' }));
     if (value !== '_CUSTOM_') {
@@ -516,60 +514,30 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <FormField control={form.control} name="towerType" render={({ field }) => (
-                <FormItem><FormLabel>Tipo de Torre</FormLabel><FormControl><Input placeholder="Ex: Triplex, Duplex" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-              )} />
               <FormField control={form.control} name="towerOpenHeightMm" render={({ field }) => (
                 <FormItem><FormLabel>Altura Torre Aberta (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="towerClosedHeightMm" render={({ field }) => (
                 <FormItem><FormLabel>Altura Torre Fechada (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
               )} />
-              <FormField control={form.control} name="forkSize" render={({ field }) => (
-                <FormItem><FormLabel>Tamanho do Garfo</FormLabel><FormControl><Input placeholder="Ex: 1070mm" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="totalWidthMm" render={({ field }) => (
-                <FormItem><FormLabel>Largura Total (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="totalLengthMm" render={({ field }) => (
-                <FormItem><FormLabel>Comprimento Total (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="machineWeightKg" render={({ field }) => (
-                <FormItem><FormLabel>Peso da Máquina (kg)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
               <FormField control={form.control} name="nominalCapacityKg" render={({ field }) => (
                 <FormItem><FormLabel>Capacidade Nominal (kg)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
               )} />
-              <FormField control={form.control} name="turningRadiusMm" render={({ field }) => (
-                <FormItem><FormLabel>Raio de Giro (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={form.control} name="color" render={({ field }) => (
-                <FormItem><FormLabel>Cor</FormLabel><FormControl><Input placeholder="Ex: Amarelo" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-              )} />
+            </div>
+            
+            <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Dimensões Caixa de Bateria (Opcional)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => (
+                    <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="batteryBoxHeightMm" render={({ field }) => (
+                    <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="batteryBoxDepthMm" render={({ field }) => (
+                    <FormItem><FormLabel>Profundidade (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                )} />
             </div>
 
-            <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Motor e Energia (Opcional)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <FormField control={form.control} name="engineType" render={({ field }) => (
-                    <FormItem><FormLabel>Tipo de Motor</FormLabel><FormControl><Input placeholder="Ex: K25, GM 4.3L" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="fuelType" render={({ field }) => (
-                    <FormItem><FormLabel>Tipo de Combustível</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                        {fuelTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="batteryVoltage" render={({ field }) => (
-                    <FormItem><FormLabel>Voltagem Bateria (V)</FormLabel><FormControl><Input placeholder="Ex: 48V, 80V" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="batteryAmpHour" render={({ field }) => (
-                    <FormItem><FormLabel>Amperagem Bateria (Ah)</FormLabel><FormControl><Input placeholder="Ex: 625Ah" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-                )} />
-            </div>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Informações Adicionais (Opcional)</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
