@@ -1,19 +1,19 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIcon, XCircle } from "lucide-react";
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIcon, XCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { ServiceOrder, Customer, Equipment, Technician, Vehicle } from "@/types";
-import { ServiceOrderSchema, serviceTypeOptionsList } from "@/types";
+import type { ServiceOrder, Customer, Equipment, Technician, Vehicle, CompanyId } from "@/types";
+import { ServiceOrderSchema, serviceTypeOptionsList, companyIds } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -22,6 +22,8 @@ import { db, storage } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, Timestamp, query, orderBy, setDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { isBefore, isToday, addDays, parseISO, isValid } from 'date-fns';
+import { cn } from "@/lib/utils";
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
 const phaseIcons = {
@@ -41,6 +43,9 @@ const FIRESTORE_VEHICLE_COLLECTION_NAME = "veiculos";
 const NO_VEHICLE_SELECTED_VALUE = "_NO_VEHICLE_SELECTED_";
 const LOADING_VEHICLES_SELECT_ITEM_VALUE = "_LOADING_VEHICLES_";
 const CUSTOM_SERVICE_TYPE_VALUE = "_CUSTOM_";
+const NO_EQUIPMENT_SELECTED_VALUE = "_NO_EQUIPMENT_SELECTED_";
+const LOADING_EQUIPMENT_SELECT_ITEM_VALUE = "_LOADING_EQUIPMENT_";
+
 
 const getFileNameFromUrl = (url: string): string => {
   try {
@@ -63,7 +68,7 @@ async function uploadServiceOrderFile(
 ): Promise<string> {
   const filePath = `service_order_media/${orderId}/${Date.now()}_${file.name}`;
   const fileStorageRef = storageRef(storage, filePath);
-  await uploadBytes(fileStorageRef, file);
+  await uploadBytes(fileStorageRef, fileStorageRef);
   return getDownloadURL(fileStorageRef);
 }
 
@@ -83,29 +88,32 @@ async function deleteServiceOrderFileFromStorage(fileUrl?: string | null) {
 
 const formatDateForInput = (date: any): string => {
   if (!date) return "";
+  let d: Date;
   if (date instanceof Timestamp) {
-    return date.toDate().toISOString().split('T')[0];
+    d = date.toDate();
+  } else if (typeof date === 'string') {
+    d = parseISO(date); 
+  } else if (date instanceof Date) {
+    d = date;
+  } else {
+    return "";
   }
-  if (typeof date === 'string') {
-    try {
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return ""; 
-      return d.toISOString().split('T')[0];
-    } catch (e) { return ""; }
-  }
-  if (date instanceof Date) {
-     if (isNaN(date.getTime())) return "";
-    return date.toISOString().split('T')[0];
-  }
-  return "";
+  if (!isValid(d)) return "";
+  // Ensure date is treated as local by creating a new date from its parts
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  const day = d.getDate();
+  const localDate = new Date(year, month, day);
+  return localDate.toISOString().split('T')[0];
 };
 
 const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
   if (!dateString) return null;
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return null;
-  const adjustedDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  return Timestamp.fromDate(adjustedDate);
+  const date = parseISO(dateString); // Use parseISO for robust parsing
+  if (!isValid(date)) return null;
+  // Create a new Date object at UTC midnight to avoid timezone shifts when converting to Timestamp
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  return Timestamp.fromDate(utcDate);
 };
 
 async function fetchServiceOrders(): Promise<ServiceOrder[]> {
@@ -161,6 +169,41 @@ const getNextOrderNumber = (currentOrders: ServiceOrder[]): string => {
   return (maxOrderNum + 1).toString();
 };
 
+type DeadlineStatus = 'overdue' | 'due_today' | 'due_soon' | 'none';
+
+const getDeadlineStatusInfo = (
+  endDateString?: string,
+  phase?: ServiceOrder['phase']
+): { status: DeadlineStatus; message?: string; icon?: JSX.Element } => {
+  if (!endDateString || phase === 'Concluída' || phase === 'Cancelada') {
+    return { status: 'none' };
+  }
+
+  const endDate = parseISO(endDateString);
+  if (!isValid(endDate)) {
+    return { status: 'none' };
+  }
+  const today = new Date();
+  today.setHours(0,0,0,0); // Normalize today to midnight
+
+  const endDateNormalized = new Date(endDate.valueOf()); // Clone and normalize
+  endDateNormalized.setHours(0,0,0,0);
+
+
+  if (isBefore(endDateNormalized, today)) {
+    return { status: 'overdue', message: 'Atrasada!', icon: <AlertTriangle className="h-4 w-4 text-red-500" /> };
+  }
+  if (isToday(endDateNormalized)) {
+    return { status: 'due_today', message: 'Vence Hoje!', icon: <AlertTriangle className="h-4 w-4 text-yellow-500" /> };
+  }
+  const twoDaysFromNow = addDays(today, 2);
+  if (isBefore(endDateNormalized, twoDaysFromNow) || isToday(endDateNormalized)) { // Check if endDate is today, tomorrow or day after tomorrow
+     return { status: 'due_soon', message: 'Vence em Breve', icon: <AlertTriangle className="h-4 w-4 text-yellow-400" /> };
+  }
+  return { status: 'none' };
+};
+
+
 export function ServiceOrderClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -181,6 +224,7 @@ export function ServiceOrderClientPage() {
   });
 
   const selectedCustomerId = useWatch({ control: form.control, name: 'customerId' });
+  const selectedEquipmentId = useWatch({ control: form.control, name: 'equipmentId' });
 
   const { data: serviceOrders = [], isLoading: isLoadingServiceOrders, isError: isErrorServiceOrders, error: errorServiceOrders } = useQuery<ServiceOrder[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
@@ -207,8 +251,22 @@ export function ServiceOrderClientPage() {
     queryFn: fetchVehicles,
   });
 
+  const filteredEquipmentList = useMemo(() => {
+    if (isLoadingEquipment) return [];
+    if (selectedCustomerId) {
+      return equipmentList.filter(eq =>
+        eq.customerId === selectedCustomerId ||
+        (companyIds.includes(eq.ownerReference as CompanyId) && (eq.operationalStatus === "Disponível" || eq.operationalStatus === "Em Manutenção"))
+      );
+    }
+    // Se nenhum cliente selecionado, mostrar equipamentos da frota que podem ser usados ou que precisam de manutenção
+    return equipmentList.filter(eq =>
+      companyIds.includes(eq.ownerReference as CompanyId) && (eq.operationalStatus === "Disponível" || eq.operationalStatus === "Em Manutenção")
+    );
+  }, [equipmentList, selectedCustomerId, isLoadingEquipment]);
+
   useEffect(() => {
-    if (selectedCustomerId && customers.length > 0 && technicians.length > 0) {
+    if (selectedCustomerId) {
       const customer = customers.find(c => c.id === selectedCustomerId);
       if (customer?.preferredTechnician) {
         const preferredTech = technicians.find(t => t.name === customer.preferredTechnician);
@@ -216,8 +274,18 @@ export function ServiceOrderClientPage() {
           form.setValue('technicianId', preferredTech.id, { shouldValidate: true });
         }
       }
+      // Reset equipment if current selection is not valid for new customer
+      if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
+        form.setValue('equipmentId', "", { shouldValidate: true });
+      }
+    } else {
+      // Reset equipment if customer is deselected and current selection is not valid
+       if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
+        form.setValue('equipmentId', "", { shouldValidate: true });
+      }
     }
-  }, [selectedCustomerId, customers, technicians, form]);
+  }, [selectedCustomerId, customers, technicians, form, filteredEquipmentList, selectedEquipmentId]);
+
 
   const prepareDataForFirestore = (
     formData: z.infer<typeof ServiceOrderSchema>,
@@ -424,7 +492,7 @@ export function ServiceOrderClientPage() {
   const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || id;
   const getEquipmentIdentifier = (id: string) => {
     const eq = equipmentList.find(e => e.id === id);
-    return eq ? `${eq.brand} ${eq.model}` : id;
+    return eq ? `${eq.brand} ${eq.model} (Chassi: ${eq.chassisNumber})` : id;
   };
   const getTechnicianName = (id: string) => technicians.find(t => t.id === id)?.name || id;
   const getVehicleIdentifier = (id?: string | null) => {
@@ -455,31 +523,45 @@ export function ServiceOrderClientPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {serviceOrders.map((order) => (
+          {serviceOrders.map((order) => {
+            const deadlineInfo = getDeadlineStatusInfo(order.endDate, order.phase);
+            const cardClasses = cn("flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer", {
+              "border-red-500 border-2": deadlineInfo.status === 'overdue',
+              "border-yellow-500 border-2": deadlineInfo.status === 'due_today' || deadlineInfo.status === 'due_soon',
+            });
+
+            return (
             <Card 
               key={order.id} 
-              className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+              className={cardClasses}
               onClick={() => openModal(order)}
             >
               <CardHeader>
-                <CardTitle className="font-headline text-xl text-primary">OS: {order.orderNumber}</CardTitle>
+                <div className="flex justify-between items-start">
+                  <CardTitle className="font-headline text-xl text-primary">OS: {order.orderNumber}</CardTitle>
+                  {deadlineInfo.icon && (
+                    <div title={deadlineInfo.message}>
+                      {deadlineInfo.icon}
+                    </div>
+                  )}
+                </div>
                 <CardDescription className="flex items-center text-sm pt-1">
                   {phaseIcons[order.phase]} <span className="font-medium text-muted-foreground ml-1 mr-1">Fase:</span> {order.phase}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                <p className="flex items-center text-sm"><User className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span> {isLoadingCustomers ? 'Carregando...' : getCustomerName(order.customerId)}</p>
-                <p className="flex items-center text-sm"><Construction className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Equip.:</span> {isLoadingEquipment ? 'Carregando...' : getEquipmentIdentifier(order.equipmentId)}</p>
-                <p className="flex items-center text-sm"><HardHat className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Técnico:</span> {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
-                {order.vehicleId && <p className="flex items-center text-sm"><VehicleIcon className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Veículo:</span> {isLoadingVehicles ? 'Carregando...' : getVehicleIdentifier(order.vehicleId)}</p>}
-                <p className="flex items-center text-sm"><Settings2 className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Tipo Serviço:</span> {order.serviceType}</p>
-                {order.startDate && <p className="flex items-center text-sm"><Calendar className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {formatDateForInput(order.startDate)}</p>}
-                {order.endDate && <p className="flex items-center text-sm"><Calendar className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Prev.:</span> {formatDateForInput(order.endDate)}</p>}
-                <p className="flex items-start text-sm"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Problema Relatado:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
-                {order.notes && <p className="flex items-start text-sm"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Obs.:</span> <span className="whitespace-pre-wrap break-words">{order.notes}</span></p>}
+                <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span> {isLoadingCustomers ? 'Carregando...' : getCustomerName(order.customerId)}</p>
+                <p className="flex items-center"><Construction className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Equip.:</span> {isLoadingEquipment ? 'Carregando...' : getEquipmentIdentifier(order.equipmentId)}</p>
+                <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Técnico:</span> {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
+                {order.vehicleId && <p className="flex items-center"><VehicleIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Veículo:</span> {isLoadingVehicles ? 'Carregando...' : getVehicleIdentifier(order.vehicleId)}</p>}
+                <p className="flex items-center"><Settings2 className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Tipo Serviço:</span> {order.serviceType}</p>
+                {order.startDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {formatDateForInput(order.startDate)}</p>}
+                {order.endDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Conclusão Prev.:</span> {formatDateForInput(order.endDate)}</p>}
+                <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Problema Relatado:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
+                {order.notes && <p className="flex items-start"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Obs.:</span> <span className="whitespace-pre-wrap break-words">{order.notes}</span></p>}
                 {order.mediaUrl && (
-                  <p className="flex items-center text-sm">
-                    <LinkIcon className="mr-2 h-4 w-4 text-primary" />
+                  <p className="flex items-center">
+                    <LinkIcon className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
                     <span className="font-medium text-muted-foreground mr-1">Mídia:</span>
                     <a
                       href={order.mediaUrl}
@@ -497,7 +579,7 @@ export function ServiceOrderClientPage() {
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
               </CardFooter>
             </Card>
-          ))}
+          )})}
         </div>
       )}
 
@@ -552,15 +634,28 @@ export function ServiceOrderClientPage() {
               <FormField control={form.control} name="equipmentId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Equipamento</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value || NO_EQUIPMENT_SELECTED_VALUE}
+                  >
                     <FormControl><SelectTrigger>
                       <SelectValue placeholder={isLoadingEquipment ? "Carregando..." : "Selecione o Equipamento"} />
                     </SelectTrigger></FormControl>
                     <SelectContent>
-                      {isLoadingEquipment ? <SelectItem value="loading" disabled>Carregando...</SelectItem> :
-                       equipmentList.map(eq => (
-                        <SelectItem key={eq.id} value={eq.id}>{eq.brand} {eq.model} (Chassi: {eq.chassisNumber})</SelectItem>
-                      ))}
+                      {isLoadingEquipment ? (
+                        <SelectItem value={LOADING_EQUIPMENT_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
+                       ) : filteredEquipmentList.length === 0 ? (
+                        <SelectItem value={NO_EQUIPMENT_SELECTED_VALUE} disabled>
+                          {selectedCustomerId ? "Nenhum equipamento para este cliente ou disponível na frota" : "Nenhum equipamento da frota disponível/em manutenção"}
+                        </SelectItem>
+                       ) : (
+                        <>
+                          <SelectItem value={NO_EQUIPMENT_SELECTED_VALUE}>Selecione um equipamento</SelectItem>
+                          {filteredEquipmentList.map(eq => (
+                            <SelectItem key={eq.id} value={eq.id}>{eq.brand} {eq.model} (Chassi: {eq.chassisNumber})</SelectItem>
+                          ))}
+                        </>
+                       )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -689,3 +784,5 @@ export function ServiceOrderClientPage() {
   );
 }
 
+
+    
