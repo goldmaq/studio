@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2 } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -284,22 +284,31 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   });
 
   const deleteEquipmentMutation = useMutation({
-    mutationFn: async (equipmentId: string) => {
-      if (!equipmentId) throw new Error("ID do equipamento é necessário para exclusão.");
-      console.log("deleteEquipmentMutation - mutationFn: Deletando ID", equipmentId); // Log dentro da mutação
-      return deleteDoc(doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, equipmentId));
+    mutationFn: async (idToDelete: string) => {
+      console.log("[DELETE] deleteEquipmentMutation.mutationFn: Entered. Attempting deleteDoc for ID:", idToDelete);
+      if (!idToDelete || typeof idToDelete !== 'string' || idToDelete.trim() === '') {
+        console.error("[DELETE] deleteEquipmentMutation.mutationFn: Invalid ID received:", idToDelete);
+        throw new Error("ID do equipamento inválido fornecido para a função de mutação.");
+      }
+      const equipmentRef = doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, idToDelete);
+      return deleteDoc(equipmentRef);
     },
-    onSuccess: (data, equipmentId, context) => {
-      console.log("deleteEquipmentMutation - onSuccess: Equipamento excluído. ID:", equipmentId, "Data:", data, "Context:", context); // Log no sucesso
+    onSuccess: (_, deletedId) => {
+      console.log("[DELETE] deleteEquipmentMutation.onSuccess: Successfully deleted equipment with ID:", deletedId);
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
-      toast({ title: "Equipamento Excluído", description: "O equipamento foi excluído." });
+      toast({ title: "Equipamento Excluído", description: "O equipamento foi removido com sucesso." });
       closeModal();
     },
-    onError: (err: Error, equipmentId, context) => {
-      console.error("deleteEquipmentMutation - onError: Erro ao excluir. ID:", equipmentId, "Erro:", err, "Context:", context); // Log no erro
-      toast({ title: "Erro ao Excluir", description: `Não foi possível excluir o equipamento. Detalhe: ${err.message}`, variant: "destructive" });
+    onError: (error: Error, deletedIdAttempt) => {
+      console.error(`[DELETE] deleteEquipmentMutation.onError: Failed to delete equipment with attempted ID: ${deletedIdAttempt}. Error:`, error.message, error);
+      toast({
+        title: "Erro ao Excluir",
+        description: `Não foi possível excluir o equipamento. Detalhe: ${error.message || 'Erro desconhecido.'}`,
+        variant: "destructive",
+      });
     },
   });
+
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -318,22 +327,31 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const handleModalDeleteConfirm = () => {
     const equipmentToExclude = editingEquipment;
-    console.log("handleModalDeleteConfirm chamado. editingEquipment:", equipmentToExclude);
+    console.log("[DELETE] handleModalDeleteConfirm: Entered. editingEquipment:", equipmentToExclude);
 
-    if (equipmentToExclude && equipmentToExclude.id) {
-      const equipmentId = equipmentToExclude.id;
-      console.log(`Confirmando exclusão para ID: ${equipmentId}, Nome: ${equipmentToExclude.brand} ${equipmentToExclude.model}`);
-      if (window.confirm(`Tem certeza que deseja excluir o equipamento "${equipmentToExclude.brand} ${equipmentToExclude.model}"?`)) {
-        console.log("Usuário confirmou a exclusão. Chamando deleteEquipmentMutation.mutate...");
-        deleteEquipmentMutation.mutate(equipmentId);
-      } else {
-        console.log("Usuário cancelou a exclusão no window.confirm.");
-      }
+    if (!equipmentToExclude) {
+      console.error("[DELETE] handleModalDeleteConfirm: editingEquipment is null or undefined. Cannot proceed.");
+      toast({ title: "Erro Interno", description: "Referência ao equipamento não encontrada para exclusão.", variant: "destructive" });
+      return;
+    }
+    if (!equipmentToExclude.id || typeof equipmentToExclude.id !== 'string' || equipmentToExclude.id.trim() === '') {
+      console.error("[DELETE] handleModalDeleteConfirm: editingEquipment.id is invalid:", equipmentToExclude.id);
+      toast({ title: "Erro Interno", description: "ID do equipamento inválido para exclusão.", variant: "destructive" });
+      return;
+    }
+
+    const equipmentId = equipmentToExclude.id;
+    const equipmentName = `${equipmentToExclude.brand || 'Equipamento'} ${equipmentToExclude.model || ''}`.trim();
+    console.log(`[DELETE] handleModalDeleteConfirm: Attempting to delete ID: ${equipmentId}, Name: ${equipmentName}`);
+
+    if (window.confirm(`Tem certeza que deseja excluir o equipamento "${equipmentName}"? Esta ação não pode ser desfeita.`)) {
+      console.log("[DELETE] handleModalDeleteConfirm: User confirmed deletion via window.confirm. Calling mutation...");
+      deleteEquipmentMutation.mutate(equipmentId);
     } else {
-      console.error("Tentativa de exclusão sem editingEquipment válido ou sem editingEquipment.id.");
-      toast({ title: "Erro de Exclusão", description: "Não foi possível identificar o equipamento para exclusão. Tente novamente.", variant: "destructive" });
+      console.log("[DELETE] handleModalDeleteConfirm: User CANCELED deletion via window.confirm.");
     }
   };
+
 
   const handleSelectChange = (field: 'brand' | 'equipmentType', value: string) => {
     form.setValue(field, value);
@@ -609,4 +627,3 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
-
