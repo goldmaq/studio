@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { Customer, Technician, Equipment } from "@/types";
+import type { Customer, Technician, Maquina } from "@/types";
 import { CustomerSchema } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
@@ -25,7 +25,7 @@ import { Textarea } from "../ui/textarea";
 
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 const FIRESTORE_TECHNICIAN_COLLECTION_NAME = "tecnicos";
-const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos";
+const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; // Firestore collection name remains unchanged
 
 const NO_TECHNICIAN_SELECT_ITEM_VALUE = "_NO_TECHNICIAN_SELECTED_";
 const LOADING_TECHNICIANS_SELECT_ITEM_VALUE = "_LOADING_TECHS_";
@@ -50,14 +50,14 @@ async function fetchTechnicians(): Promise<Technician[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
 }
 
-async function fetchEquipment(): Promise<Equipment[]> {
+async function fetchMaquinas(): Promise<Maquina[]> { // Renamed from fetchEquipment
   if (!db) {
-    console.error("fetchEquipment: Firebase DB is not available.");
+    console.error("fetchMaquinas: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
   const q = query(collection(db!, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Maquina));
 }
 
 interface ViaCepResponse {
@@ -192,9 +192,9 @@ export function CustomerClientPage() {
     enabled: !!db,
   });
 
-  const { data: equipmentList = [], isLoading: isLoadingEquipment, isError: isErrorEquipment, error: errorEquipment } = useQuery<Equipment[], Error>({
-    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME],
-    queryFn: fetchEquipment,
+  const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({ // Renamed from equipmentList
+    queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME], // Query key remains for Firestore collection
+    queryFn: fetchMaquinas, // Renamed from fetchEquipment
     enabled: !!db,
   });
 
@@ -347,7 +347,7 @@ export function CustomerClientPage() {
   };
 
   const isMutating = addCustomerMutation.isPending || updateCustomerMutation.isPending;
-  const isLoadingPageData = isLoadingCustomers || isLoadingTechnicians || isLoadingEquipment;
+  const isLoadingPageData = isLoadingCustomers || isLoadingTechnicians || isLoadingMaquinas; // Renamed from isLoadingEquipment
 
   if (isLoadingPageData && !isModalOpen) {
     return (
@@ -369,13 +369,13 @@ export function CustomerClientPage() {
     );
   }
 
-  if (isErrorEquipment) {
+  if (isErrorMaquinas) { // Renamed from isErrorEquipment
      return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
         <AlertTriangle className="h-12 w-12 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Equipamentos</h2>
-        <p className="text-center">Não foi possível buscar os dados dos equipamentos. Tente novamente mais tarde.</p>
-        <p className="text-sm mt-2">Detalhe: {errorEquipment?.message}</p>
+        <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Máquinas</h2>
+        <p className="text-center">Não foi possível buscar os dados das máquinas. Tente novamente mais tarde.</p>
+        <p className="text-sm mt-2">Detalhe: {errorMaquinas?.message}</p> {/* Renamed from errorEquipment */}
       </div>
     );
   }
@@ -403,7 +403,7 @@ export function CustomerClientPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {customers.map((customer) => {
-            const linkedEquipment = equipmentList.filter(eq => eq.customerId === customer.id);
+            const linkedMaquinas = maquinaList.filter(eq => eq.customerId === customer.id); // Renamed from linkedEquipment
             const whatsappNumber = getWhatsAppNumber(customer.phone);
             const whatsappLink = whatsappNumber
               ? `https://wa.me/${whatsappNumber}?text=Ol%C3%A1%20${encodeURIComponent(customer.name)}`
@@ -503,39 +503,39 @@ export function CustomerClientPage() {
                 )}
 
                 <div className="pt-2 mt-2 border-t border-border">
-                  {isLoadingEquipment ? (
+                  {isLoadingMaquinas ? ( // Renamed from isLoadingEquipment
                      <p className="flex items-center text-xs text-muted-foreground mt-2">
-                        <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Carregando equipamentos...
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Carregando máquinas...
                      </p>
-                  ) : linkedEquipment.length > 0 ? (
+                  ) : linkedMaquinas.length > 0 ? ( // Renamed from linkedEquipment
                     <div>
                       <h4 className="font-semibold text-xs mt-2 mb-1 flex items-center">
                         <Construction className="mr-1.5 h-3.5 w-3.5 text-primary" />
-                        <span className="font-medium text-muted-foreground mr-1">Equipamentos:</span>
+                        <span className="font-medium text-muted-foreground mr-1">Máquinas:</span>
                       </h4>
                       <ul className="list-none pl-1 space-y-0.5">
-                        {linkedEquipment.slice(0, 3).map(eq => (
-                          <li key={eq.id} className="text-xs text-muted-foreground">
+                        {linkedMaquinas.slice(0, 3).map(maq => ( // Renamed from eq
+                          <li key={maq.id} className="text-xs text-muted-foreground">
                             <Link
-                              href={`/equipment?openEquipmentId=${eq.id}`}
+                              href={`/maquinas?openMaquinaId=${maq.id}`} // Updated path and query param
                               onClick={(e) => e.stopPropagation()}
                               className="hover:underline hover:text-primary transition-colors"
-                              title={`Ver detalhes de ${eq.brand} ${eq.model}`}
+                              title={`Ver detalhes de ${maq.brand} ${maq.model}`}
                             >
-                              {eq.brand} {eq.model} <span className="text-gray-400">(Chassi: {eq.chassisNumber})</span>
+                              {maq.brand} {maq.model} <span className="text-gray-400">(Chassi: {maq.chassisNumber})</span>
                             </Link>
                           </li>
                         ))}
-                        {linkedEquipment.length > 3 && (
-                           <li className="text-xs text-muted-foreground">...e mais {linkedEquipment.length - 3}.</li>
+                        {linkedMaquinas.length > 3 && ( // Renamed from linkedEquipment
+                           <li className="text-xs text-muted-foreground">...e mais {linkedMaquinas.length - 3}.</li>
                         )}
                       </ul>
                     </div>
                   ) : (
                     <p className="flex items-center text-xs text-muted-foreground mt-2">
                       <Construction className="mr-1.5 h-3.5 w-3.5 text-gray-400" />
-                      <span className="font-medium text-muted-foreground mr-1">Equipamentos:</span>
-                       Nenhum vinculado.
+                      <span className="font-medium text-muted-foreground mr-1">Máquinas:</span>
+                       Nenhuma vinculada.
                     </p>
                   )}
                 </div>
@@ -696,5 +696,3 @@ export function CustomerClientPage() {
     </>
   );
 }
-
-    
