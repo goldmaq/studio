@@ -35,7 +35,7 @@ async function fetchCustomers(): Promise<Customer[]> {
     console.error("fetchCustomers: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
-  const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
+  const q = query(collection(db!, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
 }
@@ -45,7 +45,7 @@ async function fetchTechnicians(): Promise<Technician[]> {
     console.error("fetchTechnicians: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
-  const q = query(collection(db, FIRESTORE_TECHNICIAN_COLLECTION_NAME), orderBy("name", "asc"));
+  const q = query(collection(db!, FIRESTORE_TECHNICIAN_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Technician));
 }
@@ -55,7 +55,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
     console.error("fetchEquipment: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
-  const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
+  const q = query(collection(db!, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Equipment));
 }
@@ -215,7 +215,7 @@ export function CustomerClientPage() {
   const addCustomerMutation = useMutation({
     mutationFn: async (newCustomerData: z.infer<typeof CustomerSchema>) => {
       if (!db) throw new Error("Conexão com Firebase não disponível.");
-      const docRef = await addDoc(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), newCustomerData);
+      const docRef = await addDoc(collection(db!, FIRESTORE_CUSTOMER_COLLECTION_NAME), newCustomerData);
       return docRef;
     },
     onSuccess: (docRef, variables) => {
@@ -233,7 +233,7 @@ export function CustomerClientPage() {
       if (!db) throw new Error("Conexão com Firebase não disponível.");
       const { id, ...dataToUpdate } = customerData;
       if (!id) throw new Error("ID do cliente é necessário para atualização.");
-      const customerRef = doc(db, FIRESTORE_CUSTOMER_COLLECTION_NAME, id);
+      const customerRef = doc(db!, FIRESTORE_CUSTOMER_COLLECTION_NAME, id);
       await updateDoc(customerRef, dataToUpdate);
     },
     onSuccess: (_, variables) => {
@@ -250,7 +250,7 @@ export function CustomerClientPage() {
     mutationFn: async (customerId: string) => {
       if (!db) throw new Error("Conexão com Firebase não disponível.");
       if (!customerId) throw new Error("ID do cliente é necessário para exclusão.");
-      await deleteDoc(doc(db, FIRESTORE_CUSTOMER_COLLECTION_NAME, customerId));
+      await deleteDoc(doc(db!, FIRESTORE_CUSTOMER_COLLECTION_NAME, customerId));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_CUSTOMER_COLLECTION_NAME] });
@@ -697,3 +697,4 @@ export function CustomerClientPage() {
   );
 }
 
+    
