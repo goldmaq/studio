@@ -32,8 +32,7 @@ const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 const NO_CUSTOMER_FORM_VALUE = "";
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
-const NO_COMPANY_FORM_VALUE = ""; // Para o select da empresa proprietária
-const LOADING_COMPANIES_SELECT_ITEM_VALUE = "_LOADING_COMPANIES_";
+const NO_OWNER_COMPANY_SELECT_ITEM_VALUE = "_NO_OWNER_COMPANY_";
 
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
@@ -109,7 +108,7 @@ async function fetchEquipment(): Promise<Equipment[]> {
       manufactureYear: parseNumericToNullOrNumber(data.manufactureYear),
       operationalStatus: operationalStatusOptions.includes(data.operationalStatus as any) ? data.operationalStatus : "Disponível",
       customerId: data.customerId || null,
-      ownerCompanyId: data.ownerCompanyId || null, // Buscar ownerCompanyId
+      ownerCompanyId: data.ownerCompanyId || null, 
       towerOpenHeightMm: parseNumericToNullOrNumber(data.towerOpenHeightMm),
       towerClosedHeightMm: parseNumericToNullOrNumber(data.towerClosedHeightMm),
       nominalCapacityKg: parseNumericToNullOrNumber(data.nominalCapacityKg),
@@ -156,7 +155,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     defaultValues: {
       brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
       operationalStatus: "Disponível", customerId: NO_CUSTOMER_FORM_VALUE,
-      ownerCompanyId: undefined, // Valor padrão para ownerCompanyId
+      ownerCompanyId: undefined, 
       manufactureYear: new Date().getFullYear(),
       customBrand: "", customEquipmentType: "",
       towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
@@ -284,7 +283,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
       customerId: (formCustomerId === NO_CUSTOMER_FORM_VALUE || formCustomerId === null || formCustomerId === undefined) ? null : formCustomerId,
-      ownerCompanyId: (formOwnerCompanyId === NO_COMPANY_FORM_VALUE || formOwnerCompanyId === null || formOwnerCompanyId === undefined) ? null : formOwnerCompanyId,
+      ownerCompanyId: (formOwnerCompanyId === NO_OWNER_COMPANY_SELECT_ITEM_VALUE || formOwnerCompanyId === null || formOwnerCompanyId === undefined) ? null : formOwnerCompanyId,
       notes: parsedData.notes || null,
       partsCatalogUrl: newPartsCatalogUrl === undefined ? formData.partsCatalogUrl : newPartsCatalogUrl,
       errorCodesUrl: newErrorCodesUrl === undefined ? formData.errorCodesUrl : newErrorCodesUrl,
@@ -679,8 +678,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 <FormItem>
                   <FormLabel>Empresa Proprietária</FormLabel>
                   <Select
-                    onValueChange={(value) => field.onChange(value === NO_COMPANY_FORM_VALUE ? undefined : value as CompanyId)}
-                    value={field.value || NO_COMPANY_FORM_VALUE}
+                    onValueChange={(value) => field.onChange(value === NO_OWNER_COMPANY_SELECT_ITEM_VALUE ? undefined : value as CompanyId)}
+                    value={field.value || NO_OWNER_COMPANY_SELECT_ITEM_VALUE}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -688,7 +687,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={NO_COMPANY_FORM_VALUE}>Nenhuma (Próprio)</SelectItem>
+                      <SelectItem value={NO_OWNER_COMPANY_SELECT_ITEM_VALUE}>Nenhuma (Próprio)</SelectItem>
                       {companyDisplayOptions.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
