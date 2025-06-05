@@ -42,7 +42,11 @@ const mockVehiclesData: Vehicle[] = [
 ];
 
 async function fetchVehicles(): Promise<Vehicle[]> {
-  const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("model", "asc"), orderBy("licensePlate", "asc"));
+  if (!db) {
+    console.error("fetchVehicles: Firebase DB is not available.");
+    throw new Error("Firebase DB is not available");
+  }
+  const q = query(collection(db!, FIRESTORE_COLLECTION_NAME), orderBy("model", "asc"), orderBy("licensePlate", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data();
@@ -76,7 +80,22 @@ export function VehicleClientPage() {
   const { data: vehiclesFromFirestore = [], isLoading, isError, error } = useQuery<Vehicle[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
     queryFn: fetchVehicles,
+    enabled: !!db,
   });
+
+  if (!db) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão com Firebase" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar ao banco de dados.
+          <br />
+          Verifique a configuração do Firebase e sua conexão com a internet.
+        </p>
+      </div>
+    );
+  }
 
   const isMockDataActive = vehiclesFromFirestore.length === 0 && !isLoading && !isError;
   const vehiclesToDisplay = isMockDataActive ? mockVehiclesData : vehiclesFromFirestore;
@@ -84,7 +103,8 @@ export function VehicleClientPage() {
 
   const addVehicleMutation = useMutation({
     mutationFn: async (newVehicleData: z.infer<typeof VehicleSchema>) => {
-      return addDoc(collection(db, FIRESTORE_COLLECTION_NAME), newVehicleData);
+      if (!db) throw new Error("Conexão com Firebase não disponível para adicionar veículo.");
+      return addDoc(collection(db!, FIRESTORE_COLLECTION_NAME), newVehicleData);
     },
     onSuccess: (docRef, variables) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -98,9 +118,10 @@ export function VehicleClientPage() {
 
   const updateVehicleMutation = useMutation({
     mutationFn: async (vehicleData: Vehicle) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível para atualizar veículo.");
       const { id, ...dataToUpdate } = vehicleData;
       if (!id || id.startsWith("mock")) throw new Error("ID do veículo inválido para atualização.");
-      const vehicleRef = doc(db, FIRESTORE_COLLECTION_NAME, id);
+      const vehicleRef = doc(db!, FIRESTORE_COLLECTION_NAME, id);
       return updateDoc(vehicleRef, dataToUpdate);
     },
     onSuccess: (_, variables) => {
@@ -115,8 +136,9 @@ export function VehicleClientPage() {
 
   const deleteVehicleMutation = useMutation({
     mutationFn: async (vehicleId: string) => {
+      if (!db) throw new Error("Conexão com Firebase não disponível para excluir veículo.");
       if (!vehicleId || vehicleId.startsWith("mock")) throw new Error("ID do veículo inválido para exclusão.");
-      return deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, vehicleId));
+      return deleteDoc(doc(db!, FIRESTORE_COLLECTION_NAME, vehicleId));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -171,7 +193,7 @@ export function VehicleClientPage() {
 
   const isMutating = addVehicleMutation.isPending || updateVehicleMutation.isPending;
 
-  if (isLoading) {
+  if (isLoading && !isModalOpen) { // Added !isModalOpen to prevent loading screen when modal is open
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -352,3 +374,5 @@ export function VehicleClientPage() {
     </>
   );
 }
+
+    
