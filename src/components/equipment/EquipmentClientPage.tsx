@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react"; // Added useCallback
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, DraftingCompass, Warehouse, Brick, FileText, Palette, Thermometer, Weight, Ruler, TowerControl, Power, Fuel, Coins, HandCoins, CalendarClock, History } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, XCircle, AlertTriangle as AlertIconLI, User, Loader2, Users, DraftingCompass, Warehouse, FileText, Palette, Thermometer, Weight, Ruler, TowerControl, Power, Fuel, Coins, HandCoins, CalendarClock, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -117,18 +117,68 @@ export function EquipmentClientPage() {
     queryFn: fetchCustomers,
   });
 
+  const openModal = useCallback((equipment?: Equipment) => {
+    if (equipment) {
+      setEditingEquipment(equipment);
+      const defaultValues = {
+        ...equipment,
+        brand: equipment.brand, 
+        model: equipment.model,
+        equipmentType: equipment.equipmentType,
+        customBrand: "", 
+        customModel: "",
+        customEquipmentType: "",
+        customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
+        manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
+        towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
+        towerClosedHeightMm: equipment.towerClosedHeightMm ?? undefined,
+        totalWidthMm: equipment.totalWidthMm ?? undefined,
+        totalLengthMm: equipment.totalLengthMm ?? undefined,
+        machineWeightKg: equipment.machineWeightKg ?? undefined,
+        nominalCapacityKg: equipment.nominalCapacityKg ?? undefined,
+        turningRadiusMm: equipment.turningRadiusMm ?? undefined,
+        monthlyRentalValue: equipment.monthlyRentalValue ?? undefined,
+        hourMeter: equipment.hourMeter ?? undefined,
+        acquisitionDate: equipment.acquisitionDate || undefined,
+        lastPreventiveMaintenance: equipment.lastPreventiveMaintenance || undefined,
+        nextPreventiveMaintenance: equipment.nextPreventiveMaintenance || undefined,
+        notes: equipment.notes || "",
+        fuelType: equipment.fuelType || undefined,
+      };
+      form.reset(defaultValues);
+      setShowCustomFields({ brand: false, model: false, equipmentType: false });
+
+    } else {
+      setEditingEquipment(null);
+      form.reset({ 
+        brand: "", model: "", chassisNumber: "", equipmentType: "", 
+        operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
+        manufactureYear: new Date().getFullYear(),
+        customBrand: "", customModel: "", customEquipmentType: "",
+        towerType: undefined, towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
+        forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
+        color: undefined, nominalCapacityKg: undefined, turningRadiusMm: undefined,
+        engineType: undefined, fuelType: undefined, batteryVoltage: undefined, batteryAmpHour: undefined,
+        notes: "", monthlyRentalValue: undefined, acquisitionDate: undefined,
+        lastPreventiveMaintenance: undefined, nextPreventiveMaintenance: undefined, hourMeter: undefined,
+      });
+      setShowCustomFields({ brand: false, model: false, equipmentType: false });
+    }
+    setIsModalOpen(true);
+  }, [form]); 
+
   useEffect(() => {
     const equipmentIdToOpen = searchParams.get('openEquipmentId');
-    if (equipmentIdToOpen && equipmentList.length > 0 && !isLoadingEquipment) {
-      const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdToOpen);
-      if (equipmentToEdit) {
-        openModal(equipmentToEdit);
-        // Remove the query parameter from the URL without reloading the page
-        router.replace('/equipment', { shallow: true });
+    if (equipmentIdToOpen) { 
+      if (!isLoadingEquipment && equipmentList.length > 0) {
+        const equipmentToEdit = equipmentList.find(eq => eq.id === equipmentIdToOpen);
+        if (equipmentToEdit) {
+          openModal(equipmentToEdit);
+          router.replace('/equipment', { shallow: true });
+        }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, equipmentList, isLoadingEquipment, router]);
+  }, [searchParams, equipmentList, isLoadingEquipment, router, openModal]);
 
 
   const prepareDataForFirestore = (formData: z.infer<typeof EquipmentSchema>): Omit<Equipment, 'id'> => {
@@ -209,56 +259,6 @@ export function EquipmentClientPage() {
     },
   });
 
-  const openModal = (equipment?: Equipment) => {
-    if (equipment) {
-      setEditingEquipment(equipment);
-      const defaultValues = {
-        ...equipment,
-        brand: equipment.brand, 
-        model: equipment.model,
-        equipmentType: equipment.equipmentType,
-        customBrand: "", 
-        customModel: "",
-        customEquipmentType: "",
-        customerId: equipment.customerId || NO_CUSTOMER_FORM_VALUE,
-        manufactureYear: equipment.manufactureYear ?? new Date().getFullYear(),
-        towerOpenHeightMm: equipment.towerOpenHeightMm ?? undefined,
-        towerClosedHeightMm: equipment.towerClosedHeightMm ?? undefined,
-        totalWidthMm: equipment.totalWidthMm ?? undefined,
-        totalLengthMm: equipment.totalLengthMm ?? undefined,
-        machineWeightKg: equipment.machineWeightKg ?? undefined,
-        nominalCapacityKg: equipment.nominalCapacityKg ?? undefined,
-        turningRadiusMm: equipment.turningRadiusMm ?? undefined,
-        monthlyRentalValue: equipment.monthlyRentalValue ?? undefined,
-        hourMeter: equipment.hourMeter ?? undefined,
-        acquisitionDate: equipment.acquisitionDate || undefined,
-        lastPreventiveMaintenance: equipment.lastPreventiveMaintenance || undefined,
-        nextPreventiveMaintenance: equipment.nextPreventiveMaintenance || undefined,
-        notes: equipment.notes || "",
-        fuelType: equipment.fuelType || undefined,
-      };
-      form.reset(defaultValues);
-      setShowCustomFields({ brand: false, model: false, equipmentType: false });
-
-    } else {
-      setEditingEquipment(null);
-      form.reset({ 
-        brand: "", model: "", chassisNumber: "", equipmentType: "", 
-        operationalStatus: "Operacional", customerId: NO_CUSTOMER_FORM_VALUE,
-        manufactureYear: new Date().getFullYear(),
-        customBrand: "", customModel: "", customEquipmentType: "",
-        towerType: undefined, towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
-        forkSize: undefined, totalWidthMm: undefined, totalLengthMm: undefined, machineWeightKg: undefined,
-        color: undefined, nominalCapacityKg: undefined, turningRadiusMm: undefined,
-        engineType: undefined, fuelType: undefined, batteryVoltage: undefined, batteryAmpHour: undefined,
-        notes: "", monthlyRentalValue: undefined, acquisitionDate: undefined,
-        lastPreventiveMaintenance: undefined, nextPreventiveMaintenance: undefined, hourMeter: undefined,
-      });
-      setShowCustomFields({ brand: false, model: false, equipmentType: false });
-    }
-    setIsModalOpen(true);
-  };
-
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingEquipment(null);
@@ -293,7 +293,7 @@ export function EquipmentClientPage() {
   const isLoading = isLoadingEquipment || isLoadingCustomers;
   const isMutating = addEquipmentMutation.isPending || updateEquipmentMutation.isPending;
 
-  if (isLoading && !isModalOpen) { // Apenas mostrar loader se não houver modal aberto
+  if (isLoading && !isModalOpen) { 
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -603,6 +603,5 @@ export function EquipmentClientPage() {
     </>
   );
 }
-
 
     
