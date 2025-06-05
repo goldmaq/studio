@@ -58,6 +58,8 @@ const LOADING_VEHICLES_SELECT_ITEM_VALUE = "_LOADING_VEHICLES_";
 const CUSTOM_SERVICE_TYPE_VALUE = "_CUSTOM_";
 const NO_EQUIPMENT_SELECTED_VALUE = "_NO_EQUIPMENT_SELECTED_";
 const LOADING_EQUIPMENT_SELECT_ITEM_VALUE = "_LOADING_EQUIPMENT_";
+const NO_TECHNICIAN_SELECTED_VALUE = "_NO_TECHNICIAN_SELECTED_";
+const LOADING_TECHNICIANS_SELECT_ITEM_VALUE = "_LOADING_TECHNICIANS_";
 
 
 const getFileNameFromUrl = (url: string): string => {
@@ -131,24 +133,24 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
   const q = query(collection(db, FIRESTORE_COLLECTION_NAME), orderBy("startDate", "desc"), orderBy("orderNumber", "desc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
-    const data = docSnap.data() as DocumentData;
+    const data = docSnap.data() as DocumentData; // Keep DocumentData for flexibility initially
     return {
       id: docSnap.id,
       orderNumber: data.orderNumber || "N/A",
-      customerId: data.customerId || "N/A",
-      equipmentId: data.equipmentId || "N/A",
+      customerId: data.customerId || "N/A", // Default if missing
+      equipmentId: data.equipmentId || "N/A", // Default if missing
       phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'],
-      technicianId: data.technicianId || "N/A",
-      description: data.description || "N/A",
-      serviceType: data.serviceType || "Não especificado",
+      technicianId: data.technicianId || null, // Default to null if missing
+      serviceType: data.serviceType || "Não especificado", // Default if missing
       customServiceType: data.customServiceType || "",
       vehicleId: data.vehicleId || null,
       startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
       endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
+      description: data.description || "N/A", // Default if missing
       notes: data.notes || "",
       mediaUrl: data.mediaUrl || null,
       technicalConclusion: data.technicalConclusion || null,
-    } as ServiceOrder;
+    } as ServiceOrder; // Assert as ServiceOrder after explicit mapping
   });
 }
 
@@ -240,7 +242,7 @@ export function ServiceOrderClientPage() {
   const form = useForm<z.infer<typeof ServiceOrderSchema>>({
     resolver: zodResolver(ServiceOrderSchema),
     defaultValues: {
-      orderNumber: "", customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
+      orderNumber: "", customerId: "", equipmentId: "", phase: "Pendente", technicianId: null,
       serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
       startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null, technicalConclusion: null,
     },
@@ -288,23 +290,31 @@ export function ServiceOrderClientPage() {
   }, [equipmentList, selectedCustomerId, isLoadingEquipment]);
 
   useEffect(() => {
-    if (selectedCustomerId) {
-      const customer = customers.find(c => c.id === selectedCustomerId);
-      if (customer?.preferredTechnician) {
-        const preferredTech = technicians.find(t => t.name === customer.preferredTechnician);
-        if (preferredTech) {
-          form.setValue('technicianId', preferredTech.id, { shouldValidate: true });
+    if (!editingOrder) { // Only for new orders or when form is reset for a new order
+        if (selectedCustomerId) {
+            const customer = customers.find(c => c.id === selectedCustomerId);
+            if (customer?.preferredTechnician) {
+                const preferredTech = technicians.find(t => t.name === customer.preferredTechnician);
+                form.setValue('technicianId', preferredTech ? preferredTech.id : null, { shouldValidate: true });
+            } else {
+                form.setValue('technicianId', null, { shouldValidate: true }); // No preferred tech
+            }
+        } else {
+             form.setValue('technicianId', null, { shouldValidate: true }); // No customer
         }
-      }
+    }
+
+    // Existing equipment filtering logic
+    if (selectedCustomerId) {
       if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
-        form.setValue('equipmentId', "", { shouldValidate: true });
+        form.setValue('equipmentId', NO_EQUIPMENT_SELECTED_VALUE, { shouldValidate: true });
       }
     } else {
        if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
-        form.setValue('equipmentId', "", { shouldValidate: true });
+        form.setValue('equipmentId', NO_EQUIPMENT_SELECTED_VALUE, { shouldValidate: true });
       }
     }
-  }, [selectedCustomerId, customers, technicians, form, filteredEquipmentList, selectedEquipmentId]);
+  }, [selectedCustomerId, customers, technicians, form, editingOrder, equipmentList, selectedEquipmentId, filteredEquipmentList]);
 
 
   const prepareDataForFirestore = (
@@ -324,8 +334,10 @@ export function ServiceOrderClientPage() {
       startDate: convertToTimestamp(restOfData.startDate),
       endDate: convertToTimestamp(restOfData.endDate),
       vehicleId: restOfData.vehicleId || null,
+      technicianId: restOfData.technicianId || null,
       mediaUrl: newMediaUrl === undefined ? formData.mediaUrl : newMediaUrl,
       technicalConclusion: restOfData.technicalConclusion || null,
+      notes: restOfData.notes || null,
     };
   };
 
@@ -367,7 +379,7 @@ export function ServiceOrderClientPage() {
 
       const orderDataForFirestore = prepareDataForFirestore(data.formData, newMediaUrl);
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.id);
-      await updateDoc(orderRef, orderDataForFirestore);
+      await updateDoc(orderRef, orderDataForFirestore as { [x: string]: any }); // Type assertion for updateDoc
       return { ...orderDataForFirestore, id: data.id };
     },
     onSuccess: (data) => {
@@ -399,7 +411,7 @@ export function ServiceOrderClientPage() {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
       toast({ title: "Ordem de Serviço Concluída", description: `A OS foi marcada como concluída.` });
       setIsConclusionModalOpen(false);
-      closeModal(); // Fecha o modal principal também
+      closeModal(); 
     },
     onError: (err: Error) => {
       toast({ title: "Erro ao Concluir OS", description: `Não foi possível concluir a OS. Detalhe: ${err.message}`, variant: "destructive" });
@@ -454,10 +466,12 @@ export function ServiceOrderClientPage() {
         startDate: formatDateForInput(order.startDate),
         endDate: formatDateForInput(order.endDate),
         vehicleId: order.vehicleId || null,
+        technicianId: order.technicianId || null,
         mediaUrl: order.mediaUrl || null,
         serviceType: isServiceTypePredefined ? order.serviceType : CUSTOM_SERVICE_TYPE_VALUE,
         customServiceType: isServiceTypePredefined ? "" : order.serviceType,
         technicalConclusion: order.technicalConclusion || null,
+        notes: order.notes || "",
       });
       setShowCustomServiceType(!isServiceTypePredefined);
     } else {
@@ -465,7 +479,7 @@ export function ServiceOrderClientPage() {
       const nextOrderNum = getNextOrderNumber(serviceOrders);
       form.reset({
         orderNumber: nextOrderNum,
-        customerId: "", equipmentId: "", phase: "Pendente", technicianId: "",
+        customerId: "", equipmentId: "", phase: "Pendente", technicianId: null,
         serviceType: "", customServiceType: "", vehicleId: null, description: "", notes: "",
         startDate: formatDateForInput(new Date().toISOString()), endDate: "", mediaUrl: null, technicalConclusion: null,
       });
@@ -566,7 +580,10 @@ export function ServiceOrderClientPage() {
     const eq = equipmentList.find(e => e.id === id);
     return eq ? `${eq.brand} ${eq.model} (Chassi: ${eq.chassisNumber})` : id;
   };
-  const getTechnicianName = (id: string) => technicians.find(t => t.id === id)?.name || id;
+  const getTechnicianName = (id?: string | null) => {
+    if (!id) return "Não Atribuído";
+    return technicians.find(t => t.id === id)?.name || id;
+  };
   const getVehicleIdentifier = (id?: string | null) => {
     if (!id) return "N/A";
     const vehicle = vehicles.find(v => v.id === id);
@@ -748,16 +765,26 @@ export function ServiceOrderClientPage() {
 
                 <FormField control={form.control} name="technicianId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Técnico</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""} disabled={isOrderConcludedOrCancelled}>
+                    <FormLabel>Técnico (Opcional)</FormLabel>
+                    <Select
+                      onValueChange={(selectedValue) => field.onChange(selectedValue === NO_TECHNICIAN_SELECTED_VALUE ? null : selectedValue)}
+                      value={field.value ?? NO_TECHNICIAN_SELECTED_VALUE}
+                      disabled={isOrderConcludedOrCancelled}
+                    >
                       <FormControl><SelectTrigger>
-                        <SelectValue placeholder={isLoadingTechnicians ? "Carregando..." : "Atribuir Técnico"} />
+                        <SelectValue placeholder={isLoadingTechnicians ? "Carregando..." : "Atribuir Técnico (Opcional)"} />
                       </SelectTrigger></FormControl>
                       <SelectContent>
-                        {isLoadingTechnicians ? <SelectItem value="loading" disabled>Carregando...</SelectItem> :
-                         technicians.map(tech => (
-                          <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
-                        ))}
+                        {isLoadingTechnicians ? (
+                          <SelectItem value={LOADING_TECHNICIANS_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value={NO_TECHNICIAN_SELECTED_VALUE}>Não atribuir / Opcional</SelectItem>
+                            {technicians.map(tech => (
+                              <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                            ))}
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -856,13 +883,12 @@ export function ServiceOrderClientPage() {
               </FormItem>
             </fieldset>
 
-            {/* Campos editáveis mesmo se concluída/cancelada */}
             <FormField control={form.control} name="technicalConclusion" render={({ field }) => (
               <FormItem>
                 <FormLabel>Conclusão Técnica</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder={isOrderConcludedOrCancelled ? (field.value ? "" : "Nenhuma conclusão técnica registrada.") : "Será preenchido ao concluir a OS."}
+                    placeholder={editingOrder?.phase === 'Concluída' || editingOrder?.phase === 'Cancelada' ? (field.value ? "" : "Nenhuma conclusão técnica registrada.") : "Será preenchido ao concluir a OS."}
                     {...field}
                     value={field.value ?? ""}
                     readOnly={!isOrderConcludedOrCancelled && editingOrder?.phase !== 'Cancelada'} 
@@ -909,7 +935,6 @@ export function ServiceOrderClientPage() {
         </DialogFooter>
       </FormModal>
 
-      {/* AlertDialog para Conclusão Técnica */}
       <AlertDialog open={isConclusionModalOpen} onOpenChange={setIsConclusionModalOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -948,3 +973,5 @@ export function ServiceOrderClientPage() {
     </>
   );
 }
+
+    

@@ -84,7 +84,7 @@ export interface ServiceOrder {
   customerId: string;
   equipmentId: string;
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
-  technicianId: string;
+  technicianId?: string | null; // Tornou-se opcional/nulável
   serviceType: string; 
   customServiceType?: string; 
   vehicleId?: string | null; 
@@ -93,6 +93,7 @@ export interface ServiceOrder {
   description: string; 
   notes?: string;
   mediaUrl?: string | null;
+  technicalConclusion?: string | null; // Adicionado para consistência com o formulário
 }
 
 export interface Technician {
@@ -220,15 +221,16 @@ export const ServiceOrderSchema = z.object({
   customerId: z.string().min(1, "Cliente é obrigatório"),
   equipmentId: z.string().min(1, "Equipamento é obrigatório"),
   phase: z.enum(['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada']),
-  technicianId: z.string().min(1, "Técnico é obrigatório"),
+  technicianId: z.string().nullable().optional(), // Tornou-se opcional/nulável
   serviceType: z.string().min(1, "Tipo de serviço é obrigatório"),
   customServiceType: z.string().optional(),
   vehicleId: z.string().nullable().optional(), 
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  startDate: z.string().optional(), // Considerar z.date() se for objeto Date
+  endDate: z.string().optional(),   // Considerar z.date() se for objeto Date
   description: z.string().min(1, "Problema relatado é obrigatório"), 
-  notes: z.string().optional(),
+  notes: z.string().optional().nullable(), // Permitir explicitamente null
   mediaUrl: z.string().url("URL de mídia inválida").nullable().optional(),
+  technicalConclusion: z.string().nullable().optional(), // Adicionado para consistência
 }).refine(data => {
   if (data.serviceType === '_CUSTOM_' && (!data.customServiceType || data.customServiceType.trim() === "")) {
     return false;
@@ -255,3 +257,5 @@ export const CompanySchema = z.object({
   bankAccount: z.string().optional(),
   bankPixKey: z.string().optional(),
 });
+
+    
