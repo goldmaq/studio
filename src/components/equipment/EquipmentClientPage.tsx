@@ -75,6 +75,9 @@ async function uploadFile(
   equipmentId: string,
   fileTypePrefix: 'partsCatalog' | 'errorCodes'
 ): Promise<string> {
+  if (!storage) {
+    throw new Error("Firebase Storage connection not available.");
+  }
   const filePath = `equipment_files/${equipmentId}/${fileTypePrefix}_${file.name}`;
   const fileStorageRef = storageRef(storage, filePath);
   await uploadBytes(fileStorageRef, file);
@@ -83,6 +86,9 @@ async function uploadFile(
 
 async function deleteFileFromStorage(fileUrl?: string | null) {
   if (fileUrl) {
+ if (!storage) {
+ throw new Error("Firebase Storage connection not available for deletion.");
+ }
     try {
       const gcsPath = new URL(fileUrl).pathname.split('/o/')[1].split('?')[0];
       const decodedPath = decodeURIComponent(gcsPath);
@@ -96,6 +102,9 @@ async function deleteFileFromStorage(fileUrl?: string | null) {
 
 
 async function fetchEquipment(): Promise<Equipment[]> {
+  if (!db) {
+    throw new Error("Firebase Firestore connection not available.");
+  }
   const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
@@ -126,6 +135,9 @@ async function fetchEquipment(): Promise<Equipment[]> {
 }
 
 async function fetchCustomers(): Promise<Customer[]> {
+  if (!db) {
+    throw new Error("Firebase Firestore connection not available.");
+  }
   const q = query(collection(db, FIRESTORE_CUSTOMER_COLLECTION_NAME), orderBy("name", "asc"));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
@@ -279,6 +291,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       catalogFile: File | null,
       codesFile: File | null
     }) => {
+      if (!db) {
+        throw new Error("Firebase Firestore connection not available.");
+      }
       setIsUploadingFiles(true);
       const newEquipmentId = doc(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME)).id;
       let partsCatalogUrl: string | null = null;
@@ -318,6 +333,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       codesFile: File | null,
       currentEquipment: Equipment
     }) => {
+      if (!db) {
+        throw new Error("Firebase Firestore connection not available.");
+      }
       setIsUploadingFiles(true);
       let newPartsCatalogUrl = data.currentEquipment.partsCatalogUrl;
       let newErrorCodesUrl = data.currentEquipment.errorCodesUrl;
@@ -353,6 +371,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const removeFileMutation = useMutation({
     mutationFn: async (data: { equipmentId: string; fileType: 'partsCatalogUrl' | 'errorCodesUrl'; fileUrl: string }) => {
+      if (!db) {
+        throw new Error("Firebase Firestore connection not available.");
+      }
       await deleteFileFromStorage(data.fileUrl);
       const equipmentRef = doc(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME, data.equipmentId);
       await updateDoc(equipmentRef, { [data.fileType]: null });
@@ -373,6 +394,9 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (equipmentToDelete: Equipment) => {
+      if (!db) {
+        throw new Error("Firebase Firestore connection not available.");
+      }
       if (!equipmentToDelete?.id) {
         throw new Error("ID do equipamento inválido fornecido para a função de mutação.");
       }

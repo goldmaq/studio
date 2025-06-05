@@ -12,7 +12,7 @@ const quickLinks = [
   { title: "Ordens de Serviço", href: "/service-orders", icon: ClipboardList, description: "Supervisionar operações de serviço" },
   { title: "Técnicos", href: "/technicians", icon: HardHat, description: "Manter registro de técnicos" },
   { title: "Veículos", href: "/vehicles", icon: CarFront, description: "Administrar dados de veículos" },
-  { title: "Config. das Empresas", href: "/company-config", icon: SlidersHorizontal, description: "Definir detalhes das empresas do grupo" },
+  { title: "Dados das Empresas", href: "/company-config", icon: SlidersHorizontal, description: "Definir detalhes das empresas do grupo" },
 ];
 
 export default function DashboardPage() {
