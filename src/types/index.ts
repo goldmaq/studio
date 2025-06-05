@@ -49,6 +49,8 @@ export interface Equipment {
   monthlyRentalValue?: number | null;
   hourMeter?: number | null;
   notes?: string | null;
+  partsCatalogUrl?: string | null; // Novo campo
+  errorCodesUrl?: string | null;   // Novo campo
 }
 
 export interface ServiceOrder {
@@ -59,7 +61,7 @@ export interface ServiceOrder {
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
   technicianId: string;
   natureOfService: string;
-  vehicleId?: string | null; // Permitir null para veículo
+  vehicleId?: string | null; 
   estimatedLaborCost: number;
   actualLaborCost?: number;
   startDate?: string; 
@@ -81,7 +83,6 @@ export interface Company {
   id: CompanyId;
   name: string;
   cnpj: string;
-  // Endereço detalhado
   street: string;
   number?: string;
   complement?: string;
@@ -89,7 +90,6 @@ export interface Company {
   city: string;
   state: string;
   cep: string;
-  // Informações bancárias
   bankName?: string;
   bankAgency?: string;
   bankAccount?: string;
@@ -154,6 +154,8 @@ export const EquipmentSchema = z.object({
   monthlyRentalValue: z.coerce.number().min(0, "Valor deve ser positivo ou zero").optional().nullable(),
   hourMeter: z.coerce.number().min(0, "Horímetro deve ser positivo ou zero").optional().nullable(),
   notes: z.string().optional().nullable(),
+  partsCatalogUrl: z.string().url("URL inválida para catálogo de peças").nullable().optional(), // Novo campo
+  errorCodesUrl: z.string().url("URL inválida para códigos de erro").nullable().optional(),   // Novo campo
 });
 
 export const TechnicianSchema = z.object({
@@ -192,7 +194,6 @@ export const ServiceOrderSchema = z.object({
 export const CompanySchema = z.object({
   name: z.string().min(1, "Nome da empresa é obrigatório"),
   cnpj: z.string().min(1, "CNPJ é obrigatório"),
-  // Validação para endereço detalhado
   street: z.string().min(1, "Rua é obrigatória"),
   number: z.string().optional(),
   complement: z.string().optional(),
@@ -200,10 +201,8 @@ export const CompanySchema = z.object({
   city: z.string().min(1, "Cidade é obrigatória"),
   state: z.string().length(2, "UF deve ter 2 caracteres").min(2, "UF é obrigatória"),
   cep: z.string().min(1, "CEP é obrigatório").regex(/^\d{5}-?\d{3}$/, "CEP inválido. Use XXXXX-XXX."),
-  // Validação para informações bancárias (mantidas como opcionais)
   bankName: z.string().optional(),
   bankAgency: z.string().optional(),
   bankAccount: z.string().optional(),
   bankPixKey: z.string().optional(),
 });
-
