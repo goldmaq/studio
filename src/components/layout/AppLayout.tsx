@@ -2,13 +2,13 @@
 "use client";
 
 import Link from "next/link";
-// import Image from "next/image"; // No longer needed for the logo
+import Image from "next/image"; // Restaurar a importação de next/image
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   LayoutDashboard,
   Users,
-  Construction,
+  Construction, // Será atualizado para Maquinas no próximo passo, se ainda não foi
   ClipboardList,
   HardHat,
   CarFront,
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/icons/Logo"; // Import the SVG Logo component
+// Remover a importação do Logo SVG: import { Logo } from "@/components/icons/Logo";
 
 interface NavItem {
   href: string;
@@ -62,7 +62,14 @@ function MainSidebar() {
       <SidebarHeader className="p-4 border-b border-sidebar-border flex justify-center items-center h-16">
         <Link href="/" className="flex items-center gap-2">
           {open ? (
-            <Logo className="transition-all duration-300 ease-in-out" /> // Use the SVG Logo component
+            <Image
+              src="/images/logo.png" // Restaurar o uso do Image
+              alt="Gold Maq Controle Logo"
+              width={120}
+              height={30}
+              priority
+              className="transition-all duration-300 ease-in-out"
+            />
           ) : (
             <Settings className="w-6 h-6 text-primary transition-all duration-300 ease-in-out" />
           )}
