@@ -156,7 +156,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     defaultValues: {
       brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
       operationalStatus: "Disponível", customerId: null, 
-      ownerReference: null, // Default to null for owner reference
+      ownerReference: null, 
       manufactureYear: new Date().getFullYear(),
       customBrand: "", customEquipmentType: "",
       towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
@@ -214,7 +214,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
         operationalStatus: "Disponível", customerId: null, 
-        ownerReference: null, // Default to null
+        ownerReference: null, 
         manufactureYear: new Date().getFullYear(),
         customBrand: "", customEquipmentType: "",
         towerOpenHeightMm: undefined, towerClosedHeightMm: undefined, nominalCapacityKg: undefined,
@@ -258,13 +258,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       hourMeter: parseNumericToNullOrNumber(restOfData.hourMeter),
     };
 
-    let finalOwnerReference: OwnerReferenceType | null = null;
-    if (formOwnerReferenceFromForm === NO_OWNER_REFERENCE_VALUE || formOwnerReferenceFromForm === null || formOwnerReferenceFromForm === undefined) {
-      finalOwnerReference = null;
-    } else {
-      // If it's not the "not specified" value, null, or undefined, it should be a valid OwnerReferenceType
-      finalOwnerReference = formOwnerReferenceFromForm as OwnerReferenceType;
-    }
+    const finalOwnerReference: OwnerReferenceType | null = formOwnerReferenceFromForm ?? null;
 
     return {
       ...parsedData,
@@ -862,7 +856,3 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     </>
   );
 }
-
-    
-
-    
