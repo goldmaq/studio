@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from 'react'; // Explicitly import React
 import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -25,8 +26,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import React from 'react';
-
+// React is imported at the top
 
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; 
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
@@ -536,7 +536,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   }
 
   return (
-    <>
+    <React.Fragment>
       <PageHeader
         title="Máquinas" 
         actions={
@@ -840,7 +840,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="batteryBoxHeightMm" render={({ field }) => (
-                    <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormMessage /></FormItem>
+                    <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="batteryBoxDepthMm" render={({ field }) => (
                     <FormItem><FormLabel>Profundidade (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
@@ -903,7 +903,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     <FormItem><FormLabel>Horímetro Atual (h)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="monthlyRentalValue" render={({ field }) => (
-                    <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormMessage /></FormItem>
+                    <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
             <FormField control={form.control} name="notes" render={({ field }) => (
@@ -912,6 +912,6 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
           </form>
         </Form>
       </FormModal>
-    </>
+    </React.Fragment>
   );
 }
