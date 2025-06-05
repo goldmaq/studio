@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { Building, Landmark, Hash, QrCode, MapPin, Contact, Loader2, AlertTriangle, Search } from "lucide-react";
+import { Building, Landmark, Hash, QrCode, MapPin, Contact, Loader2, AlertTriangle, Search, ShieldQuestion } from "lucide-react"; // Added ShieldQuestion for CNPJ
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,8 +87,8 @@ const formatAddressForDisplay = (company: Company): string => {
   else if (company.state) parts.push(company.state);
   
   const addressString = parts.join(', ').trim();
-  if (!addressString && company.cep) return `CEP: ${company.cep}`;
-  return addressString || "Endereço não fornecido";
+  if (!addressString && company.cep) return `${company.cep}`; // CEP only if no other address part
+  return addressString || "Não fornecido";
 };
 
 async function fetchCompanyConfigs(): Promise<Company[]> {
@@ -270,19 +270,50 @@ export function CompanyConfigClientPage() {
                   <CardTitle className="font-headline text-xl flex items-center">
                     <Building className="mr-2 h-6 w-6 text-primary" /> {company.name}
                   </CardTitle>
-                  <CardDescription>CNPJ: {company.cnpj}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow space-y-2 text-sm">
-                  <div className="flex items-start">
-                    <MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> 
-                    <span>{displayAddress}</span>
+                  <p className="flex items-center text-sm">
+                    <ShieldQuestion className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="font-medium text-muted-foreground mr-1">CNPJ:</span>
+                    <span>{company.cnpj}</span>
+                  </p>
+                  <div className="flex items-start text-sm">
+                    <MapPin className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> 
+                    <div>
+                      <span className="font-medium text-muted-foreground mr-1">Endereço:</span>
+                      <span>{displayAddress}</span>
+                      {company.cep && displayAddress !== company.cep && <span className="block text-xs text-muted-foreground/80">CEP: {company.cep}</span>}
+                    </div>
                   </div>
-                  {company.cep && displayAddress !== `CEP: ${company.cep}` && <p className="text-xs text-muted-foreground ml-6">CEP: {company.cep}</p>}
-
-                  {company.bankName && <p className="flex items-center"><Landmark className="mr-2 h-4 w-4 text-primary" /> {company.bankName}</p>}
-                  {company.bankAgency && <p className="flex items-center"><Hash className="mr-2 h-4 w-4 text-primary" /> Agência: {company.bankAgency}</p>}
-                  {company.bankAccount && <p className="flex items-center"><Contact className="mr-2 h-4 w-4 text-primary" /> Conta: {company.bankAccount}</p>}
-                  {company.bankPixKey && <p className="flex items-center"><QrCode className="mr-2 h-4 w-4 text-primary" /> PIX: {company.bankPixKey}</p>}
+                  
+                  {company.bankName && (
+                    <p className="flex items-center text-sm">
+                      <Landmark className="mr-2 h-4 w-4 text-primary" />
+                      <span className="font-medium text-muted-foreground mr-1">Banco:</span>
+                      <span>{company.bankName}</span>
+                    </p>
+                  )}
+                  {company.bankAgency && (
+                    <p className="flex items-center text-sm">
+                      <Hash className="mr-2 h-4 w-4 text-primary" />
+                      <span className="font-medium text-muted-foreground mr-1">Agência:</span>
+                      <span>{company.bankAgency}</span>
+                    </p>
+                  )}
+                  {company.bankAccount && (
+                    <p className="flex items-center text-sm">
+                      <Contact className="mr-2 h-4 w-4 text-primary" />
+                      <span className="font-medium text-muted-foreground mr-1">Conta:</span>
+                      <span>{company.bankAccount}</span>
+                    </p>
+                  )}
+                  {company.bankPixKey && (
+                    <p className="flex items-center text-sm">
+                      <QrCode className="mr-2 h-4 w-4 text-primary" />
+                      <span className="font-medium text-muted-foreground mr-1">PIX:</span>
+                      <span>{company.bankPixKey}</span>
+                    </p>
+                  )}
                 </CardContent>
                 <CardFooter className="border-t pt-4">
                 </CardFooter>

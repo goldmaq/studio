@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, CarFront, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle, DollarSign } from "lucide-react";
+import { PlusCircle, CarFront, Tag, Gauge, Droplets, Coins, FileBadge, CircleCheck, WrenchIcon, Loader2, AlertTriangle, DollarSign, Car } from "lucide-react"; // Added Car for Kind
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 const statusOptions: Vehicle['status'][] = ['Disponível', 'Em Uso', 'Manutenção'];
 const statusIcons = {
@@ -129,8 +130,6 @@ export function VehicleClientPage() {
 
   const openModal = (vehicle?: Vehicle) => {
     if (vehicle) {
-      // If it's a mock vehicle or a real one, prefill the form.
-      // If it's mock, editingVehicle will be set, but onSubmit will lead to add.
       setEditingVehicle(vehicle); 
       form.reset({
         ...vehicle,
@@ -140,7 +139,7 @@ export function VehicleClientPage() {
         fipeValue: vehicle.fipeValue !== undefined && vehicle.fipeValue !== null ? Number(vehicle.fipeValue) : null,
       });
     } else {
-      setEditingVehicle(null); // For creating a new vehicle from scratch
+      setEditingVehicle(null); 
       form.reset({ model: "", licensePlate: "", kind: "", currentMileage: 0, fuelConsumption: 0, costPerKilometer: 0, fipeValue: null, registrationInfo: "", status: "Disponível" });
     }
     setIsModalOpen(true);
@@ -153,8 +152,6 @@ export function VehicleClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof VehicleSchema>) => {
-    // If editingVehicle exists AND its id is NOT a mock id, then update.
-    // Otherwise, it's an add operation (either new from scratch or from a mock item).
     if (editingVehicle && editingVehicle.id && !editingVehicle.id.startsWith("mock")) {
       updateVehicleMutation.mutate({ ...values, id: editingVehicle.id });
     } else {
@@ -219,7 +216,7 @@ export function VehicleClientPage() {
         </Card>
       )}
 
-      {vehiclesToDisplay.length === 0 && !isMockDataActive ? ( // Only show placeholder if no Firestore data AND no mock data (which shouldn't happen with current logic)
+      {vehiclesToDisplay.length === 0 && !isMockDataActive ? (
         <DataTablePlaceholder
           icon={CarFront}
           title="Nenhum Veículo Registrado"
@@ -233,27 +230,62 @@ export function VehicleClientPage() {
             <Card 
               key={vehicle.id} 
               className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
-              onClick={() => openModal(vehicle)} // Clicking a mock item will prefill the "add new" form
+              onClick={() => openModal(vehicle)}
             >
               <CardHeader>
                 <CardTitle className="font-headline text-xl text-primary">{vehicle.model}</CardTitle>
-                <CardDescription className="flex items-center text-sm">
-                  <Tag className="mr-2 h-4 w-4 text-muted-foreground" /> Placa: {vehicle.licensePlate} ({vehicle.kind})
-                </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                <p className="flex items-center"><Gauge className="mr-2 h-4 w-4 text-primary" /> KM: {Number(vehicle.currentMileage).toLocaleString('pt-BR')} km</p>
-                <p className="flex items-center"><Droplets className="mr-2 h-4 w-4 text-primary" /> Cons. Médio: {Number(vehicle.fuelConsumption)} km/L</p>
-                <p className="flex items-center"><Coins className="mr-2 h-4 w-4 text-primary" /> Custo/km: R$ {Number(vehicle.costPerKilometer).toFixed(2)}</p>
+                <p className="flex items-center text-sm">
+                  <Tag className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="font-medium text-muted-foreground mr-1">Placa:</span>
+                  <span>{vehicle.licensePlate}</span>
+                </p>
+                <p className="flex items-center text-sm">
+                  <Car className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="font-medium text-muted-foreground mr-1">Tipo:</span>
+                  <span>{vehicle.kind}</span>
+                </p>
+                <p className="flex items-center text-sm">
+                  <Gauge className="mr-2 h-4 w-4 text-primary" />
+                  <span className="font-medium text-muted-foreground mr-1">KM Atual:</span> 
+                  <span>{Number(vehicle.currentMileage).toLocaleString('pt-BR')} km</span>
+                </p>
+                <p className="flex items-center text-sm">
+                  <Droplets className="mr-2 h-4 w-4 text-primary" />
+                  <span className="font-medium text-muted-foreground mr-1">Consumo:</span>
+                  <span>{Number(vehicle.fuelConsumption)} km/L</span>
+                </p>
+                <p className="flex items-center text-sm">
+                  <Coins className="mr-2 h-4 w-4 text-primary" />
+                  <span className="font-medium text-muted-foreground mr-1">Custo/km:</span>
+                  <span>R$ {Number(vehicle.costPerKilometer).toFixed(2)}</span>
+                </p>
                 {vehicle.fipeValue !== null && vehicle.fipeValue !== undefined && (
-                  <p className="flex items-center">
-                    <DollarSign className="mr-2 h-4 w-4 text-primary" /> FIPE: {Number(vehicle.fipeValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  <p className="flex items-center text-sm">
+                    <DollarSign className="mr-2 h-4 w-4 text-primary" /> 
+                    <span className="font-medium text-muted-foreground mr-1">FIPE:</span>
+                    <span>{Number(vehicle.fipeValue).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </p>
                 )}
-                <p className="flex items-center">
-                  {statusIcons[vehicle.status]} <span className="ml-2">Status: {vehicle.status}</span>
+                <p className="flex items-center text-sm">
+                  {statusIcons[vehicle.status]} 
+                  <span className="font-medium text-muted-foreground ml-2 mr-1">Status:</span>
+                   <span className={cn({
+                    'text-green-600': vehicle.status === 'Disponível',
+                    'text-blue-600': vehicle.status === 'Em Uso',
+                    'text-yellow-600': vehicle.status === 'Manutenção',
+                  })}>
+                    {vehicle.status}
+                  </span>
                 </p>
-                {vehicle.registrationInfo && <p className="flex items-center"><FileBadge className="mr-2 h-4 w-4 text-primary" /> Info. Reg.: {vehicle.registrationInfo}</p>}
+                {vehicle.registrationInfo && (
+                  <p className="flex items-center text-sm">
+                    <FileBadge className="mr-2 h-4 w-4 text-primary" /> 
+                    <span className="font-medium text-muted-foreground mr-1">Registro:</span>
+                    <span>{vehicle.registrationInfo}</span>
+                  </p>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
               </CardFooter>
@@ -269,7 +301,7 @@ export function VehicleClientPage() {
         description="Forneça os detalhes do veículo."
         formId="vehicle-form"
         isSubmitting={isMutating}
-        editingItem={editingVehicle && editingVehicle.id && !editingVehicle.id.startsWith("mock") ? editingVehicle : null} // Only pass real items for delete
+        editingItem={editingVehicle && editingVehicle.id && !editingVehicle.id.startsWith("mock") ? editingVehicle : null}
         onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteVehicleMutation.isPending}
         deleteButtonLabel="Excluir Veículo"

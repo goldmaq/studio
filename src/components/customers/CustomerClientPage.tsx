@@ -6,7 +6,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Users, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Search, Phone, User, Construction } from "lucide-react";
+import { PlusCircle, Users, FileText, MapPin, Mail, Building, HardHat, Loader2, AlertTriangle, Search, Phone, User, Construction, ShieldQuestion } from "lucide-react"; // Added ShieldQuestion
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,8 +76,8 @@ const formatAddressForDisplay = (customer: Customer): string => {
   else if (customer.state) parts.push(customer.state);
   
   const addressString = parts.join(', ').trim();
-  if (!addressString && customer.cep) return `CEP: ${customer.cep}`;
-  return addressString || "Endereço não fornecido";
+  if (!addressString && customer.cep) return `${customer.cep}`; // CEP only
+  return addressString || "Não fornecido";
 };
 
 const generateGoogleMapsUrl = (customer: Customer): string => {
@@ -389,66 +389,87 @@ export function CustomerClientPage() {
             >
               <CardHeader>
                 <CardTitle className="font-headline text-xl text-primary">{customer.name}</CardTitle>
-                <CardDescription className="flex items-center text-sm">
-                  <Building className="mr-2 h-4 w-4 text-muted-foreground" />{customer.cnpj}
-                </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                {customer.contactName && !customer.phone && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Contato: {customer.contactName}</p>}
-                <p className="flex items-center">
+                <p className="flex items-center text-sm">
+                  <ShieldQuestion className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="font-medium text-muted-foreground mr-1">CNPJ:</span>
+                  <span>{customer.cnpj}</span>
+                </p>
+                {customer.contactName && !customer.phone && (
+                  <p className="flex items-center text-sm">
+                    <User className="mr-2 h-4 w-4 text-primary" /> 
+                    <span className="font-medium text-muted-foreground mr-1">Contato:</span>
+                    <span>{customer.contactName}</span>
+                  </p>
+                )}
+                <p className="flex items-center text-sm">
                   <Mail className="mr-2 h-4 w-4 text-primary" />
+                  <span className="font-medium text-muted-foreground mr-1">Email:</span>
                   <a 
                     href={`mailto:${customer.email}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="hover:underline text-primary"
+                    className="hover:underline text-primary truncate"
                     onClick={(e) => e.stopPropagation()}
+                    title={customer.email}
                   >
                     {customer.email}
                   </a>
                 </p>
                 {customer.phone && (
-                  <p className="flex items-center">
+                  <p className="flex items-center text-sm">
                     <Phone className="mr-2 h-4 w-4 text-primary" />
+                    <span className="font-medium text-muted-foreground mr-1">{whatsappNumber ? "WhatsApp:" : "Telefone:"}</span>
                     <a 
                        href={whatsappLink}
                        target="_blank"
                        rel="noopener noreferrer"
                        className="hover:underline text-primary"
                        onClick={(e) => e.stopPropagation()}
-                       title={whatsappNumber ? "Abrir no WhatsApp" : "Número de telefone inválido para WhatsApp"}
+                       title={whatsappNumber ? "Abrir no WhatsApp" : "Número de telefone"}
                     >
                       {customer.phone}
                     </a>
-                    {customer.contactName && <span className="ml-2 text-muted-foreground">(Contato: {customer.contactName})</span>}
+                    {customer.contactName && <span className="ml-1 text-muted-foreground/80 text-xs">(Contato: {customer.contactName})</span>}
                   </p>
                 )}
-                <div className="flex items-start">
-                  <MapPin className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> 
-                  {googleMapsUrl !== "#" ? (
-                    <a
-                      href={googleMapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline text-primary"
-                      onClick={(e) => e.stopPropagation()}
-                      title="Abrir no Google Maps"
-                    >
-                      {displayAddress}
-                    </a>
-                  ) : (
-                    <span>{displayAddress}</span>
-                  )}
+                <div className="flex items-start text-sm">
+                  <MapPin className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> 
+                  <div>
+                    <span className="font-medium text-muted-foreground mr-1">Endereço:</span>
+                    {googleMapsUrl !== "#" ? (
+                      <a
+                        href={googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-primary"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Abrir no Google Maps"
+                      >
+                        {displayAddress}
+                      </a>
+                    ) : (
+                      <span>{displayAddress}</span>
+                    )}
+                    {customer.cep && displayAddress !== customer.cep && <span className="block text-xs text-muted-foreground/80">CEP: {customer.cep}</span>}
+                  </div>
                 </div>
-                {customer.cep && displayAddress !== `CEP: ${customer.cep}` && <p className="text-xs text-muted-foreground ml-6">CEP: {customer.cep}</p>}
                 
                 {preferredTechnicianDetails && 
-                  <p className="flex items-center">
+                  <p className="flex items-center text-sm">
                     <HardHat className="mr-2 h-4 w-4 text-primary" /> 
-                    Téc. Pref.: {preferredTechnicianDetails.name}
+                    <span className="font-medium text-muted-foreground mr-1">Téc. Pref.:</span>
+                    <span>{preferredTechnicianDetails.name}</span>
                   </p>
                 }
-                {customer.notes && <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Obs: {customer.notes}</p>}
+                {customer.notes && (
+                  <p className="flex items-start text-sm">
+                    <FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="font-medium text-muted-foreground mr-1">Obs.:</span>
+                    <span className="whitespace-pre-wrap break-words">{customer.notes}</span>
+                  </p>
+                )}
 
                 <div className="pt-2 mt-2 border-t border-border">
                   {isLoadingEquipment ? (
@@ -458,7 +479,8 @@ export function CustomerClientPage() {
                   ) : linkedEquipment.length > 0 ? (
                     <div>
                       <h4 className="font-semibold text-xs mt-2 mb-1 flex items-center">
-                        <Construction className="mr-1.5 h-3.5 w-3.5 text-primary" /> Equipamentos Vinculados:
+                        <Construction className="mr-1.5 h-3.5 w-3.5 text-primary" />
+                        <span className="font-medium text-muted-foreground mr-1">Equipamentos:</span>
                       </h4>
                       <ul className="list-none pl-1 space-y-0.5">
                         {linkedEquipment.slice(0, 3).map(eq => ( 
@@ -480,7 +502,9 @@ export function CustomerClientPage() {
                     </div>
                   ) : (
                     <p className="flex items-center text-xs text-muted-foreground mt-2">
-                      <Construction className="mr-1.5 h-3.5 w-3.5 text-gray-400" /> Nenhum equipamento vinculado.
+                      <Construction className="mr-1.5 h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-medium text-muted-foreground mr-1">Equipamentos:</span>
+                       Nenhum vinculado.
                     </p>
                   )}
                 </div>

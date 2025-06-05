@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIcon, X, Loader2, CarFront as VehicleIcon } from "lucide-react";
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, DollarSign, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon } from "lucide-react"; // Renamed AlertTriangle to AlertIconLI
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const phaseOptions: ServiceOrder['phase'][] = ['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada'];
 const phaseIcons = {
-  Pendente: <AlertIcon className="h-4 w-4 text-yellow-400" />, 
+  Pendente: <AlertIconLI className="h-4 w-4 text-yellow-400" />, 
   'Em Progresso': <Play className="h-4 w-4 text-blue-500" />,
   'Aguardando Peças': <Pause className="h-4 w-4 text-orange-500" />,
   Concluída: <Check className="h-4 w-4 text-green-500" />,
@@ -215,7 +215,7 @@ export function ServiceOrderClientPage() {
         endDate: formatDateForInput(order.endDate),
         estimatedLaborCost: Number(order.estimatedLaborCost) || 0,
         actualLaborCost: order.actualLaborCost ? Number(order.actualLaborCost) : undefined,
-        vehicleId: order.vehicleId || "", // Garantir que seja string vazia se null/undefined
+        vehicleId: order.vehicleId || "", 
       });
     } else {
       setEditingOrder(null);
@@ -240,7 +240,7 @@ export function ServiceOrderClientPage() {
       ...values,
       estimatedLaborCost: Number(values.estimatedLaborCost),
       actualLaborCost: values.actualLaborCost ? Number(values.actualLaborCost) : undefined,
-      vehicleId: values.vehicleId || null, // Enviar null se string vazia
+      vehicleId: values.vehicleId || null, 
     };
     if (editingOrder && editingOrder.id) {
       updateServiceOrderMutation.mutate({ ...orderData, id: editingOrder.id });
@@ -272,7 +272,7 @@ export function ServiceOrderClientPage() {
   if (isErrorServiceOrders) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-destructive">
-        <AlertIcon className="h-12 w-12 mb-4" />
+        <AlertIconLI className="h-12 w-12 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Erro ao Carregar Ordens de Serviço</h2>
         <p className="text-center">Não foi possível buscar os dados. Tente novamente mais tarde.</p>
         <p className="text-sm mt-2">Detalhe: {errorServiceOrders?.message}</p>
@@ -280,13 +280,17 @@ export function ServiceOrderClientPage() {
     );
   }
 
-  // Helper para encontrar nomes a partir de IDs
   const getCustomerName = (id: string) => customers.find(c => c.id === id)?.name || id;
   const getEquipmentIdentifier = (id: string) => {
     const eq = equipmentList.find(e => e.id === id);
     return eq ? `${eq.brand} ${eq.model}` : id;
   };
   const getTechnicianName = (id: string) => technicians.find(t => t.id === id)?.name || id;
+  const getVehicleIdentifier = (id?: string | null) => {
+    if (!id) return "N/A";
+    const vehicle = vehicles.find(v => v.id === id);
+    return vehicle ? `${vehicle.model} (${vehicle.licensePlate})` : id;
+  };
 
 
   return (
@@ -317,19 +321,23 @@ export function ServiceOrderClientPage() {
               onClick={() => openModal(order)}
             >
               <CardHeader>
-                <CardTitle className="font-headline text-xl text-primary">Ordem: {order.orderNumber}</CardTitle>
-                <CardDescription className="flex items-center text-sm">
-                  {phaseIcons[order.phase]} <span className="ml-2">{order.phase}</span>
+                <CardTitle className="font-headline text-xl text-primary">OS: {order.orderNumber}</CardTitle>
+                <CardDescription className="flex items-center text-sm pt-1">
+                  {phaseIcons[order.phase]} <span className="font-medium text-muted-foreground ml-1 mr-1">Fase:</span> {order.phase}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Cli.: {isLoadingCustomers ? 'Carregando...' : getCustomerName(order.customerId)}</p>
-                <p className="flex items-center"><Construction className="mr-2 h-4 w-4 text-primary" /> Equip.: {isLoadingEquipment ? 'Carregando...' : getEquipmentIdentifier(order.equipmentId)}</p>
-                <p className="flex items-center"><HardHat className="mr-2 h-4 w-4 text-primary" /> Téc.: {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
-                <p className="flex items-center"><Settings2 className="mr-2 h-4 w-4 text-primary" /> Serviço: {order.natureOfService}</p>
-                <p className="flex items-center"><DollarSign className="mr-2 h-4 w-4 text-primary" /> Custo Est.: R$ {Number(order.estimatedLaborCost).toFixed(2)}</p>
-                {order.startDate && <p className="flex items-center"><Calendar className="mr-2 h-4 w-4 text-primary" /> Início: {formatDateForInput(order.startDate)}</p>}
-                <p className="flex items-start"><FileText className="mr-2 mt-1 h-4 w-4 text-primary flex-shrink-0" /> Desc.: {order.description}</p>
+                <p className="flex items-center text-sm"><User className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span> {isLoadingCustomers ? 'Carregando...' : getCustomerName(order.customerId)}</p>
+                <p className="flex items-center text-sm"><Construction className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Equip.:</span> {isLoadingEquipment ? 'Carregando...' : getEquipmentIdentifier(order.equipmentId)}</p>
+                <p className="flex items-center text-sm"><HardHat className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Técnico:</span> {isLoadingTechnicians ? 'Carregando...' : getTechnicianName(order.technicianId)}</p>
+                {order.vehicleId && <p className="flex items-center text-sm"><VehicleIcon className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Veículo:</span> {isLoadingVehicles ? 'Carregando...' : getVehicleIdentifier(order.vehicleId)}</p>}
+                <p className="flex items-center text-sm"><Settings2 className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Serviço:</span> {order.natureOfService}</p>
+                <p className="flex items-center text-sm"><DollarSign className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Custo Est.:</span> R$ {Number(order.estimatedLaborCost).toFixed(2)}</p>
+                {order.actualLaborCost !== undefined && <p className="flex items-center text-sm"><DollarSign className="mr-2 h-4 w-4 text-green-500" /> <span className="font-medium text-muted-foreground mr-1">Custo Real:</span> R$ {Number(order.actualLaborCost).toFixed(2)}</p>}
+                {order.startDate && <p className="flex items-center text-sm"><Calendar className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Início:</span> {formatDateForInput(order.startDate)}</p>}
+                {order.endDate && <p className="flex items-center text-sm"><Calendar className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Término:</span> {formatDateForInput(order.endDate)}</p>}
+                <p className="flex items-start text-sm"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Descrição:</span> <span className="whitespace-pre-wrap break-words">{order.description}</span></p>
+                {order.notes && <p className="flex items-start text-sm"><FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" /> <span className="font-medium text-muted-foreground mr-1">Obs.:</span> <span className="whitespace-pre-wrap break-words">{order.notes}</span></p>}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
               </CardFooter>

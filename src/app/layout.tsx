@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AppQueryProvider } from '@/components/shared/QueryProvider'; 
 
 export const metadata: Metadata = {
-  title: 'Gold Maq Controle',
+  title: 'Gold Maq',
   description: 'Sistema de gerenciamento para as operações da Gold Maq.',
   // icons: { // Next.js metadata API for icons
   //   icon: '/favicon.ico', 

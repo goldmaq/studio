@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, HardHat, UserCircle, Wrench, Loader2, AlertTriangle } from "lucide-react";
+import { PlusCircle, HardHat, UserCircle, Wrench, Loader2, AlertTriangle, BadgeCheck } from "lucide-react"; // Added BadgeCheck for employeeId
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -175,18 +175,27 @@ export function TechnicianClientPage() {
             >
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <UserCircle className="w-10 h-10 text-primary" />
+                  <UserCircle className="w-10 h-10 text-primary flex-shrink-0" />
                   <div>
                     <CardTitle className="font-headline text-xl text-primary">{tech.name}</CardTitle>
-                    <CardDescription>Matrícula: {tech.employeeId}</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                {tech.specialization && <p className="flex items-center"><Wrench className="mr-2 h-4 w-4 text-primary" /> Especialização: {tech.specialization}</p>}
+                <p className="flex items-center text-sm">
+                  <BadgeCheck className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="font-medium text-muted-foreground mr-1">Matrícula:</span>
+                  <span>{tech.employeeId}</span>
+                </p>
+                {tech.specialization && (
+                  <p className="flex items-center text-sm">
+                    <Wrench className="mr-2 h-4 w-4 text-primary" /> 
+                    <span className="font-medium text-muted-foreground mr-1">Especialização:</span> 
+                    <span>{tech.specialization}</span>
+                  </p>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
-                {/* Botão Editar removido */}
               </CardFooter>
             </Card>
           ))}

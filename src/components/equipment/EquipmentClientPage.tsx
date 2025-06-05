@@ -3,9 +3,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer } from "lucide-react"; // Added tower and timer icons
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,10 +37,10 @@ const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
 
 
 const operationalStatusIcons: Record<typeof operationalStatusOptions[number], JSX.Element> = {
-  Disponível: <CheckCircle className="h-4 w-4 text-success" />,
+  Disponível: <CheckCircle className="h-4 w-4 text-green-500" />, // Use green-500 for Disponível
   Locada: <Package className="h-4 w-4 text-blue-500" />,
-  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-danger" />,
-  Sucata: <Trash2 className="h-4 w-4 text-danger" />,
+  'Em Manutenção': <ShieldAlert className="h-4 w-4 text-yellow-500" />, // Use yellow-500 for Em Manutenção
+  Sucata: <Trash2 className="h-4 w-4 text-red-500" />, // Use red-500 for Sucata
 };
 
 const parseNumericToNullOrNumber = (value: any): number | null => {
@@ -457,13 +457,13 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const getOwnerDisplayString = (ownerRef?: OwnerReferenceType | null, customerId?: string | null, customersList?: Customer[]): string => {
     if (ownerRef === OWNER_REF_CUSTOMER) {
       const customer = customersList?.find(c => c.id === customerId);
-      return customer ? `Cliente: ${customer.name}` : 'Propriedade: Cliente (Não Vinculado)';
+      return customer ? `${customer.name}` : 'Cliente (Não Vinculado)';
     }
     if (companyIds.includes(ownerRef as CompanyId)) {
       const company = companyDisplayOptions.find(c => c.id === ownerRef);
-      return company ? `Empresa: ${company.name}` : 'Propriedade: Empresa Desconhecida';
+      return company ? `${company.name}` : 'Empresa Desconhecida';
     }
-    return 'Propriedade: Não Especificado';
+    return 'Não Especificado';
   };
 
   const getOwnerIcon = (ownerRef?: OwnerReferenceType | null): LucideIcon => {
@@ -528,75 +528,94 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             >
               <CardHeader>
                 <CardTitle className="font-headline text-xl text-primary">{eq.brand} {eq.model}</CardTitle>
-                <CardDescription className="flex items-center text-sm">
-                  <Tag className="mr-2 h-4 w-4 text-muted-foreground" /> Chassi: {eq.chassisNumber}
-                </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Tipo: {eq.equipmentType}</p>
-                {eq.manufactureYear && <p className="flex items-center"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> Ano: {eq.manufactureYear}</p>}
-                 <p className="flex items-center">
-                    <OwnerIconComponent className="mr-2 h-4 w-4 text-primary" /> {ownerDisplay}
+                 <p className="flex items-center text-sm">
+                    <Tag className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="font-medium text-muted-foreground mr-1">Chassi:</span>
+                    <span>{eq.chassisNumber}</span>
                   </p>
-                <p className="flex items-center">
+                <p className="flex items-center text-sm"><Layers className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Tipo:</span> {eq.equipmentType}</p>
+                {eq.manufactureYear && <p className="flex items-center text-sm"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Ano:</span> {eq.manufactureYear}</p>}
+                <p className="flex items-center text-sm">
+                    <OwnerIconComponent className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Propriedade:</span> {ownerDisplay}
+                </p>
+                <p className="flex items-center text-sm">
                   {operationalStatusIcons[eq.operationalStatus]}
-                  <span className={cn("ml-2", {
-                    'text-success': eq.operationalStatus === 'Disponível',
+                  <span className="font-medium text-muted-foreground mr-1 ml-2">Status:</span>
+                  <span className={cn({
+                    'text-green-600': eq.operationalStatus === 'Disponível', // Adjusted for better visibility
                     'text-blue-500': eq.operationalStatus === 'Locada',
-                    'text-danger': eq.operationalStatus === 'Em Manutenção' || eq.operationalStatus === 'Sucata',
+                    'text-yellow-600': eq.operationalStatus === 'Em Manutenção', // Adjusted for better visibility
+                    'text-red-600': eq.operationalStatus === 'Sucata', // Adjusted for better visibility
                   })}>
-                    Status: {eq.operationalStatus}
+                    {eq.operationalStatus}
                   </span>
                 </p>
                 {customer ? (
-                  <p className="flex items-center">
-                    <Users className="mr-2 h-4 w-4 text-primary" /> Cliente Associado:
+                  <p className="flex items-center text-sm">
+                    <Users className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span>
                     <Link
                       href={`/customers?openCustomerId=${eq.customerId}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="ml-1 text-primary hover:underline"
+                      className="ml-1 text-primary hover:underline truncate"
                       title={`Ver detalhes de ${customer.name}`}
                     >
                       {customer.name}
                     </Link>
                   </p>
                 ) : eq.customerId ? (
-                     <p className="flex items-center"><Users className="mr-2 h-4 w-4 text-muted-foreground" /> Cliente Associado: ID {eq.customerId} (Carregando...)</p>
+                     <p className="flex items-center text-sm"><Users className="mr-2 h-4 w-4 text-muted-foreground" /> <span className="font-medium text-muted-foreground mr-1">Cliente:</span> ID {eq.customerId} (Carregando...)</p>
                 ): null}
 
-                 {eq.hourMeter !== null && eq.hourMeter !== undefined && <p className="flex items-center"><Layers className="mr-2 h-4 w-4 text-primary" /> Horímetro: {eq.hourMeter}h</p>}
-                 {eq.monthlyRentalValue !== null && eq.monthlyRentalValue !== undefined && <p className="flex items-center"><Coins className="mr-2 h-4 w-4 text-primary" /> Aluguel Mensal: R$ {eq.monthlyRentalValue.toFixed(2)}</p>}
+                {eq.towerOpenHeightMm !== null && eq.towerOpenHeightMm !== undefined && (
+                  <p className="flex items-center text-sm"><ArrowUpFromLine className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Torre Aberta:</span> {eq.towerOpenHeightMm} mm</p>
+                )}
+                {eq.towerClosedHeightMm !== null && eq.towerClosedHeightMm !== undefined && (
+                  <p className="flex items-center text-sm"><ArrowDownToLine className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Torre Fechada:</span> {eq.towerClosedHeightMm} mm</p>
+                )}
+                 {eq.hourMeter !== null && eq.hourMeter !== undefined && <p className="flex items-center text-sm"><Timer className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Horímetro:</span> {eq.hourMeter}h</p>}
+                 {eq.monthlyRentalValue !== null && eq.monthlyRentalValue !== undefined && <p className="flex items-center text-sm"><Coins className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Aluguel Mensal:</span> R$ {eq.monthlyRentalValue.toFixed(2)}</p>}
 
                  {eq.partsCatalogUrl && (
-                    <p className="flex items-center">
+                    <p className="flex items-center text-sm">
                         <BookOpen className="mr-2 h-4 w-4 text-primary" />
+                        <span className="font-medium text-muted-foreground mr-1">Catálogo Peças:</span>
                         <a
                           href={eq.partsCatalogUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
-                          className="text-primary hover:underline hover:text-primary/80 transition-colors"
+                          className="text-primary hover:underline hover:text-primary/80 transition-colors truncate"
                           title={`Ver Catálogo de Peças: ${getFileNameFromUrl(eq.partsCatalogUrl)}`}
                         >
-                            Catálogo de Peças
+                            {getFileNameFromUrl(eq.partsCatalogUrl)}
                         </a>
                     </p>
                  )}
                  {eq.errorCodesUrl && (
-                    <p className="flex items-center">
+                    <p className="flex items-center text-sm">
                         <AlertCircle className="mr-2 h-4 w-4 text-primary" />
+                        <span className="font-medium text-muted-foreground mr-1">Códigos Erro:</span>
                         <a
                           href={eq.errorCodesUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
-                          className="text-primary hover:underline hover:text-primary/80 transition-colors"
+                          className="text-primary hover:underline hover:text-primary/80 transition-colors truncate"
                           title={`Ver Códigos de Erro: ${getFileNameFromUrl(eq.errorCodesUrl)}`}
                         >
-                            Códigos de Erro
+                            {getFileNameFromUrl(eq.errorCodesUrl)}
                         </a>
                     </p>
                  )}
+                 {eq.notes && (
+                  <p className="flex items-start text-sm">
+                    <FileText className="mr-2 mt-0.5 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="font-medium text-muted-foreground mr-1">Obs.:</span>
+                    <span className="whitespace-pre-wrap break-words">{eq.notes}</span>
+                  </p>
+                )}
               </CardContent>
               <CardFooter className="border-t pt-4 flex justify-end gap-2">
               </CardFooter>

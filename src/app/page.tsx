@@ -19,7 +19,7 @@ export default function DashboardPage() {
       <div className="space-y-8">
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="font-headline text-2xl">Bem-vindo ao Gold Maq Controle</CardTitle>
+            <CardTitle className="font-headline text-2xl">Bem-vindo ao Gold Maq</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
