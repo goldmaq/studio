@@ -1,4 +1,5 @@
 
+
 export interface Customer {
   id: string;
   name: string;
@@ -36,6 +37,9 @@ export const companyDisplayOptions: { id: CompanyId; name: string }[] = [
   { id: "goldjob", name: "Gold Empilhadeiras" },
 ];
 
+export type OwnerReferenceType = CompanyId | 'CUSTOMER_OWNED';
+export const OWNER_REF_CUSTOMER: OwnerReferenceType = 'CUSTOMER_OWNED';
+
 
 export interface Equipment {
   id:string;
@@ -46,7 +50,7 @@ export interface Equipment {
   manufactureYear: number | null;
   operationalStatus: typeof operationalStatusOptions[number];
   customerId?: string | null;
-  ownerCompanyId?: CompanyId | null; // Novo campo para empresa proprietária
+  ownerReference?: OwnerReferenceType | null; // Alterado de ownerCompanyId para ownerReference
   customBrand?: string; 
   customEquipmentType?: string; 
 
@@ -142,6 +146,11 @@ export const CustomerSchema = z.object({
   notes: z.string().optional(),
 });
 
+const ownerReferenceSchema = z.union([
+  z.enum(companyIds),
+  z.literal(OWNER_REF_CUSTOMER),
+]);
+
 export const EquipmentSchema = z.object({
   brand: z.string().min(1, "Marca é obrigatória"),
   model: z.string().min(1, "Modelo é obrigatório"),
@@ -150,7 +159,7 @@ export const EquipmentSchema = z.object({
   manufactureYear: z.coerce.number().min(1900, "Ano inválido").max(new Date().getFullYear() + 1, "Ano inválido").nullable(),
   operationalStatus: z.enum(operationalStatusOptions),
   customerId: z.string().nullable().optional(), 
-  ownerCompanyId: z.enum(companyIds).nullable().optional(), // Novo campo
+  ownerReference: ownerReferenceSchema.nullable().optional(),
   customBrand: z.string().optional(),
   customEquipmentType: z.string().optional(),
 
@@ -167,7 +176,16 @@ export const EquipmentSchema = z.object({
   notes: z.string().optional().nullable(),
   partsCatalogUrl: z.string().url("URL inválida para catálogo de peças").nullable().optional(),
   errorCodesUrl: z.string().url("URL inválida para códigos de erro").nullable().optional(),
+}).refine(data => {
+  if (data.ownerReference === OWNER_REF_CUSTOMER && !data.customerId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Um cliente deve ser selecionado se a propriedade for definida como 'Cliente Vinculado'.",
+  path: ["customerId"], // Ou path: ["ownerReference"] se preferir associar o erro ao campo de propriedade
 });
+
 
 export const TechnicianSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
@@ -217,3 +235,4 @@ export const CompanySchema = z.object({
   bankAccount: z.string().optional(),
   bankPixKey: z.string().optional(),
 });
+

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -89,9 +90,9 @@ const generateGoogleMapsUrl = (customer: Customer): string => {
     customer.city,
     customer.state,
     customer.cep,
-  ].filter(Boolean).join(', '); // Filtra partes vazias e junta com vírgula
+  ].filter(Boolean).join(', '); 
 
-  if (!addressParts) return "#"; // Retorna link morto se não houver partes do endereço
+  if (!addressParts) return "#"; 
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressParts)}`;
 };
@@ -99,7 +100,7 @@ const generateGoogleMapsUrl = (customer: Customer): string => {
 
 const getWhatsAppNumber = (phone?: string): string => {
   if (!phone) return "";
-  let cleaned = phone.replace(/\D/g, ''); // Remove non-digits
+  let cleaned = phone.replace(/\D/g, ''); 
 
   if (cleaned.startsWith('55') && (cleaned.length === 12 || cleaned.length === 13)) {
     return cleaned;
@@ -370,7 +371,7 @@ export function CustomerClientPage() {
             const linkedEquipment = equipmentList.filter(eq => eq.customerId === customer.id);
             const whatsappNumber = getWhatsAppNumber(customer.phone);
             const whatsappLink = whatsappNumber 
-              ? `https://wa.me/${whatsappNumber}?text=Olá%20${encodeURIComponent(customer.name)}`
+              ? `https://wa.me/${whatsappNumber}?text=Ol%C3%A1%20${encodeURIComponent(customer.name)}`
               : "#";
             const googleMapsUrl = generateGoogleMapsUrl(customer);
             const displayAddress = formatAddressForDisplay(customer);
@@ -388,7 +389,7 @@ export function CustomerClientPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow space-y-2 text-sm">
-                {customer.contactName && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Contato: {customer.contactName}</p>}
+                {customer.contactName && !customer.phone && <p className="flex items-center"><User className="mr-2 h-4 w-4 text-primary" /> Contato: {customer.contactName}</p>}
                 <p className="flex items-center">
                   <Mail className="mr-2 h-4 w-4 text-primary" />
                   <a 
@@ -414,6 +415,7 @@ export function CustomerClientPage() {
                     >
                       {customer.phone}
                     </a>
+                    {customer.contactName && <span className="ml-2 text-muted-foreground">(Contato: {customer.contactName})</span>}
                   </p>
                 )}
                 <div className="flex items-start">
@@ -638,4 +640,5 @@ export function CustomerClientPage() {
     </>
   );
 }
+
 
