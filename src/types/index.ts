@@ -83,7 +83,7 @@ export interface ServiceOrder {
   orderNumber: string;
   customerId: string;
   equipmentId: string; // This ID refers to a 'Maquina' entity
-  requesterName?: string; // Nome do solicitante do serviço
+  requesterName?: string | null; // Nome do solicitante do serviço
   phase: 'Pendente' | 'Em Progresso' | 'Aguardando Peças' | 'Concluída' | 'Cancelada';
   technicianId?: string | null;
   serviceType: string; 
@@ -92,7 +92,7 @@ export interface ServiceOrder {
   startDate?: string; 
   endDate?: string;   
   description: string; 
-  notes?: string | undefined;
+  notes?: string | null;
   mediaUrls?: string[] | null; // Array de URLs de mídia (fotos/vídeos)
   technicalConclusion?: string | null;
 }
@@ -238,7 +238,7 @@ export const ServiceOrderSchema = z.object({
   orderNumber: z.string().min(1, "Número da ordem é obrigatório"),
   customerId: z.string().min(1, "Cliente é obrigatório"),
   equipmentId: z.string().min(1, "Máquina é obrigatória"), 
-  requesterName: z.string().optional(),
+  requesterName: z.string().optional().nullable(),
   phase: z.enum(['Pendente', 'Em Progresso', 'Aguardando Peças', 'Concluída', 'Cancelada']),
   technicianId: z.string().nullable().optional(),
   serviceType: z.string().min(1, "Tipo de serviço é obrigatório"),

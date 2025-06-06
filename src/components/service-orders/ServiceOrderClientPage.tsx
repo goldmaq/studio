@@ -396,10 +396,10 @@ export function ServiceOrderClientPage() {
       notes: (restOfData.notes === undefined || restOfData.notes === null || restOfData.notes.trim() === "") ? null : restOfData.notes,
     };
   };
-
+ 
 
   const addServiceOrderMutation = useMutation({
-    mutationFn: async (data: { formData: z.infer<typeof ServiceOrderSchema>, filesToUpload: File[] }) => {
+    mutationFn: async (data: { formData: z.infer<typeof ServiceOrderSchema>; filesToUpload: File[] }) => {
       if (!db) throw new Error("Firebase DB is not available for adding service order.");
       setIsUploadingFile(true);
       const newOrderId = doc(collection(db, FIRESTORE_COLLECTION_NAME)).id;
