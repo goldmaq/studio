@@ -161,11 +161,12 @@ export function VehicleClientPage() {
         costPerKilometer: Number(vehicle.costPerKilometer),
         fipeValue: vehicle.fipeValue !== undefined && vehicle.fipeValue !== null ? Number(vehicle.fipeValue) : null,
       });
+      setIsEditMode(false); 
     } else {
       setEditingVehicle(null); 
       form.reset({ model: "", licensePlate: "", kind: "", currentMileage: 0, fuelConsumption: 0, costPerKilometer: 0, fipeValue: null, registrationInfo: "", status: "Disponível" });
+      setIsEditMode(true);
     }
-    setIsEditMode(!!vehicle); // Set to false if editing, true if creating
     setIsModalOpen(true);
   };
 
@@ -173,7 +174,7 @@ export function VehicleClientPage() {
     setIsModalOpen(false);
     setEditingVehicle(null);
     form.reset();
-    setIsEditMode(false); // Reset edit mode on close
+    setIsEditMode(false); 
   };
 
   const onSubmit = async (values: z.infer<typeof VehicleSchema>) => {
@@ -196,7 +197,7 @@ export function VehicleClientPage() {
 
   const isMutating = addVehicleMutation.isPending || updateVehicleMutation.isPending;
 
-  if (isLoading && !isModalOpen) { // Added !isModalOpen to prevent loading screen when modal is open
+  if (isLoading && !isModalOpen) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -330,52 +331,131 @@ export function VehicleClientPage() {
         onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteVehicleMutation.isPending}
         deleteButtonLabel="Excluir Veículo"
+        isEditMode={isEditMode}
+        onEditModeToggle={() => setIsEditMode(true)}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="vehicle-form" className="space-y-4">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="model" render={({ field }) => (
-                  <FormItem><FormLabel>Modelo</FormLabel><FormControl><Input placeholder="ex: Fiat Fiorino" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="licensePlate" render={({ field }) => (
-                  <FormItem><FormLabel>Placa</FormLabel><FormControl><Input placeholder="ABC1D23" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="kind" render={({ field }) => (
-                  <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input placeholder="ex: Van, Carro, Moto" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="currentMileage" render={({ field }) => (
-                  <FormItem><FormLabel>Quilometragem Atual (km)</FormLabel><FormControl><Input type="number" step="any" {...field} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="fuelConsumption" render={({ field }) => (
-                  <FormItem><FormLabel>Consumo de Combustível (km/L)</FormLabel><FormControl><Input type="number" step="any" {...field} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="costPerKilometer" render={({ field }) => (
-                  <FormItem><FormLabel>Custo por Quilômetro (R$)</FormLabel><FormControl><Input type="number" step="any" {...field} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                )} />
-                 <FormField control={form.control} name="fipeValue" render={({ field }) => (
+            <fieldset disabled={!!editingVehicle && !isEditMode} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="model" render={({ field }) => (
+                    <FormItem><FormLabel>Modelo</FormLabel><FormControl><Input placeholder="ex: Fiat Fiorino" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="licensePlate" render={({ field }) => (
+                    <FormItem><FormLabel>Placa</FormLabel><FormControl><Input placeholder="ABC1D23" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="kind" render={({ field }) => (
+                    <FormItem><FormLabel>Tipo</FormLabel><FormControl><Input placeholder="ex: Van, Carro, Moto" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="currentMileage" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Valor Tabela FIPE (R$) (Opcional)</FormLabel>
-                        <FormControl><Input type="number" step="any" placeholder="Ex: 29243" {...field} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} value={field.value ?? ''} /></FormControl>
-                        <FormMessage />
+                      <FormLabel>Quilometragem Atual (km)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="any" {...field} 
+                          onChange={e => {
+                            const rawValue = e.target.value;
+                            if (rawValue === '') {
+                              field.onChange(null);
+                            } else {
+                              const numValue = parseFloat(rawValue);
+                              field.onChange(isNaN(numValue) ? null : numValue);
+                            }
+                          }} 
+                          value={String(field.value ?? '')} 
+                        />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
-                )} />
-                 <FormField control={form.control} name="status" render={({ field }) => (
-                  <FormItem><FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
-                      <SelectContent>{statusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
-                    </Select><FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-            <FormField control={form.control} name="registrationInfo" render={({ field }) => (
-              <FormItem><FormLabel>Informações de Registro (Opcional)</FormLabel><FormControl><Input placeholder="ex: Renavam, Chassi" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
+                  )} />
+                  <FormField control={form.control} name="fuelConsumption" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Consumo de Combustível (km/L)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="any" {...field} 
+                          onChange={e => {
+                            const rawValue = e.target.value;
+                            if (rawValue === '') {
+                              field.onChange(null);
+                            } else {
+                              const numValue = parseFloat(rawValue);
+                              field.onChange(isNaN(numValue) ? null : numValue);
+                            }
+                          }} 
+                          value={String(field.value ?? '')} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="costPerKilometer" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Custo por Quilômetro (R$)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="any" {...field} 
+                          onChange={e => {
+                            const rawValue = e.target.value;
+                            if (rawValue === '') {
+                              field.onChange(null);
+                            } else {
+                              const numValue = parseFloat(rawValue);
+                              field.onChange(isNaN(numValue) ? null : numValue);
+                            }
+                          }} 
+                          value={String(field.value ?? '')} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="fipeValue" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Valor Tabela FIPE (R$) (Opcional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="any" 
+                              placeholder="Ex: 29243" {...field} 
+                              onChange={e => {
+                                const rawValue = e.target.value;
+                                if (rawValue === '') {
+                                  field.onChange(null);
+                                } else {
+                                  const numValue = parseFloat(rawValue);
+                                  field.onChange(isNaN(numValue) ? null : numValue);
+                                }
+                              }} 
+                              value={String(field.value ?? '')} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+                  <FormField control={form.control} name="status" render={({ field }) => (
+                    <FormItem><FormLabel>Status</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
+                        <SelectContent>{statusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent>
+                      </Select><FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              <FormField control={form.control} name="registrationInfo" render={({ field }) => (
+                <FormItem><FormLabel>Informações de Registro (Opcional)</FormLabel><FormControl><Input placeholder="ex: Renavam, Chassi" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </fieldset>
           </form>
         </Form>
       </FormModal>
     </>
   );
 }
+
+    
 
     

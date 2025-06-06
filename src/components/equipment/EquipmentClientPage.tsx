@@ -683,88 +683,87 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         isDeleting={deleteMaquinaMutation.isPending}
         deleteButtonLabel="Excluir Máquina"
       >
-        <Form {...form}>
- </div> disabled={!!editingMaquina && !isEditMode}>
-          <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> {/* Updated id */}
-            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
- </fieldset> disabled={!!editingMaquina && !isEditMode}>
-              <FormField control={form.control} name="brand" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Marca</FormLabel>
-                  <Select onValueChange={(value) => handleSelectChange('brand', value)} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione ou digite" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {predefinedBrandOptionsList.map(option => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                      <SelectItem value="_CUSTOM_">Digitar Marca...</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {showCustomFields.brand && (
-                    <FormField control={form.control} name="customBrand" render={({ field: customField }) => (
-                      <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite a marca" {...customField} value={customField.value ?? ""} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  )}
-                  <FormMessage />
-                </FormItem>
+ <Form {...form}>
+          <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> {/* Updated id */}
+              <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="brand" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Marca</FormLabel>
+                    <Select onValueChange={(value) => handleSelectChange('brand', value)} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione ou digite" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {predefinedBrandOptionsList.map(option => (
+                          <SelectItem key={option} value={option}>{option}</SelectItem>
+                        ))}
+                        <SelectItem value="_CUSTOM_">Digitar Marca...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {showCustomFields.brand && (
+                      <FormField control={form.control} name="customBrand" render={({ field: customField }) => (
+                        <FormItem className="mt-2">
+                          <FormControl><Input placeholder="Digite a marca" {...customField} value={customField.value ?? ""} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="model" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modelo</FormLabel>
+                    <FormControl><Input placeholder="Ex: 8FGCU25, S25" {...field} value={field.value ?? ""} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <FormField control={form.control} name="chassisNumber" render={({ field }) => (
+                <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
 
-              <FormField control={form.control} name="model" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Modelo</FormLabel>
-                  <FormControl><Input placeholder="Ex: 8FGCU25, S25" {...field} value={field.value ?? ""} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
- </fieldset>
+              <FormField
+                control={form.control}
+                name="ownerReference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Propriedade</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === NO_OWNER_REFERENCE_VALUE ? null : value as OwnerReferenceType)}
+                      value={field.value || NO_OWNER_REFERENCE_VALUE}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o proprietário" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_OWNER_REFERENCE_VALUE}>Não Especificado / Outro</SelectItem>
+                        {companyDisplayOptions.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={OWNER_REF_CUSTOMER}>Cliente Vinculado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {field.value === OWNER_REF_CUSTOMER && !form.getValues("customerId") && (
+                      <FormDescription className="text-destructive">Atenção: Vincule um cliente abaixo para esta opção.</FormDescription>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField control={form.control} name="chassisNumber" render={({ field }) => (
-              <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-            
-            <FormField
-              control={form.control}
-              name="ownerReference"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Propriedade</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === NO_OWNER_REFERENCE_VALUE ? null : value as OwnerReferenceType)}
-                    value={field.value || NO_OWNER_REFERENCE_VALUE}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o proprietário" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NO_OWNER_REFERENCE_VALUE}>Não Especificado / Outro</SelectItem>
-                      {companyDisplayOptions.map((company) => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value={OWNER_REF_CUSTOMER}>Cliente Vinculado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {field.value === OWNER_REF_CUSTOMER && !form.getValues("customerId") && (
-                     <FormDescription className="text-destructive">Atenção: Vincule um cliente abaixo para esta opção.</FormDescription>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField control={form.control} name="customerId" render={({ field }) => (
+              <FormField control={form.control} name="customerId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cliente Associado (Serviço/Locação)</FormLabel>
                   <Select
                     onValueChange={(selectedValue) => field.onChange(selectedValue === NO_CUSTOMER_SELECT_ITEM_VALUE ? null : selectedValue)}
-                    value={field.value || NO_CUSTOMER_SELECT_ITEM_VALUE} 
+                    value={field.value || NO_CUSTOMER_SELECT_ITEM_VALUE}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -791,8 +790,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
               )} />
 
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="equipmentType" render={({ field }) => ( // Name will be changed later
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="equipmentType" render={({ field }) => ( // Name will be changed later
                 <FormItem>
                   <FormLabel>Tipo de Máquina</FormLabel>
                   <Select onValueChange={(value) => handleSelectChange('equipmentType', value)} value={field.value}>
@@ -814,7 +813,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                 </FormItem>
               )} />
               <FormField control={form.control} name="manufactureYear" render={({ field }) => (
-                <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="Ex: 2022" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="Ex: 2022" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
             <FormField control={form.control} name="operationalStatus" render={({ field }) => (
@@ -829,28 +828,28 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             )} />
 
 
-            <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <FormField control={form.control} name="towerOpenHeightMm" render={({ field }) => (
-                <FormItem><FormLabel>Altura Torre Aberta (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Altura Torre Aberta (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="towerClosedHeightMm" render={({ field }) => (
-                <FormItem><FormLabel>Altura Torre Fechada (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Altura Torre Fechada (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="nominalCapacityKg" render={({ field }) => (
-                <FormItem><FormLabel>Capacidade Nominal (kg)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Capacidade Nominal (kg)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Dimensões Caixa de Bateria (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => ( 
-                    <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => (
+                    <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="batteryBoxHeightMm" render={({ field }) => (
-                    <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="batteryBoxDepthMm" render={({ field }) => (
-                    <FormItem><FormLabel>Profundidade (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Profundidade (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value, 10))} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
 
@@ -908,7 +907,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField control={form.control} name="hourMeter" render={({ field }) => (
                     <FormItem><FormLabel>Horímetro Atual (h)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                )} />
+)} />
                 <FormField control={form.control} name="monthlyRentalValue" render={({ field }) => (
                    <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -917,7 +916,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
               <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais, histórico, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />
           </form>
-        </Form>
+          </fieldset>
+ </Form>
       </FormModal>
     </>
   );

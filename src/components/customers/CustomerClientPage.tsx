@@ -20,7 +20,7 @@ import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
-import { useQuery, useMutation, useQueryClient, useQueryState } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "../ui/textarea";
 
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
