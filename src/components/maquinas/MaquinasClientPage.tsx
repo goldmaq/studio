@@ -71,67 +71,70 @@ const getFileNameFromUrl = (url: string): string => {
 };
 
 // Seed data for Maquinas
-const maquinasParaSemear: Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType' | 'partsCatalogUrl' | 'errorCodesUrl' | 'customerId' | 'fleetNumber'>[] = [
+const maquinasParaSemear: Partial<Maquina>[] = [
   {
     brand: "Toyota",
     model: "8FGCU25",
-    chassisNumber: "TYT-SEED-001",
+    chassisNumber: "TOYOTA-CHASSI-001",
     equipmentType: "Empilhadeira Contrabalançada GLP",
     manufactureYear: 2021,
     operationalStatus: "Disponível",
     ownerReference: "goldmaq",
+    fleetNumber: "GM-001",
+    hourMeter: 1250,
+    nominalCapacityKg: 2500,
     towerOpenHeightMm: 4800,
     towerClosedHeightMm: 2200,
-    nominalCapacityKg: 2500,
-    hourMeter: 1250,
-    notes: "Máquina de demonstração semeada 1, revisada.",
-    monthlyRentalValue: 1800,
-  },
-  {
-    brand: "Linde",
-    model: "H25T",
-    chassisNumber: "LND-SEED-002",
-    equipmentType: "Empilhadeira Contrabalançada GLP",
-    manufactureYear: 2022,
-    operationalStatus: "Disponível",
-    ownerReference: "goldcomercio",
-    towerOpenHeightMm: 4500,
-    towerClosedHeightMm: 2100,
-    nominalCapacityKg: 2500,
-    hourMeter: 870,
-    notes: "Máquina de demonstração semeada 2, pintura nova.",
-    monthlyRentalValue: 1750,
   },
   {
     brand: "Hyster",
     model: "H50FT",
-    chassisNumber: "HYS-SEED-003",
+    chassisNumber: "HYSTER-CHASSI-002",
     equipmentType: "Empilhadeira Contrabalançada GLP",
     manufactureYear: 2020,
-    operationalStatus: "Em Manutenção",
-    ownerReference: "goldjob",
-    towerOpenHeightMm: 5000,
-    towerClosedHeightMm: 2300,
+    operationalStatus: "Locada",
+    customerId: "CUSTOMER_ID_EXAMPLE_1", // Substituir por um ID de cliente existente, se necessário para teste
+    ownerReference: "goldcomercio",
+    fleetNumber: "GC-005",
+    hourMeter: 3500,
     nominalCapacityKg: 2200,
-    hourMeter: 2100,
-    notes: "Máquina de demonstração semeada 3, aguardando peças.",
-    monthlyRentalValue: 1600,
+  },
+  {
+    brand: "Yale",
+    model: "VX-ERP030",
+    chassisNumber: "YALE-CHASSI-003",
+    equipmentType: "Empilhadeira Contrabalançada Elétrica",
+    manufactureYear: 2022,
+    operationalStatus: "Disponível",
+    ownerReference: "goldjob",
+    fleetNumber: "GJ-010",
+    hourMeter: 800,
+    nominalCapacityKg: 1500,
+    batteryBoxWidthMm: 800,
+    batteryBoxHeightMm: 600,
+    batteryBoxDepthMm: 400,
+  },
+  {
+    brand: "Linde",
+    model: "R14",
+    chassisNumber: "LINDE-CHASSI-004",
+    equipmentType: "Empilhadeira Retrátil",
+    manufactureYear: 2019,
+    operationalStatus: "Em Manutenção",
+    ownerReference: "goldmaq",
+    fleetNumber: "GM-002",
+    hourMeter: 5600,
   },
   {
     brand: "Still",
     model: "RX20-16",
-    chassisNumber: "STL-SEED-004",
+    chassisNumber: "STILL-CHASSI-005",
     equipmentType: "Empilhadeira Contrabalançada Elétrica",
     manufactureYear: 2023,
     operationalStatus: "Disponível",
     ownerReference: "goldmaq",
-    towerOpenHeightMm: 4200,
-    towerClosedHeightMm: 2000,
-    nominalCapacityKg: 1600,
-    batteryBoxWidthMm: 800, batteryBoxHeightMm: 600, batteryBoxDepthMm: 500,
-    hourMeter: 350,
-    notes: "Empilhadeira elétrica semeada, baixa quilometragem.",
-    monthlyRentalValue: 2200,
+    fleetNumber: "GM-003",
+    notes: "Equipamento novo, poucas horas de uso.",
   },
 ];
 
@@ -287,20 +290,25 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
 
     try {
       for (const maquina of maquinasParaSemear) {
+        if (!maquina.chassisNumber) {
+          console.warn("Máquina sem número de chassi no array de semeadura, pulando:", maquina);
+          skippedCount++;
+          continue;
+        }
         const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), where("chassisNumber", "==", maquina.chassisNumber));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-          await addDoc(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), maquina);
+          await addDoc(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), maquina as Maquina);
           seededCount++;
         } else {
           skippedCount++;
         }
       }
       if (seededCount > 0) {
-        toast({ title: "Dados Semeadas", description: `${seededCount} máquinas foram adicionadas. ${skippedCount} já existiam.` });
+        toast({ title: "Dados Semeadas", description: `${seededCount} máquinas foram adicionadas. ${skippedCount} já existiam ou foram puladas.` });
       } else if (skippedCount > 0) {
-        toast({ title: "Dados Já Existem", description: `Nenhuma máquina nova adicionada, ${skippedCount} já existiam.` });
+        toast({ title: "Dados Já Existem ou Pulados", description: `Nenhuma máquina nova adicionada, ${skippedCount} já existiam ou foram puladas.` });
       } else {
         toast({ title: "Nenhum Dado para Semear", description: "Não havia máquinas na lista de semeadura." });
       }
@@ -650,7 +658,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   }
 
   return (
-    <React.Fragment>
+    <>
       <PageHeader
         title="Máquinas" 
         actions={
@@ -659,13 +667,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Máquina
             </Button>
             {process.env.NODE_ENV === 'development' && (
-              <Button
-                onClick={handleSeedMaquinas}
-                variant="outline"
-                size="sm"
-                className="ml-2"
-                disabled={isSeeding || isMutating}
-              >
+               <Button onClick={handleSeedMaquinas} variant="outline" disabled={isSeeding || isMutating}>
                 {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
                 Semear Dados (DEV)
               </Button>
@@ -957,6 +959,14 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                   </Select><FormMessage />
                 </FormItem>
               )} />
+
+              <FormField
+ control={form.control}
+ name="fleetNumber"
+ render={({ field }) => (
+ <FormItem><FormLabel>Número da Frota</FormLabel><FormControl><Input placeholder="Ex: F-001, FROTA123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+ )}
+ />
             </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
@@ -988,14 +998,6 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                   )} />
               </div>
             </fieldset>
-            <FormField
- control={form.control}
- name="fleetNumber"
- render={({ field }) => (
- <FormItem><FormLabel>Número da Frota</FormLabel><FormControl><Input placeholder="Ex: F-001, FROTA123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
- )}
- />
-
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
             <fieldset disabled={!!editingMaquina && !isEditMode}>
               <FormItem>
@@ -1064,6 +1066,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
           </form>
         </Form>
       </FormModal>
-    </React.Fragment>
+    </>
   );
 }
+
