@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIconLI, XCircle, AlertTriangle, Save, Trash2 } from "lucide-react"; // Renamed LinkIcon to LinkIconLI to avoid conflict
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIconLI, XCircle, AlertTriangle, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import type { ServiceOrder, Customer, Maquina, Technician, Vehicle } from "@/types";
-import { ServiceOrderSchema, serviceTypeOptionsList } from "@/types"; // Removed companyIds and Equipment as they are not directly used here
+import { ServiceOrderSchema, serviceTypeOptionsList } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
@@ -122,9 +122,8 @@ const formatDateForInput = (date: any): string => {
     return "";
   }
   if (!isValid(d)) return "";
-  // Ensure we are using local date parts to avoid timezone shifts to previous day
   const year = d.getFullYear();
-  const month = d.getMonth(); // 0-indexed
+  const month = d.getMonth(); 
   const day = d.getDate();
   const localDate = new Date(year, month, day);
   return localDate.toISOString().split('T')[0];
@@ -132,9 +131,8 @@ const formatDateForInput = (date: any): string => {
 
 const convertToTimestamp = (dateString?: string | null): Timestamp | null => {
   if (!dateString) return null;
-  const date = parseISO(dateString); // This parses "YYYY-MM-DD" as UTC midnight
+  const date = parseISO(dateString); 
   if (!isValid(date)) return null;
-  // No need to create new Date with UTC parts if parseISO already handles it correctly for YYYY-MM-DD
   return Timestamp.fromDate(date);
 };
 
@@ -209,7 +207,7 @@ async function fetchVehicles(): Promise<Vehicle[]> {
 }
 
 const getNextOrderNumber = (currentOrders: ServiceOrder[]): string => {
-  let maxOrderNum = 3999; // Start from a base if no orders exist or all are below this
+  let maxOrderNum = 3999; 
   currentOrders.forEach(order => {
     if (order.orderNumber) {
         const num = parseInt(order.orderNumber, 10);
@@ -239,7 +237,7 @@ const getDeadlineStatusInfo = (
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  const endDateNormalized = new Date(endDate.valueOf()); // Use valueOf to get epoch time for comparison
+  const endDateNormalized = new Date(endDate.valueOf()); 
   endDateNormalized.setHours(0,0,0,0);
 
 
@@ -250,7 +248,7 @@ const getDeadlineStatusInfo = (
     return { status: 'due_today', message: 'Vence Hoje!', icon: <AlertTriangle className="h-5 w-5" />, alertClass: "bg-yellow-100 border-yellow-500 text-yellow-700" };
   }
   const twoDaysFromNow = addDays(today, 2);
-  if (isBefore(endDateNormalized, twoDaysFromNow)) { // Removed || isToday(endDateNormalized) as it's covered by above
+  if (isBefore(endDateNormalized, twoDaysFromNow)) { 
      return { status: 'due_soon', message: 'Vence em Breve', icon: <AlertTriangle className="h-5 w-5" />, alertClass: "bg-amber-100 border-amber-500 text-amber-700" };
   }
   return { status: 'none' };
@@ -264,7 +262,7 @@ export function ServiceOrderClientPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
   const [showCustomServiceType, setShowCustomServiceType] = useState(false);
-  const [mediaFiles, setMediaFiles] = useState<File[]>([]); // For new files to be uploaded
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]); 
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isConclusionModalOpen, setIsConclusionModalOpen] = useState(false);
   const [technicalConclusionText, setTechnicalConclusionText] = useState("");
@@ -282,7 +280,7 @@ export function ServiceOrderClientPage() {
 
   const selectedCustomerId = useWatch({ control: form.control, name: 'customerId' });
   const selectedEquipmentId = useWatch({ control: form.control, name: 'equipmentId' });
-  const formMediaUrls = useWatch({ control: form.control, name: 'mediaUrls' }); // To track existing media URLs from form state
+  const formMediaUrls = useWatch({ control: form.control, name: 'mediaUrls' }); 
 
   const { data: serviceOrders = [], isLoading: isLoadingServiceOrders, isError: isErrorServiceOrders, error: errorServiceOrders } = useQuery<ServiceOrder[], Error>({
     queryKey: [FIRESTORE_COLLECTION_NAME],
@@ -342,11 +340,11 @@ export function ServiceOrderClientPage() {
   }, [equipmentList, selectedCustomerId, isLoadingEquipment]);
 
   useEffect(() => {
-    if (!editingOrder) { // Only set preferred technician for new orders
+    if (!editingOrder) { 
         if (selectedCustomerId) {
             const customer = customers.find(c => c.id === selectedCustomerId);
             if (customer?.preferredTechnician) {
-                const preferredTech = technicians.find(t => t.name === customer.preferredTechnician); // Assuming preferredTechnician stores name
+                const preferredTech = technicians.find(t => t.name === customer.preferredTechnician); 
                 form.setValue('technicianId', preferredTech ? preferredTech.id : null, { shouldValidate: true });
             } else {
                 form.setValue('technicianId', null, { shouldValidate: true });
@@ -356,12 +354,11 @@ export function ServiceOrderClientPage() {
         }
     }
 
-    // Reset equipment if customer changes and selected equipment is no longer valid
     if (selectedCustomerId) {
       if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
         form.setValue('equipmentId', NO_EQUIPMENT_SELECTED_VALUE, { shouldValidate: true });
       }
-    } else { // No customer selected, reset equipment if it's not in the general available list
+    } else { 
        if (selectedEquipmentId && !filteredEquipmentList.find(eq => eq.id === selectedEquipmentId)) {
         form.setValue('equipmentId', NO_EQUIPMENT_SELECTED_VALUE, { shouldValidate: true });
       }
@@ -371,7 +368,7 @@ export function ServiceOrderClientPage() {
 
   const prepareDataForFirestore = (
     formData: z.infer<typeof ServiceOrderSchema>,
-    processedMediaUrls?: (string | null)[] | null // Array can contain null if some files failed or were removed
+    processedMediaUrls?: (string | null)[] | null 
   ): Omit<ServiceOrder, 'id' | 'customServiceType' | 'startDate' | 'endDate' | 'mediaUrls'> & { startDate: Timestamp | null; endDate: Timestamp | null; mediaUrls: string[] | null } => {
     const { customServiceType, mediaUrls: formMediaUrlsIgnored, ...restOfData } = formData;
 
@@ -416,7 +413,7 @@ export function ServiceOrderClientPage() {
       }
       const orderDataForFirestore = prepareDataForFirestore(data.formData, uploadedUrls);
       await setDoc(doc(db, FIRESTORE_COLLECTION_NAME, newOrderId), orderDataForFirestore);
-      return { ...orderDataForFirestore, id: newOrderId }; // Return with the ID and processed data
+      return { ...orderDataForFirestore, id: newOrderId }; 
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -430,13 +427,18 @@ export function ServiceOrderClientPage() {
   });
 
   const updateServiceOrderMutation = useMutation({
-    mutationFn: async (data: { id: string, formData: z.infer<typeof ServiceOrderSchema>, filesToUpload: File[], existingMediaUrlsToKeep: string[] }) => {
+    mutationFn: async (data: { 
+      id: string, 
+      formData: z.infer<typeof ServiceOrderSchema>, 
+      filesToUpload: File[], 
+      existingUrlsToKeep: string[],
+      originalMediaUrls: string[] 
+    }) => {
       if (!db) throw new Error("Firebase DB is not available for updating service order.");
       setIsUploadingFile(true);
       
-      let finalMediaUrls: string[] = [...data.existingMediaUrlsToKeep]; // Start with URLs to keep
+      let finalMediaUrls: string[] = [...data.existingUrlsToKeep]; 
 
-      // Upload new files and add to the list
       if (data.filesToUpload && data.filesToUpload.length > 0) {
         const newUploadedUrls: string[] = [];
         for (const file of data.filesToUpload) {
@@ -445,17 +447,15 @@ export function ServiceOrderClientPage() {
         }
         finalMediaUrls = [...finalMediaUrls, ...newUploadedUrls];
       }
-
-      // Delete files from storage that are no longer in `existingMediaUrlsToKeep` or `newUploadedUrls`
-      const originalUrls = editingOrder?.mediaUrls || [];
-      const urlsToDelete = originalUrls.filter(url => !data.existingMediaUrlsToKeep.includes(url));
+      
+      const urlsToDelete = data.originalMediaUrls.filter(url => !data.existingUrlsToKeep.includes(url));
       for (const urlToDelete of urlsToDelete) {
         await deleteServiceOrderFileFromStorage(urlToDelete);
       }
       
       const orderDataForFirestore = prepareDataForFirestore(data.formData, finalMediaUrls);
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.id);
-      await updateDoc(orderRef, orderDataForFirestore as { [x: string]: any }); // Cast to any for updateDoc
+      await updateDoc(orderRef, orderDataForFirestore as { [x: string]: any }); 
       return { ...orderDataForFirestore, id: data.id };
     },
     onSuccess: (data) => {
@@ -474,7 +474,7 @@ export function ServiceOrderClientPage() {
       if (!db) throw new Error("Firebase DB is not available for concluding service order.");
       const orderRef = doc(db, FIRESTORE_COLLECTION_NAME, data.orderId);
       let finalEndDate = convertToTimestamp(data.currentEndDate);
-      if (!finalEndDate) { // If endDate is not set or invalid, use current date
+      if (!finalEndDate) { 
         finalEndDate = Timestamp.now();
       }
       await updateDoc(orderRef, {
@@ -516,7 +516,7 @@ export function ServiceOrderClientPage() {
   });
 
   const openModal = useCallback((order?: ServiceOrder) => {
-    setMediaFiles([]); // Clear any staged new files
+    setMediaFiles([]); 
     if (order) {
       setEditingOrder(order);
       const isServiceTypePredefined = serviceTypeOptionsList.includes(order.serviceType as any);
@@ -526,7 +526,7 @@ export function ServiceOrderClientPage() {
         endDate: formatDateForInput(order.endDate),
         vehicleId: order.vehicleId || null,
         technicianId: order.technicianId || null,
-        mediaUrls: order.mediaUrls || [], // Initialize with existing URLs
+        mediaUrls: order.mediaUrls || [], 
         serviceType: isServiceTypePredefined ? order.serviceType : CUSTOM_SERVICE_TYPE_VALUE,
         customServiceType: isServiceTypePredefined ? "" : order.serviceType,
         technicalConclusion: order.technicalConclusion || null,
@@ -562,16 +562,27 @@ export function ServiceOrderClientPage() {
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
     const existingUrlsToKeep = form.getValues('mediaUrls') || [];
     const newFilesToUpload = mediaFiles;
+    const originalMediaUrls = editingOrder?.mediaUrls || [];
 
     if (editingOrder?.phase === 'Concluída' && editingOrder?.id) {
-        // If order is already concluded, only allow certain fields to be updated if necessary,
-        // or simply allow note/media updates. For now, just general update.
-        updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, filesToUpload: newFilesToUpload, existingMediaUrlsToKeep });
+        updateServiceOrderMutation.mutate({ 
+          id: editingOrder.id, 
+          formData: values, 
+          filesToUpload: newFilesToUpload, 
+          existingUrlsToKeep,
+          originalMediaUrls
+        });
         return;
     }
 
     if (editingOrder && editingOrder.id) {
-      updateServiceOrderMutation.mutate({ id: editingOrder.id, formData: values, filesToUpload: newFilesToUpload, existingMediaUrlsToKeep });
+      updateServiceOrderMutation.mutate({ 
+        id: editingOrder.id, 
+        formData: values, 
+        filesToUpload: newFilesToUpload, 
+        existingUrlsToKeep,
+        originalMediaUrls 
+      });
     } else {
       addServiceOrderMutation.mutate({ formData: values, filesToUpload: newFilesToUpload });
     }
@@ -596,7 +607,7 @@ export function ServiceOrderClientPage() {
         description: `Você pode anexar no máximo ${MAX_FILES_ALLOWED} arquivos no total. Você já tem ${currentExistingUrlsCount} e tentou adicionar ${files.length}. Selecione no máximo ${availableSlots} novo(s) arquivo(s).`,
         variant: "destructive",
       });
-      setMediaFiles(files.slice(0, availableSlots)); // Keep only allowed number of new files
+      setMediaFiles(files.slice(0, availableSlots)); 
     } else {
       setMediaFiles(files);
     }
@@ -604,8 +615,7 @@ export function ServiceOrderClientPage() {
   
   const handleRemoveAllExistingAttachments = () => {
     if (editingOrder && window.confirm("Tem certeza que deseja remover TODOS os anexos existentes desta Ordem de Serviço? Esta ação não poderá ser desfeita até que você salve o formulário.")) {
-      form.setValue('mediaUrls', []); // Clear existing URLs from form state
-      // Actual deletion from storage will happen on submit via updateServiceOrderMutation
+      form.setValue('mediaUrls', []); 
       toast({title: "Anexos Marcados para Remoção", description: "Os anexos existentes serão removidos ao salvar."})
     }
   };
@@ -703,8 +713,7 @@ export function ServiceOrderClientPage() {
           {serviceOrders.map((order) => {
             const deadlineInfo = getDeadlineStatusInfo(order.endDate, order.phase);
             const cardClasses = cn("flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer");
-            // No longer adding border directly to cardClasses for deadline, using internal div
-
+            
             return (
             <Card key={order.id} className={cardClasses} onClick={() => openModal(order)} >
               {deadlineInfo.status !== 'none' && deadlineInfo.alertClass && (
@@ -785,7 +794,7 @@ export function ServiceOrderClientPage() {
         isDeleting={deleteServiceOrderMutation.isPending}
         deleteButtonLabel="Excluir OS"
         submitButtonLabel={editingOrder ? "Salvar Alterações" : "Criar OS"}
-        disableSubmit={editingOrder?.phase === 'Concluída' && editingOrder?.phase !== 'Cancelada'} // Only disable submit if concluded, not if cancelled
+        disableSubmit={editingOrder?.phase === 'Concluída' && editingOrder?.phase !== 'Cancelada'} 
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
@@ -961,10 +970,8 @@ export function ServiceOrderClientPage() {
               )} />
             </fieldset>
             
-            {/* Media Upload Section */}
             <FormItem>
               <FormLabel>Anexos (Foto/Vídeo/PDF - Opcional) - Máx {MAX_FILES_ALLOWED} arquivos.</FormLabel>
-              {/* Display existing files */}
               {editingOrder && formMediaUrls && formMediaUrls.length > 0 && (
                 <div className="mb-2">
                   <p className="text-sm font-medium mb-1">Anexos Existentes ({formMediaUrls.length}):</p>
@@ -987,7 +994,6 @@ export function ServiceOrderClientPage() {
                 </div>
               )}
 
-              {/* File input for new files */}
               {!isOrderConcludedOrCancelled && (
                 <FormControl>
                   <Input
@@ -1003,7 +1009,6 @@ export function ServiceOrderClientPage() {
                 </FormControl>
               )}
 
-              {/* Display newly selected files for upload */}
               {mediaFiles.length > 0 && !isOrderConcludedOrCancelled && (
                 <FormDescription className="mt-2 text-sm text-muted-foreground">
                   Novos arquivos selecionados ({mediaFiles.length}): {mediaFiles.map(file => file.name).join(', ')}. <br />
@@ -1013,7 +1018,7 @@ export function ServiceOrderClientPage() {
               {((formMediaUrls?.length || 0) + mediaFiles.length) > MAX_FILES_ALLOWED && !isOrderConcludedOrCancelled && (
                 <p className="text-sm font-medium text-destructive mt-1">Limite de {MAX_FILES_ALLOWED} arquivos excedido.</p>
               )}
-              <FormMessage /> {/* For Zod validation errors on mediaUrls field if any from schema */}
+              <FormMessage /> 
             </FormItem>
             
             {editingOrder && !isOrderConcludedOrCancelled && editingOrder.phase !== 'Cancelada' && (
@@ -1089,3 +1094,4 @@ export function ServiceOrderClientPage() {
   );
 }
 
+    
