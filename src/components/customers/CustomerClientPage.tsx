@@ -310,7 +310,7 @@ export function CustomerClientPage() {
         preferredTechnician: customer.preferredTechnician || null,
         cep: customer.cep || null,
       });
-      setIsEditMode(false);
+      setIsEditMode(false); // Start in view mode
     } else {
       setEditingCustomer(null);
       form.reset({
@@ -318,16 +318,16 @@ export function CustomerClientPage() {
         complement: "", neighborhood: "", city: "", state: "",
         preferredTechnician: null, notes: ""
       });
+      setIsEditMode(true); // Start in edit mode
     }
-    setIsEditMode(true);
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setIsEditMode(false);
     setEditingCustomer(null);
     form.reset();
+    setIsEditMode(false); // Reset edit mode
   };
 
   const onSubmit = async (values: z.infer<typeof CustomerSchema>) => {
@@ -561,141 +561,143 @@ export function CustomerClientPage() {
         editingItem={editingCustomer}
         onDeleteConfirm={editingCustomer ? handleModalDeleteConfirm : undefined}
         isDeleting={deleteCustomerMutation.isPending}
- isEditMode={isEditMode}
+        isEditMode={isEditMode}
         onEditModeToggle={() => setIsEditMode(true)}
         deleteButtonLabel="Excluir Cliente"
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="customer-form" className="space-y-4">
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome completo do cliente ou razão social" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="cnpj" render={({ field }) => (
-              <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input placeholder="00.000.000/0000-00" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="contactName" render={({ field }) => (
-              <FormItem><FormLabel>Nome do Contato (Opcional)</FormLabel><FormControl><Input placeholder="Nome da pessoa de contato" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
-             <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Email Principal</FormLabel><FormControl><Input type="email" placeholder="contato@exemplo.com" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="phone" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Telefone Principal (Opcional)</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="(00) 00000-0000"
-                    {...field}
-                    value={field.value ?? ""}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/\D/g, "");
-                      if (rawValue.length <= 11) {
-                        field.onChange(formatPhoneNumberForInputDisplay(e.target.value));
-                      } else {
-                        field.onChange(formatPhoneNumberForInputDisplay(rawValue.substring(0,11)));
-                      }
-                    }}
-                    maxLength={15}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Endereço</h3>
-
-            <FormField control={form.control} name="cep" render={({ field }) => (
-              <FormItem>
-                <FormLabel>CEP</FormLabel>
-                <div className="flex items-center gap-2">
-                  <FormControl>
-                    <Input placeholder="00000-000" {...field} value={field.value ?? ""} onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, "");
-                      if (value.length <= 5) {
-                        field.onChange(value);
-                      } else if (value.length <= 8) {
-                        field.onChange(`${value.slice(0,5)}-${value.slice(5)}`);
-                      } else {
-                        field.onChange(`${value.slice(0,5)}-${value.slice(5,8)}`);
-                      }
-                    }}/>
-                  </FormControl>
-                  <Button type="button" variant="outline" onClick={handleSearchCep} disabled={isCepLoading}>
-                    {isCepLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    <span className="ml-2 sm:inline hidden">Buscar</span>
-                  </Button>
-                </div>
-                <FormDescription>Digite o CEP para buscar o endereço automaticamente.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <FormField control={form.control} name="street" render={({ field }) => (
-              <FormItem><FormLabel>Rua / Logradouro</FormLabel><FormControl><Input placeholder="Ex: Av. Paulista" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField control={form.control} name="number" render={({ field }) => (
-                <FormItem className="md:col-span-1"><FormLabel>Número</FormLabel><FormControl><Input placeholder="Ex: 123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+            <fieldset disabled={!!editingCustomer && !isEditMode} className="space-y-4">
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome completo do cliente ou razão social" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-              <FormField control={form.control} name="complement" render={({ field }) => (
-                <FormItem className="md:col-span-2"><FormLabel>Complemento</FormLabel><FormControl><Input placeholder="Ex: Apto 10, Bloco B" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              <FormField control={form.control} name="cnpj" render={({ field }) => (
+                <FormItem><FormLabel>CNPJ</FormLabel><FormControl><Input placeholder="00.000.000/0000-00" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-            </div>
-
-            <FormField control={form.control} name="neighborhood" render={({ field }) => (
-              <FormItem><FormLabel>Bairro</FormLabel><FormControl><Input placeholder="Ex: Bela Vista" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField control={form.control} name="city" render={({ field }) => (
-                <FormItem className="md:col-span-2"><FormLabel>Cidade</FormLabel><FormControl><Input placeholder="Ex: São Paulo" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              <FormField control={form.control} name="contactName" render={({ field }) => (
+                <FormItem><FormLabel>Nome do Contato (Opcional)</FormLabel><FormControl><Input placeholder="Nome da pessoa de contato" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
               )} />
-              <FormField control={form.control} name="state" render={({ field }) => (
-                <FormItem className="md:col-span-1"><FormLabel>Estado (UF)</FormLabel><FormControl><Input placeholder="Ex: SP" maxLength={2} {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+               <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem><FormLabel>Email Principal</FormLabel><FormControl><Input type="email" placeholder="contato@exemplo.com" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-            </div>
-
-            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Outras Informações</h3>
-            <FormField
-              control={form.control}
-              name="preferredTechnician"
-              render={({ field }) => (
+              <FormField control={form.control} name="phone" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Técnico Preferencial (Opcional)</FormLabel>
-                  <Select
-                    onValueChange={(selectedValue) => {
-                        field.onChange(selectedValue === NO_TECHNICIAN_SELECT_ITEM_VALUE ? null : selectedValue);
-                    }}
-                    value={field.value ?? NO_TECHNICIAN_SELECT_ITEM_VALUE}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoadingTechnicians ? "Carregando técnicos..." : "Selecione um técnico"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {isLoadingTechnicians ? (
-                        <SelectItem value={LOADING_TECHNICIANS_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
-                      ) : (
-                        <>
-                          <SelectItem value={NO_TECHNICIAN_SELECT_ITEM_VALUE}>Nenhum</SelectItem>
-                          {technicians.map((tech) => (
-                            <SelectItem key={tech.id} value={tech.name}>
-                              {tech.name}
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Telefone Principal (Opcional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="(00) 00000-0000"
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/\D/g, "");
+                        if (rawValue.length <= 11) {
+                          field.onChange(formatPhoneNumberForInputDisplay(e.target.value));
+                        } else {
+                          field.onChange(formatPhoneNumberForInputDisplay(rawValue.substring(0,11)));
+                        }
+                      }}
+                      maxLength={15}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
-              )}
-            />
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Quaisquer observações relevantes sobre o cliente" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
+              )} />
+
+              <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Endereço</h3>
+
+              <FormField control={form.control} name="cep" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>CEP</FormLabel>
+                  <div className="flex items-center gap-2">
+                    <FormControl>
+                      <Input placeholder="00000-000" {...field} value={field.value ?? ""} onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "");
+                        if (value.length <= 5) {
+                          field.onChange(value);
+                        } else if (value.length <= 8) {
+                          field.onChange(`${value.slice(0,5)}-${value.slice(5)}`);
+                        } else {
+                          field.onChange(`${value.slice(0,5)}-${value.slice(5,8)}`);
+                        }
+                      }}/>
+                    </FormControl>
+                    <Button type="button" variant="outline" onClick={handleSearchCep} disabled={isCepLoading}>
+                      {isCepLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      <span className="ml-2 sm:inline hidden">Buscar</span>
+                    </Button>
+                  </div>
+                  <FormDescription>Digite o CEP para buscar o endereço automaticamente.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="street" render={({ field }) => (
+                <FormItem><FormLabel>Rua / Logradouro</FormLabel><FormControl><Input placeholder="Ex: Av. Paulista" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField control={form.control} name="number" render={({ field }) => (
+                  <FormItem className="md:col-span-1"><FormLabel>Número</FormLabel><FormControl><Input placeholder="Ex: 123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="complement" render={({ field }) => (
+                  <FormItem className="md:col-span-2"><FormLabel>Complemento</FormLabel><FormControl><Input placeholder="Ex: Apto 10, Bloco B" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+
+              <FormField control={form.control} name="neighborhood" render={({ field }) => (
+                <FormItem><FormLabel>Bairro</FormLabel><FormControl><Input placeholder="Ex: Bela Vista" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField control={form.control} name="city" render={({ field }) => (
+                  <FormItem className="md:col-span-2"><FormLabel>Cidade</FormLabel><FormControl><Input placeholder="Ex: São Paulo" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="state" render={({ field }) => (
+                  <FormItem className="md:col-span-1"><FormLabel>Estado (UF)</FormLabel><FormControl><Input placeholder="Ex: SP" maxLength={2} {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+
+              <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Outras Informações</h3>
+              <FormField
+                control={form.control}
+                name="preferredTechnician"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Técnico Preferencial (Opcional)</FormLabel>
+                    <Select
+                      onValueChange={(selectedValue) => {
+                          field.onChange(selectedValue === NO_TECHNICIAN_SELECT_ITEM_VALUE ? null : selectedValue);
+                      }}
+                      value={field.value ?? NO_TECHNICIAN_SELECT_ITEM_VALUE}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoadingTechnicians ? "Carregando técnicos..." : "Selecione um técnico"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {isLoadingTechnicians ? (
+                          <SelectItem value={LOADING_TECHNICIANS_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value={NO_TECHNICIAN_SELECT_ITEM_VALUE}>Nenhum</SelectItem>
+                            {technicians.map((tech) => (
+                              <SelectItem key={tech.id} value={tech.name}>
+                                {tech.name}
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Quaisquer observações relevantes sobre o cliente" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </fieldset>
           </form>
         </Form>
       </FormModal>
