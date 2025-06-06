@@ -2,11 +2,11 @@
 "use client";
 
 import React from 'react';
-import { useState, useEffect, useCallback } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer, Database } from "lucide-react"; // Added Database
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer, Search, Database } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,12 +16,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import type { Maquina, Customer, CompanyId, OwnerReferenceType } from "@/types";
 import { MaquinaSchema, maquinaTypeOptions, maquinaOperationalStatusOptions, companyDisplayOptions, OWNER_REF_CUSTOMER, companyIds } from "@/types"; 
 import { PageHeader } from "@/components/shared/PageHeader";
-import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
+import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder"; 
 import { FormModal } from "@/components/shared/FormModal";
-import { ClipboardSignature } from 'lucide-react'; // Added ClipboardSignature icon
+import { ClipboardSignature } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { db, storage } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, where } from "firebase/firestore"; // Added where
+import { db, storage } from '@/lib/firebase';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, where } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,7 +34,7 @@ const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 
-const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_"; // Define NO_OWNER_REFERENCE_VALUE locally
+const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
 
 const operationalStatusIcons: Record<typeof maquinaOperationalStatusOptions[number], JSX.Element> = {
   Disponível: <CheckCircle className="h-4 w-4 text-green-500" />,
@@ -69,74 +69,6 @@ const getFileNameFromUrl = (url: string): string => {
     return "arquivo";
   }
 };
-
-// Seed data for Maquinas
-const maquinasParaSemear: Partial<Maquina>[] = [
-  {
-    brand: "Toyota",
-    model: "8FGCU25",
-    chassisNumber: "TOYOTA-CHASSI-001",
-    equipmentType: "Empilhadeira Contrabalançada GLP",
-    manufactureYear: 2021,
-    operationalStatus: "Disponível",
-    ownerReference: "goldmaq",
-    fleetNumber: "GM-001",
-    hourMeter: 1250,
-    nominalCapacityKg: 2500,
-    towerOpenHeightMm: 4800,
-    towerClosedHeightMm: 2200,
-  },
-  {
-    brand: "Hyster",
-    model: "H50FT",
-    chassisNumber: "HYSTER-CHASSI-002",
-    equipmentType: "Empilhadeira Contrabalançada GLP",
-    manufactureYear: 2020,
-    operationalStatus: "Locada",
-    customerId: "CUSTOMER_ID_EXAMPLE_1", // Substituir por um ID de cliente existente, se necessário para teste
-    ownerReference: "goldcomercio",
-    fleetNumber: "GC-005",
-    hourMeter: 3500,
-    nominalCapacityKg: 2200,
-  },
-  {
-    brand: "Yale",
-    model: "VX-ERP030",
-    chassisNumber: "YALE-CHASSI-003",
-    equipmentType: "Empilhadeira Contrabalançada Elétrica",
-    manufactureYear: 2022,
-    operationalStatus: "Disponível",
-    ownerReference: "goldjob",
-    fleetNumber: "GJ-010",
-    hourMeter: 800,
-    nominalCapacityKg: 1500,
-    batteryBoxWidthMm: 800,
-    batteryBoxHeightMm: 600,
-    batteryBoxDepthMm: 400,
-  },
-  {
-    brand: "Linde",
-    model: "R14",
-    chassisNumber: "LINDE-CHASSI-004",
-    equipmentType: "Empilhadeira Retrátil",
-    manufactureYear: 2019,
-    operationalStatus: "Em Manutenção",
-    ownerReference: "goldmaq",
-    fleetNumber: "GM-002",
-    hourMeter: 5600,
-  },
-  {
-    brand: "Still",
-    model: "RX20-16",
-    chassisNumber: "STILL-CHASSI-005",
-    equipmentType: "Empilhadeira Contrabalançada Elétrica",
-    manufactureYear: 2023,
-    operationalStatus: "Disponível",
-    ownerReference: "goldmaq",
-    fleetNumber: "GM-003",
-    notes: "Equipamento novo, poucas horas de uso.",
-  },
-];
 
 
 async function uploadFile(
@@ -179,7 +111,6 @@ async function fetchMaquinas(): Promise<Maquina[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data();
- // Ensure correct parsing and default values
     return {
       id: docSnap.id,
       brand: data.brand || "Marca Desconhecida",
@@ -199,8 +130,8 @@ async function fetchMaquinas(): Promise<Maquina[]> {
       monthlyRentalValue: parseNumericToNullOrNumber(data.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(data.hourMeter),
       notes: data.notes || null,
- partsCatalogUrl: data.partsCatalogUrl || null,
- fleetNumber: data.fleetNumber || null,
+      partsCatalogUrl: data.partsCatalogUrl || null,
+      fleetNumber: data.fleetNumber || null,
       errorCodesUrl: data.errorCodesUrl || null,
     } as Maquina;
   });
@@ -215,11 +146,11 @@ async function fetchCustomers(): Promise<Customer[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
 }
 
-interface MaquinasClientPageProps { 
-  maquinaIdFromUrl?: string | null; 
+interface MaquinasClientPageProps {
+ maquinaIdFromUrl?: string | null;
 }
 
-export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps) { 
+export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -227,16 +158,17 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   const [editingMaquina, setEditingMaquina] = useState<Maquina | null>(null); 
   const [partsCatalogFile, setPartsCatalogFile] = useState<File | null>(null);
   const [errorCodesFile, setErrorCodesFile] = useState<File | null>(null);
-  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [customerFilter, setCustomerFilter] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isSeeding, setIsSeeding] = useState(false);
-
 
   const [showCustomFields, setShowCustomFields] = useState({
     brand: false,
     equipmentType: false,
   });
-
   const form = useForm<z.infer<typeof MaquinaSchema>>({ 
     resolver: zodResolver(MaquinaSchema), 
     defaultValues: {
@@ -248,11 +180,11 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
       nominalCapacityKg: undefined,
       batteryBoxWidthMm: undefined, batteryBoxHeightMm: undefined, batteryBoxDepthMm: undefined,
-      notes: "", monthlyRentalValue: undefined, hourMeter: undefined, fleetNumber: null, // Added fleetNumber to defaultValues
+      notes: "", monthlyRentalValue: undefined, hourMeter: undefined, fleetNumber: null,
       partsCatalogUrl: null, errorCodesUrl: null,
     },
   });
-
+  
   const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({ 
     queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME], 
     queryFn: fetchMaquinas, 
@@ -265,68 +197,26 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     enabled: !!db,
   });
   
-  if (!db || !storage) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <AlertIconLI className="h-16 w-16 text-destructive mb-4" />
-        <PageHeader title="Erro de Conexão" />
-        <p className="text-lg text-center text-muted-foreground">
-          Não foi possível conectar aos serviços do Firebase.
-          <br />
-          Verifique a configuração e sua conexão com a internet.
-        </p>
-      </div>
-    );
-  }
+  const filteredMaquinas = useMemo(() => {
+    return maquinaList?.filter(maquina => {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      const matchesSearch =
+        maquina.brand.toLowerCase().includes(lowerCaseSearchTerm) ||
+        maquina.model.toLowerCase().includes(lowerCaseSearchTerm) ||
+        maquina.chassisNumber.toLowerCase().includes(lowerCaseSearchTerm) ||
+        (maquina.fleetNumber?.toLowerCase() ?? '').includes(lowerCaseSearchTerm);
 
-  const handleSeedMaquinas = async () => {
-    if (!db) {
-      toast({ title: "Erro de Conexão", description: "Banco de dados não disponível.", variant: "destructive" });
-      return;
-    }
-    setIsSeeding(true);
-    let seededCount = 0;
-    let skippedCount = 0;
-
-    try {
-      for (const maquina of maquinasParaSemear) {
-        if (!maquina.chassisNumber) {
-          console.warn("Máquina sem número de chassi no array de semeadura, pulando:", maquina);
-          skippedCount++;
-          continue;
-        }
-        const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), where("chassisNumber", "==", maquina.chassisNumber));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-          await addDoc(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), maquina as Maquina);
-          seededCount++;
-        } else {
-          skippedCount++;
-        }
-      }
-      if (seededCount > 0) {
-        toast({ title: "Dados Semeadas", description: `${seededCount} máquinas foram adicionadas. ${skippedCount} já existiam ou foram puladas.` });
-      } else if (skippedCount > 0) {
-        toast({ title: "Dados Já Existem ou Pulados", description: `Nenhuma máquina nova adicionada, ${skippedCount} já existiam ou foram puladas.` });
-      } else {
-        toast({ title: "Nenhum Dado para Semear", description: "Não havia máquinas na lista de semeadura." });
-      }
-      queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
-    } catch (err) {
-      console.error("Erro ao semear máquinas:", err);
-      toast({ title: "Erro na Semeadura", description: (err as Error).message || "Ocorreu um erro desconhecido.", variant: "destructive" });
-    } finally {
-      setIsSeeding(false);
-    }
-  };
+      const matchesStatus = statusFilter ? maquina.operationalStatus === statusFilter : true;
+      const matchesCustomer = customerFilter ? maquina.customerId === customerFilter : true;
+      return matchesSearch && matchesStatus && matchesCustomer;
+    });
+  }, [maquinaList, searchTerm, statusFilter, customerFilter]);
 
   const openModal = useCallback((maquina?: Maquina) => { 
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
     if (maquina) {
       setEditingMaquina(maquina); 
-      setIsEditMode(false); 
       const isBrandPredefined = predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra";
       const isEquipmentTypePredefined = maquinaTypeOptions.includes(maquina.equipmentType as any); 
 
@@ -349,14 +239,14 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
         monthlyRentalValue: maquina.monthlyRentalValue ?? undefined,
         hourMeter: maquina.hourMeter ?? undefined,
         notes: maquina.notes || "",
- fleetNumber: maquina.fleetNumber ?? null, // Ensure fleetNumber is loaded
+        fleetNumber: maquina.fleetNumber ?? null,
         partsCatalogUrl: maquina.partsCatalogUrl || null,
         errorCodesUrl: maquina.errorCodesUrl || null,
       });
       setShowCustomFields({ brand: !isBrandPredefined, equipmentType: !isEquipmentTypePredefined });
+      setIsEditMode(false);
     } else {
       setEditingMaquina(null); 
-      setIsEditMode(true); 
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
         operationalStatus: "Disponível", customerId: null, 
@@ -366,10 +256,11 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
         towerOpenHeightMm: undefined, towerClosedHeightMm: undefined, nominalCapacityKg: undefined,
         batteryBoxWidthMm: undefined, batteryBoxHeightMm: undefined, batteryBoxDepthMm: undefined,
         notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
- fleetNumber: null,
+        fleetNumber: null,
         partsCatalogUrl: null, errorCodesUrl: null,
       });
       setShowCustomFields({ brand: false, equipmentType: false });
+      setIsEditMode(true);
     }
     setIsModalOpen(true);
   }, [form]); 
@@ -391,7 +282,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     newPartsCatalogUrl?: string | null,
     newErrorCodesUrl?: string | null
   ): Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType'> => { 
-    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, fleetNumber: formFleetNumber, ...restOfData } = formData; // Destructure fleetNumber
+    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, fleetNumber: formFleetNumber, ...restOfData } = formData;
     const parsedData = {
       ...restOfData,
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
@@ -406,11 +297,11 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     };
     
     const finalOwnerReference: OwnerReferenceType | null = formOwnerReferenceFromForm ?? null;
-    const finalFleetNumber: string | null = formFleetNumber || null; // Handle empty string or undefined
+    const finalFleetNumber: string | null = formFleetNumber || null;
 
     return {
       ...parsedData,
- fleetNumber: finalFleetNumber, // Include fleetNumber in the returned object
+      fleetNumber: finalFleetNumber,
       brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
@@ -495,7 +386,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
       toast({ title: "Máquina Atualizada", description: `${data.brand} ${data.model} atualizada.` });
       closeModal();
-    },
+    }, 
     onError: (err: Error, variables) => {
       let message = `Não foi possível atualizar ${variables.formData.brand} ${variables.formData.model}. Detalhe: ${err.message}`;
       if (err.message.includes("Um cliente deve ser selecionado")) {
@@ -558,15 +449,14 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     },
   });
 
-
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingMaquina(null); 
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
-    setIsEditMode(false); 
     form.reset();
     setShowCustomFields({ brand: false, equipmentType: false });
+    setIsEditMode(false);
   };
 
   const onSubmit = async (values: z.infer<typeof MaquinaSchema>) => { 
@@ -595,7 +485,6 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     }
   };
 
-
   const handleFileRemove = (fileType: 'partsCatalogUrl' | 'errorCodesUrl') => {
     if (editingMaquina && editingMaquina.id) { 
       const fileUrlToRemove = editingMaquina[fileType];
@@ -606,7 +495,6 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       }
     }
   };
-
 
   const handleSelectChange = (field: 'brand' | 'equipmentType', value: string) => {
     form.setValue(field, value);
@@ -631,11 +519,26 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   const getOwnerIcon = (ownerRef?: OwnerReferenceType | null): LucideIcon => {
     if (ownerRef === OWNER_REF_CUSTOMER) return UserCog;
     if (companyIds.includes(ownerRef as CompanyId)) return Building;
+    
     return Construction;
   };
 
   const isLoadingPage = isLoadingMaquinas || isLoadingCustomers;
-  const isMutating = addMaquinaMutation.isPending || updateMaquinaMutation.isPending || deleteMaquinaMutation.isPending || removeFileMutation.isPending || isUploadingFiles;
+  const isMutating = addMaquinaMutation.isPending || updateMaquinaMutation.isPending || deleteMaquinaMutation.isPending || removeFileMutation.isPending || isUploadingFiles || isSeeding;
+
+  if (!db || !storage) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertIconLI className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar aos serviços do Firebase.
+          <br />
+          Verifique a configuração e sua conexão com a internet.
+        </p>
+      </div>
+    );
+  }
 
   if (isLoadingPage && !isModalOpen) {
     return (
@@ -662,31 +565,89 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       <PageHeader
         title="Máquinas" 
         actions={
-          <>
-            <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || isSeeding}>
+          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating}>
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Máquina
-            </Button>
-            {process.env.NODE_ENV === 'development' && (
-               <Button onClick={handleSeedMaquinas} variant="outline" disabled={isSeeding || isMutating}>
-                {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
-                Semear Dados (DEV)
-              </Button>
-            )}
-          </>
+          </Button>
         }
       />
 
-      {maquinaList.length === 0 && !isLoadingMaquinas ? ( 
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="md:col-span-1 flex items-center">
+          <Input
+            placeholder="Pesquisar máquina..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
+        <div className="md:col-span-1">
+          
+          <Select onValueChange={setStatusFilter} value={statusFilter || ""}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Filtrar por Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todos os Status</SelectItem>
+              {maquinaOperationalStatusOptions.map(status => (
+                <SelectItem key={status} value={status}>{status}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="md:col-span-2 lg:col-span-2">
+          <Select onValueChange={setCustomerFilter} value={customerFilter || ""}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Filtrar por Cliente"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Todos os Clientes</SelectItem>
+              <SelectItem value={NO_CUSTOMER_SELECT_ITEM_VALUE}>Sem Cliente Vinculado</SelectItem>
+              {isLoadingCustomers ? (
+                <SelectItem value={LOADING_CUSTOMERS_SELECT_ITEM_VALUE} disabled>Carregando clientes...</SelectItem>
+              ) : (
+                customers.map(cust => (
+                  <SelectItem key={cust.id} value={cust.id}>{cust.name} ({cust.cnpj})</SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {isLoadingMaquinas && (
+         <div className="flex justify-center items-center h-64">
+           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+           <p className="ml-2">Carregando máquinas...</p>
+         </div>
+      )}
+
+      {!isLoadingMaquinas && maquinaList.length === 0 && searchTerm === "" && statusFilter === null && customerFilter === null && (
         <DataTablePlaceholder
           icon={Construction}
-          title="Nenhuma Máquina Registrada" 
-          description="Adicione sua primeira máquina para começar a rastrear." 
+          title="Nenhuma Máquina Registrada"
+          description="Comece adicionando a primeira máquina ao seu inventário."
           buttonLabel="Adicionar Máquina" 
           onButtonClick={() => openModal()}
         />
-      ) : (
+      )}
+
+      {!isLoadingMaquinas && filteredMaquinas.length === 0 && (searchTerm !== "" || statusFilter !== null || customerFilter !== null) && (
+        <DataTablePlaceholder
+          icon={Search}
+          title="Nenhuma Máquina Encontrada"
+          description={`Nenhum resultado para os filtros aplicados ou pesquisa "${searchTerm}".`}
+          buttonLabel="Limpar Filtros/Pesquisa"
+          onButtonClick={() => {
+            setSearchTerm("");
+            setStatusFilter(null);
+            setCustomerFilter(null);
+          }}
+        />
+      )}
+
+      {!isLoadingMaquinas && filteredMaquinas.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {maquinaList.map((maq) => { 
+          {filteredMaquinas.map((maq) => {
             const customer = maq.customerId ? customers.find(c => c.id === maq.customerId) : null;
             const ownerDisplay = getOwnerDisplayString(maq.ownerReference, maq.customerId, customers);
             const OwnerIconComponent = getOwnerIcon(maq.ownerReference);
@@ -804,21 +765,21 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
 
       <FormModal
         isOpen={isModalOpen}
-        onClose={closeModal}
+        onClose={closeModal} 
         title={editingMaquina ? "Editar Máquina" : "Adicionar Nova Máquina"} 
         description="Forneça os detalhes da máquina, incluindo arquivos PDF se necessário." 
         formId="maquina-form" 
         isSubmitting={isMutating}
         editingItem={editingMaquina} 
-        onDeleteConfirm={handleModalDeleteConfirm}
-        isEditMode={isEditMode}
-        onEditModeToggle={() => setIsEditMode(true)}
+        onDeleteConfirm={handleModalDeleteConfirm} 
+        onEditModeToggle={() => setIsEditMode(true)} 
         isDeleting={deleteMaquinaMutation.isPending} 
+        isEditMode={isEditMode}
         deleteButtonLabel="Excluir Máquina" 
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> 
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
               <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="brand" render={({ field }) => (
@@ -961,16 +922,16 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
               )} />
 
               <FormField
- control={form.control}
- name="fleetNumber"
- render={({ field }) => (
- <FormItem><FormLabel>Número da Frota</FormLabel><FormControl><Input placeholder="Ex: F-001, FROTA123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
- )}
- />
+                control={form.control}
+                name="fleetNumber"
+                render={({ field }) => (
+                <FormItem><FormLabel>Número da Frota</FormLabel><FormControl><Input placeholder="Ex: F-001, FROTA123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                )}
+              />
             </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField control={form.control} name="towerOpenHeightMm" render={({ field }) => (
                   <FormItem><FormLabel>H3 - Torre Aberta (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
@@ -985,7 +946,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Dimensões Caixa de Bateria (Opcional)</h3>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => (
                       <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
@@ -999,7 +960,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
               </div>
             </fieldset>
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
               <FormItem>
                 <FormLabel>Catálogo de Peças (PDF)</FormLabel>
                   {editingMaquina?.partsCatalogUrl && !partsCatalogFile && (
@@ -1050,7 +1011,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Informações Adicionais (Opcional)</h3>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField control={form.control} name="hourMeter" render={({ field }) => (
                       <FormItem><FormLabel>Horímetro Atual (h)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
@@ -1069,4 +1030,3 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     </>
   );
 }
-

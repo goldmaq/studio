@@ -168,6 +168,7 @@ export function CustomerClientPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isCepLoading, setIsCepLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const form = useForm<z.infer<typeof CustomerSchema>>({
     resolver: zodResolver(CustomerSchema),
@@ -206,6 +207,23 @@ export function CustomerClientPage() {
     queryFn: fetchMaquinas, // Renamed from fetchEquipment
     enabled: !!db,
   });
+
+  // Filter customers based on search term
+  const filteredCustomers = customers.filter(customer => {
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    return (
+      (customer.name?.toLowerCase() || '').includes(lowerCaseSearchTerm) ||
+      (customer.cnpj?.toLowerCase() || '').includes(lowerCaseSearchTerm) ||
+      (customer.contactName?.toLowerCase() || '').includes(lowerCaseSearchTerm) ||
+      (customer.email?.toLowerCase() || '').includes(lowerCaseSearchTerm)
+    );
+  });
+
+  const hasCustomers = customers.length > 0;
+  const hasFilteredResults = filteredCustomers.length > 0;
+  const showNoCustomersPlaceholder = !hasCustomers && !isLoadingCustomers && !searchTerm;
+  const showNoFilteredResultsPlaceholder = hasCustomers && searchTerm && !hasFilteredResults && !isLoadingCustomers;
+
 
   if (!db) {
     return (
@@ -414,7 +432,16 @@ export function CustomerClientPage() {
         }
       />
 
-      {customers.length === 0 && !isLoadingCustomers ? (
+      {/* Search Input */}
+      <div className="mb-4">
+        <Input
+          placeholder="Pesquisar cliente..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {showNoCustomersPlaceholder ? (
         <DataTablePlaceholder
           icon={Users}
           title="Nenhum Cliente Ainda"
@@ -422,9 +449,18 @@ export function CustomerClientPage() {
           buttonLabel="Adicionar Cliente"
           onButtonClick={() => openModal()}
         />
+      ) : showNoFilteredResultsPlaceholder ? (
+        <DataTablePlaceholder
+          icon={Users}
+          title="Nenhum Cliente Encontrado"
+          description={`Nenhum cliente corresponde à pesquisa "${searchTerm}".`}
+          buttonLabel="Limpar Pesquisa"
+          onButtonClick={() => setSearchTerm("")}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {customers.map((customer) => {
+          {/* Use filteredCustomers for rendering */}
+          {filteredCustomers.map((customer) => {
             const linkedMaquinas = maquinaList.filter(eq => eq.customerId === customer.id); // Renamed from linkedEquipment
             const whatsappNumber = getWhatsAppNumber(customer.phone);
             const whatsappLink = whatsappNumber
