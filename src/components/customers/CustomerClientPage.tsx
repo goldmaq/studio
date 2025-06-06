@@ -30,6 +30,14 @@ const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; // Firestore collect
 const NO_TECHNICIAN_SELECT_ITEM_VALUE = "_NO_TECHNICIAN_SELECTED_";
 const LOADING_TECHNICIANS_SELECT_ITEM_VALUE = "_LOADING_TECHS_";
 
+// Helper function to convert string to Title Case
+const toTitleCase = (str: string): string => {
+ if (!str) return "";
+ return str.toLowerCase().split(' ').map(word => {
+ return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 async function fetchCustomers(): Promise<Customer[]> {
   if (!db) {
     console.error("fetchCustomers: Firebase DB is not available.");
@@ -335,12 +343,15 @@ export function CustomerClientPage() {
     const dataToSave = {
         ...values,
         preferredTechnician: values.preferredTechnician || null,
-        name: values.name.toLowerCase(),
+        name: toTitleCase(values.name),
         email: values.email.toLowerCase(),
-        contactName: values.contactName ? values.contactName.toLowerCase() : "",
-        street: values.street.toLowerCase(),
-        complement: values.complement ? values.complement.toLowerCase() : "",
-        neighborhood: values.neighborhood.toLowerCase(),
+        contactName: values.contactName ? toTitleCase(values.contactName) : "",
+        street: toTitleCase(values.street),
+ complement: values.complement ? toTitleCase(values.complement) : "",
+ neighborhood: toTitleCase(values.neighborhood),
+ city: toTitleCase(values.city),
+        state: toTitleCase(values.state),
+ notes: values.notes ? values.notes : "", // Assuming notes should not be Title Cased unless explicitly requested
     };
     if (editingCustomer && editingCustomer.id) {
       updateCustomerMutation.mutate({ ...dataToSave, id: editingCustomer.id });

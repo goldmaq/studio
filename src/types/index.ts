@@ -52,6 +52,8 @@ export interface Maquina {
   ownerReference?: OwnerReferenceType | null; 
   customBrand?: string; 
   customEquipmentType?: string; 
+  fleetNumber?: string | null;
+
 
   towerOpenHeightMm?: number | null;
   towerClosedHeightMm?: number | null;
@@ -180,6 +182,7 @@ const ownerReferenceSchema = z.union([
 ]);
 
 export const MaquinaSchema = z.object({
+  fleetNumber: z.string().optional().nullable(),
   brand: z.string().min(1, "Marca é obrigatória"),
   model: z.string().min(1, "Modelo é obrigatório"),
   chassisNumber: z.string().min(1, "Número do chassi é obrigatório"),

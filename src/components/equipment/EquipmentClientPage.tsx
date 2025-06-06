@@ -31,6 +31,14 @@ import React from 'react';
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; // Mantido, conforme plano
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 
+// Helper function to convert string to Title Case
+const toTitleCase = (str: string | null | undefined): string | null => {
+  if (!str) return str === null ? null : ""; // Return null if input is null, empty string if empty string
+ return str.toLowerCase().split(' ').map(word => {
+ return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
 const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
@@ -454,11 +462,11 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const onSubmit = async (values: z.infer<typeof MaquinaSchema>) => {
     const dataToSave = {
       ...values,
-      brand: values.brand === '_CUSTOM_' ? values.customBrand?.toLowerCase() || "não especificado" : values.brand.toLowerCase(),
-      model: values.model.toLowerCase(),
-      equipmentType: values.equipmentType === '_CUSTOM_' ? values.customEquipmentType?.toLowerCase() || "não especificado" : values.equipmentType.toLowerCase(),
-      customBrand: values.customBrand?.toLowerCase() || "",
-      customEquipmentType: values.customEquipmentType?.toLowerCase() || "",
+      brand: values.brand === '_CUSTOM_' ? toTitleCase(values.customBrand) || "Não especificado" : toTitleCase(values.brand) || "Não especificado",
+      model: toTitleCase(values.model) || "",
+      equipmentType: values.equipmentType === '_CUSTOM_' ? toTitleCase(values.customEquipmentType) || "Não especificado" : toTitleCase(values.equipmentType) || "Não especificado",
+      customBrand: toTitleCase(values.customBrand) || "",
+      customEquipmentType: toTitleCase(values.customEquipmentType) || "",
       notes: values.notes?.toLowerCase() || null,
       partsCatalogUrl: values.partsCatalogUrl, // URLs are not lowercased
       errorCodesUrl: values.errorCodesUrl, // URLs are not lowercased

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react'; // Explicitly import React
+import React from 'react';
 import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -9,15 +9,16 @@ import type * as z from "zod";
 import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer, Database } from "lucide-react"; // Added Database
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import type { Maquina, Customer, CompanyId, OwnerReferenceType } from "@/types"; 
+import type { Maquina, Customer, CompanyId, OwnerReferenceType } from "@/types";
 import { MaquinaSchema, maquinaTypeOptions, maquinaOperationalStatusOptions, companyDisplayOptions, OWNER_REF_CUSTOMER, companyIds } from "@/types"; 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
+import { ClipboardSignature } from 'lucide-react'; // Added ClipboardSignature icon
 import { useToast } from "@/hooks/use-toast";
 import { db, storage } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, where } from "firebase/firestore"; // Added where
@@ -32,8 +33,8 @@ const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
-const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
 
+const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_"; // Define NO_OWNER_REFERENCE_VALUE locally
 
 const operationalStatusIcons: Record<typeof maquinaOperationalStatusOptions[number], JSX.Element> = {
   Disponível: <CheckCircle className="h-4 w-4 text-green-500" />,
@@ -70,7 +71,7 @@ const getFileNameFromUrl = (url: string): string => {
 };
 
 // Seed data for Maquinas
-const maquinasParaSemear: Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType' | 'partsCatalogUrl' | 'errorCodesUrl' | 'customerId'>[] = [
+const maquinasParaSemear: Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType' | 'partsCatalogUrl' | 'errorCodesUrl' | 'customerId' | 'fleetNumber'>[] = [
   {
     brand: "Toyota",
     model: "8FGCU25",
@@ -175,6 +176,7 @@ async function fetchMaquinas(): Promise<Maquina[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(docSnap => {
     const data = docSnap.data();
+ // Ensure correct parsing and default values
     return {
       id: docSnap.id,
       brand: data.brand || "Marca Desconhecida",
@@ -194,7 +196,8 @@ async function fetchMaquinas(): Promise<Maquina[]> {
       monthlyRentalValue: parseNumericToNullOrNumber(data.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(data.hourMeter),
       notes: data.notes || null,
-      partsCatalogUrl: data.partsCatalogUrl || null,
+ partsCatalogUrl: data.partsCatalogUrl || null,
+ fleetNumber: data.fleetNumber || null,
       errorCodesUrl: data.errorCodesUrl || null,
     } as Maquina;
   });
@@ -242,7 +245,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
       nominalCapacityKg: undefined,
       batteryBoxWidthMm: undefined, batteryBoxHeightMm: undefined, batteryBoxDepthMm: undefined,
-      notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
+      notes: "", monthlyRentalValue: undefined, hourMeter: undefined, fleetNumber: null, // Added fleetNumber to defaultValues
       partsCatalogUrl: null, errorCodesUrl: null,
     },
   });
@@ -338,6 +341,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
         monthlyRentalValue: maquina.monthlyRentalValue ?? undefined,
         hourMeter: maquina.hourMeter ?? undefined,
         notes: maquina.notes || "",
+ fleetNumber: maquina.fleetNumber ?? null, // Ensure fleetNumber is loaded
         partsCatalogUrl: maquina.partsCatalogUrl || null,
         errorCodesUrl: maquina.errorCodesUrl || null,
       });
@@ -354,6 +358,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
         towerOpenHeightMm: undefined, towerClosedHeightMm: undefined, nominalCapacityKg: undefined,
         batteryBoxWidthMm: undefined, batteryBoxHeightMm: undefined, batteryBoxDepthMm: undefined,
         notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
+ fleetNumber: null,
         partsCatalogUrl: null, errorCodesUrl: null,
       });
       setShowCustomFields({ brand: false, equipmentType: false });
@@ -378,7 +383,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     newPartsCatalogUrl?: string | null,
     newErrorCodesUrl?: string | null
   ): Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType'> => { 
-    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, ...restOfData } = formData;
+    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, fleetNumber: formFleetNumber, ...restOfData } = formData; // Destructure fleetNumber
     const parsedData = {
       ...restOfData,
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
@@ -391,11 +396,13 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       monthlyRentalValue: parseNumericToNullOrNumber(restOfData.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(restOfData.hourMeter),
     };
-
+    
     const finalOwnerReference: OwnerReferenceType | null = formOwnerReferenceFromForm ?? null;
+    const finalFleetNumber: string | null = formFleetNumber || null; // Handle empty string or undefined
 
     return {
       ...parsedData,
+ fleetNumber: finalFleetNumber, // Include fleetNumber in the returned object
       brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
@@ -696,6 +703,13 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     <span className="font-medium text-muted-foreground mr-1">Chassi:</span>
                     <span>{maq.chassisNumber}</span>
                   </p>
+                 {maq.fleetNumber && (
+                  <p className="flex items-center text-sm">
+                    <ClipboardSignature className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="font-medium text-muted-foreground mr-1">Frota:</span>
+                    <span>{maq.fleetNumber}</span>
+                  </p>
+                 )}
                 <p className="flex items-center text-sm"><Layers className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Tipo:</span> {maq.equipmentType}</p>
                 {maq.manufactureYear && <p className="flex items-center text-sm"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Ano:</span> {maq.manufactureYear}</p>}
                 <p className="flex items-center text-sm">
@@ -853,7 +867,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                       value={field.value || NO_OWNER_REFERENCE_VALUE}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecione o proprietário" />
                         </SelectTrigger>
                       </FormControl>
@@ -884,7 +898,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Selecione um cliente"} />
+                          <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Selecione um cliente (Opcional)"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -974,6 +988,13 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                   )} />
               </div>
             </fieldset>
+            <FormField
+ control={form.control}
+ name="fleetNumber"
+ render={({ field }) => (
+ <FormItem><FormLabel>Número da Frota</FormLabel><FormControl><Input placeholder="Ex: F-001, FROTA123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+ )}
+ />
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
             <fieldset disabled={!!editingMaquina && !isEditMode}>

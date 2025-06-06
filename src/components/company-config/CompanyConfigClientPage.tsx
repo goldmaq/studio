@@ -20,6 +20,14 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+// Helper function to convert string to Title Case
+const toTitleCase = (str: string): string => {
+ if (!str) return "";
+ return str.toLowerCase().split(' ').map(word => {
+ return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 const FIRESTORE_COLLECTION_NAME = "empresas";
 
 

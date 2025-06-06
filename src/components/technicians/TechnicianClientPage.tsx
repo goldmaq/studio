@@ -66,6 +66,14 @@ const formatPhoneNumberForInputDisplay = (value: string): string => {
   return `(${ddd}) ${firstDigits}-${secondDigits}`;
 };
 
+// Helper function to convert string to Title Case
+const toTitleCase = (str: string): string => {
+  if (!str) return "";
+  return str.toLowerCase().split(' ').map(word => {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 async function fetchTechnicians(): Promise<Technician[]> {
   if (!db) {
     console.error("fetchTechnicians: Firebase DB is not available.");
@@ -184,10 +192,10 @@ export function TechnicianClientPage() {
 
   const onSubmit = async (values: z.infer<typeof TechnicianSchema>) => {
     const dataToSave = {
- ...values,
-      name: values.name.toLowerCase(),
- specialization: values.specialization?.toLowerCase() ?? "",
- phone: values.phone ? values.phone.replace(/\D/g, '') : undefined,
+      ...values,
+      name: toTitleCase(values.name),
+      specialization: values.specialization ? toTitleCase(values.specialization) : "",
+      phone: values.phone ? values.phone.replace(/\D/g, '') : undefined,
     };
     if (editingTechnician?.id) {
       updateTechnicianMutation.mutate({ ...dataToSave, id: editingTechnician.id });
