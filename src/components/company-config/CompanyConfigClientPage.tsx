@@ -141,6 +141,7 @@ export function CompanyConfigClientPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [isCepLoading, setIsCepLoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false); // Added isEditMode state
 
   const form = useForm<z.infer<typeof CompanySchema>>({
     resolver: zodResolver(CompanySchema),
@@ -204,12 +205,14 @@ export function CompanyConfigClientPage() {
   const openModal = (company: Company) => {
     setEditingCompany(company);
     form.reset(company);
+    setIsEditMode(true); // Always open in edit mode for company config
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingCompany(null);
+    setIsEditMode(false); // Reset edit mode on close
     form.reset({ 
       name: "", cnpj: "", 
       street: "", number: "", complement: "", neighborhood: "", city: "", state: "", cep: "",
@@ -365,6 +368,8 @@ export function CompanyConfigClientPage() {
         formId="company-form"
         isSubmitting={updateCompanyMutation.isPending}
         editingItem={editingCompany}
+        isEditMode={isEditMode} // Pass isEditMode
+        // No onEditModeToggle here as it's always edit mode when open
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="company-form" className="space-y-4">
@@ -449,7 +454,9 @@ export function CompanyConfigClientPage() {
     </>
   );
 }
-
     
     
 
+
+
+    
