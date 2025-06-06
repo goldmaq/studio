@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer, DatabaseSeed } from "lucide-react"; // Added DatabaseSeed
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db, storage } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, where } from "firebase/firestore"; // Added where
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,6 +68,72 @@ const getFileNameFromUrl = (url: string): string => {
     return "arquivo";
   }
 };
+
+// Seed data for Maquinas
+const maquinasParaSemear: Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType' | 'partsCatalogUrl' | 'errorCodesUrl' | 'customerId'>[] = [
+  {
+    brand: "Toyota",
+    model: "8FGCU25",
+    chassisNumber: "TYT-SEED-001",
+    equipmentType: "Empilhadeira Contrabalançada GLP",
+    manufactureYear: 2021,
+    operationalStatus: "Disponível",
+    ownerReference: "goldmaq",
+    towerOpenHeightMm: 4800,
+    towerClosedHeightMm: 2200,
+    nominalCapacityKg: 2500,
+    hourMeter: 1250,
+    notes: "Máquina de demonstração semeada 1, revisada.",
+    monthlyRentalValue: 1800,
+  },
+  {
+    brand: "Linde",
+    model: "H25T",
+    chassisNumber: "LND-SEED-002",
+    equipmentType: "Empilhadeira Contrabalançada GLP",
+    manufactureYear: 2022,
+    operationalStatus: "Disponível",
+    ownerReference: "goldcomercio",
+    towerOpenHeightMm: 4500,
+    towerClosedHeightMm: 2100,
+    nominalCapacityKg: 2500,
+    hourMeter: 870,
+    notes: "Máquina de demonstração semeada 2, pintura nova.",
+    monthlyRentalValue: 1750,
+  },
+  {
+    brand: "Hyster",
+    model: "H50FT",
+    chassisNumber: "HYS-SEED-003",
+    equipmentType: "Empilhadeira Contrabalançada GLP",
+    manufactureYear: 2020,
+    operationalStatus: "Em Manutenção",
+    ownerReference: "goldjob",
+    towerOpenHeightMm: 5000,
+    towerClosedHeightMm: 2300,
+    nominalCapacityKg: 2200,
+    hourMeter: 2100,
+    notes: "Máquina de demonstração semeada 3, aguardando peças.",
+    monthlyRentalValue: 1600,
+  },
+  {
+    brand: "Still",
+    model: "RX20-16",
+    chassisNumber: "STL-SEED-004",
+    equipmentType: "Empilhadeira Contrabalançada Elétrica",
+    manufactureYear: 2023,
+    operationalStatus: "Disponível",
+    ownerReference: "goldmaq",
+    towerOpenHeightMm: 4200,
+    towerClosedHeightMm: 2000,
+    nominalCapacityKg: 1600,
+    batteryBoxWidthMm: 800, batteryBoxHeightMm: 600, batteryBoxDepthMm: 500,
+    hourMeter: 350,
+    notes: "Empilhadeira elétrica semeada, baixa quilometragem.",
+    monthlyRentalValue: 2200,
+  },
+];
+
 
 async function uploadFile(
   file: File,
@@ -157,6 +223,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   const [errorCodesFile, setErrorCodesFile] = useState<File | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
 
   const [showCustomFields, setShowCustomFields] = useState({
@@ -206,12 +273,49 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     );
   }
 
+  const handleSeedMaquinas = async () => {
+    if (!db) {
+      toast({ title: "Erro de Conexão", description: "Banco de dados não disponível.", variant: "destructive" });
+      return;
+    }
+    setIsSeeding(true);
+    let seededCount = 0;
+    let skippedCount = 0;
+
+    try {
+      for (const maquina of maquinasParaSemear) {
+        const q = query(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), where("chassisNumber", "==", maquina.chassisNumber));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          await addDoc(collection(db, FIRESTORE_EQUIPMENT_COLLECTION_NAME), maquina);
+          seededCount++;
+        } else {
+          skippedCount++;
+        }
+      }
+      if (seededCount > 0) {
+        toast({ title: "Dados Semeadas", description: `${seededCount} máquinas foram adicionadas. ${skippedCount} já existiam.` });
+      } else if (skippedCount > 0) {
+        toast({ title: "Dados Já Existem", description: `Nenhuma máquina nova adicionada, ${skippedCount} já existiam.` });
+      } else {
+        toast({ title: "Nenhum Dado para Semear", description: "Não havia máquinas na lista de semeadura." });
+      }
+      queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
+    } catch (err) {
+      console.error("Erro ao semear máquinas:", err);
+      toast({ title: "Erro na Semeadura", description: (err as Error).message || "Ocorreu um erro desconhecido.", variant: "destructive" });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const openModal = useCallback((maquina?: Maquina) => { 
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
     if (maquina) {
       setEditingMaquina(maquina); 
-      setIsEditMode(false); // Start in view mode for existing items
+      setIsEditMode(false); 
       const isBrandPredefined = predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra";
       const isEquipmentTypePredefined = maquinaTypeOptions.includes(maquina.equipmentType as any); 
 
@@ -240,7 +344,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       setShowCustomFields({ brand: !isBrandPredefined, equipmentType: !isEquipmentTypePredefined });
     } else {
       setEditingMaquina(null); 
-      setIsEditMode(true); // Start in edit mode for new items
+      setIsEditMode(true); 
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
         operationalStatus: "Disponível", customerId: null, 
@@ -255,7 +359,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       setShowCustomFields({ brand: false, equipmentType: false });
     }
     setIsModalOpen(true);
-  }, [form, maquinaList]); // Dependency array reviewed
+  }, [form]); 
 
   useEffect(() => {
     if (maquinaIdFromUrl && !isLoadingMaquinas && maquinaList.length > 0 && !isModalOpen) { 
@@ -445,7 +549,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     setEditingMaquina(null); 
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
-    setIsEditMode(false); // Reset edit mode on close
+    setIsEditMode(false); 
     form.reset();
     setShowCustomFields({ brand: false, equipmentType: false });
   };
@@ -543,9 +647,23 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       <PageHeader
         title="Máquinas" 
         actions={
-          <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Máquina
-          </Button>
+          <>
+            <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating || isSeeding}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Máquina
+            </Button>
+            {process.env.NODE_ENV === 'development' && (
+              <Button
+                onClick={handleSeedMaquinas}
+                variant="outline"
+                size="sm"
+                className="ml-2"
+                disabled={isSeeding || isMutating}
+              >
+                {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseSeed className="mr-2 h-4 w-4" />}
+                Semear Dados (DEV)
+              </Button>
+            )}
+          </>
         }
       />
 
@@ -618,7 +736,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                   <p className="flex items-center text-sm"><ArrowDownToLine className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">H1 - Torre Fechada:</span> {maq.towerClosedHeightMm} mm</p>
                 )}
                  {maq.hourMeter !== null && maq.hourMeter !== undefined && <p className="flex items-center text-sm"><Timer className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Horímetro:</span> {maq.hourMeter}h</p>}
-                 {maq.monthlyRentalValue !== null && maq.monthlyRentalValue !== undefined && <p className="flex items-center text-sm"><Coins className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Aluguel Mensal:</span> R$ {maq.monthlyRentalValue.toFixed(2)}</p>}
+                 {maq.monthlyRentalValue !== null && maq.monthlyRentalValue !== undefined && <p className="flex items-center text-sm"><Coins className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Aluguel Mensal:</span> R$ {Number(maq.monthlyRentalValue).toFixed(2)}</p>}
 
                  {maq.partsCatalogUrl && (
                     <p className="flex items-center text-sm">
@@ -684,9 +802,9 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> 
-            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={!!editingMaquina && !isEditMode}>
+              <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="brand" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Marca</FormLabel>
@@ -718,9 +836,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     <FormMessage />
                   </FormItem>
                 )} />
-              </fieldset>
-            </div>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+              </div>
+
               <FormField control={form.control} name="chassisNumber" render={({ field }) => (
                 <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
@@ -859,57 +976,55 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
-            <FormItem>
-              <FormLabel>Catálogo de Peças (PDF)</FormLabel>
-              <fieldset disabled={!!editingMaquina && !isEditMode}>
-                {editingMaquina?.partsCatalogUrl && !partsCatalogFile && (
-                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                    <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                      <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
-                    </a>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('partsCatalogUrl')} className="text-destructive hover:text-destructive">
-                      <XCircle className="h-4 w-4 mr-1"/> Remover
-                    </Button>
-                  </div>
-                )}
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setPartsCatalogFile(e.target.files ? e.target.files[0] : null)}
-                    className="mt-1"
-                  />
-                </FormControl>
-                {partsCatalogFile && <FormDescription>Novo arquivo selecionado: {partsCatalogFile.name}</FormDescription>}
-              </fieldset>
-              <FormMessage />
-            </FormItem>
+            <fieldset disabled={!!editingMaquina && !isEditMode}>
+              <FormItem>
+                <FormLabel>Catálogo de Peças (PDF)</FormLabel>
+                  {editingMaquina?.partsCatalogUrl && !partsCatalogFile && (
+                    <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                      <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                        <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
+                      </a>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('partsCatalogUrl')} className="text-destructive hover:text-destructive">
+                        <XCircle className="h-4 w-4 mr-1"/> Remover
+                      </Button>
+                    </div>
+                  )}
+                  <FormControl>
+                    <Input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setPartsCatalogFile(e.target.files ? e.target.files[0] : null)}
+                      className="mt-1"
+                    />
+                  </FormControl>
+                  {partsCatalogFile && <FormDescription>Novo arquivo selecionado: {partsCatalogFile.name}</FormDescription>}
+                <FormMessage />
+              </FormItem>
 
-            <FormItem>
-              <FormLabel>Códigos de Erro (PDF)</FormLabel>
-              <fieldset disabled={!!editingMaquina && !isEditMode}>
-                 {editingMaquina?.errorCodesUrl && !errorCodesFile && ( 
-                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                    <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                      <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
-                    </a>
-                     <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('errorCodesUrl')} className="text-destructive hover:text-destructive">
-                      <XCircle className="h-4 w-4 mr-1"/> Remover
-                    </Button>
-                  </div>
-                )}
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setErrorCodesFile(e.target.files ? e.target.files[0] : null)}
-                    className="mt-1"
-                  />
-                </FormControl>
-                {errorCodesFile && <FormDescription>Novo arquivo selecionado: {errorCodesFile.name}</FormDescription>}
-              </fieldset>
-              <FormMessage />
-            </FormItem>
+              <FormItem>
+                <FormLabel>Códigos de Erro (PDF)</FormLabel>
+                   {editingMaquina?.errorCodesUrl && !errorCodesFile && ( 
+                    <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                      <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                        <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
+                      </a>
+                       <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('errorCodesUrl')} className="text-destructive hover:text-destructive">
+                        <XCircle className="h-4 w-4 mr-1"/> Remover
+                      </Button>
+                    </div>
+                  )}
+                  <FormControl>
+                    <Input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setErrorCodesFile(e.target.files ? e.target.files[0] : null)}
+                      className="mt-1"
+                    />
+                  </FormControl>
+                  {errorCodesFile && <FormDescription>Novo arquivo selecionado: {errorCodesFile.name}</FormDescription>}
+                <FormMessage />
+              </FormItem>
+            </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Informações Adicionais (Opcional)</h3>
             <fieldset disabled={!!editingMaquina && !isEditMode}>

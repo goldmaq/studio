@@ -203,7 +203,9 @@ export function CompanyConfigClientPage() {
 
 
   const openModal = (company: Company) => {
+    console.log("Opening modal with company data:", company);
     setEditingCompany(company);
+    console.log("Editing company set to:", company); // Use company directly as state update is async
     form.reset(company);
     setIsEditMode(true); // Always open in edit mode for company config
     setIsModalOpen(true);
@@ -221,8 +223,18 @@ export function CompanyConfigClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof CompanySchema>) => {
+    console.log("Submitting form for editing company:", editingCompany);
     if (!editingCompany || !editingCompany.id) return;
-    updateCompanyMutation.mutate({ ...values, id: editingCompany.id });
+
+    const dataToSave: Partial<Company> = { ...values };
+    // Convert empty strings or undefined values to null for optional fields
+    (Object.keys(dataToSave) as (keyof Partial<Company>)[]).forEach(key => {
+      if (dataToSave[key] === '' || dataToSave[key] === undefined) {
+        dataToSave[key] = null as any; // Explicitly cast to allow null
+      }
+    });
+
+    updateCompanyMutation.mutate({ ...dataToSave, id: editingCompany.id } as Company);
   };
   
   const handleSearchCep = async () => {
