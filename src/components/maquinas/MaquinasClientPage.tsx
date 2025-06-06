@@ -31,8 +31,11 @@ import type { LucideIcon } from "lucide-react";
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; 
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 
+const ALL_CUSTOMERS_FILTER_VALUE = "_ALL_CUSTOMERS_";
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
+
+const ALL_STATUSES_FILTER_VALUE = "_ALL_STATUSES_";
 
 const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
 
@@ -135,7 +138,7 @@ async function fetchMaquinas(): Promise<Maquina[]> {
       errorCodesUrl: data.errorCodesUrl || null,
     } as Maquina;
   });
-}
+};
 
 async function fetchCustomers(): Promise<Customer[]> {
   if (!db) {
@@ -169,10 +172,10 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     brand: false,
     equipmentType: false,
   });
-  const form = useForm<z.infer<typeof MaquinaSchema>>({ 
-    resolver: zodResolver(MaquinaSchema), 
+  const form = useForm<z.infer<typeof MaquinaSchema>>({
+    resolver: zodResolver(MaquinaSchema),
     defaultValues: {
-      brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
+      brand: "", model: "", chassisNumber: "", equipmentType: maquinaTypeOptions[0],
       operationalStatus: "Disponível", customerId: null, 
       ownerReference: null, 
       manufactureYear: new Date().getFullYear(),
@@ -184,8 +187,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       partsCatalogUrl: null, errorCodesUrl: null,
     },
   });
-  
-  const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({ 
+
+  const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({
     queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME], 
     queryFn: fetchMaquinas, 
     enabled: !!db,
@@ -197,30 +200,38 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     enabled: !!db,
   });
   
+  useEffect(() => {
+    // Set default filters after initial load
+    if (!isLoadingMaquinas && maquinaList.length > 0 && statusFilter === null && customerFilter === null) {
+      setStatusFilter(ALL_STATUSES_FILTER_VALUE);
+      setCustomerFilter(ALL_CUSTOMERS_FILTER_VALUE);
+    }
+  }, [isLoadingMaquinas, maquinaList, statusFilter, customerFilter]);
+
   const filteredMaquinas = useMemo(() => {
     return maquinaList?.filter(maquina => {
       const lowerCaseSearchTerm = searchTerm.toLowerCase();
       const matchesSearch =
-        maquina.brand.toLowerCase().includes(lowerCaseSearchTerm) ||
-        maquina.model.toLowerCase().includes(lowerCaseSearchTerm) ||
-        maquina.chassisNumber.toLowerCase().includes(lowerCaseSearchTerm) ||
+        (maquina.brand?.toLowerCase() ?? '').includes(lowerCaseSearchTerm) ||
         (maquina.fleetNumber?.toLowerCase() ?? '').includes(lowerCaseSearchTerm);
 
-      const matchesStatus = statusFilter ? maquina.operationalStatus === statusFilter : true;
-      const matchesCustomer = customerFilter ? maquina.customerId === customerFilter : true;
+        const matchesStatus = statusFilter && statusFilter !== ALL_STATUSES_FILTER_VALUE
+        ? maquina.operationalStatus === statusFilter
+        : true;
+            const matchesCustomer = customerFilter && customerFilter !== ALL_CUSTOMERS_FILTER_VALUE ? maquina.customerId === customerFilter : true;
       return matchesSearch && matchesStatus && matchesCustomer;
     });
   }, [maquinaList, searchTerm, statusFilter, customerFilter]);
 
   const openModal = useCallback((maquina?: Maquina) => { 
-    setPartsCatalogFile(null);
+    setPartsCatalogFile(null); // Clear file inputs on opening
     setErrorCodesFile(null);
     if (maquina) {
-      setEditingMaquina(maquina); 
-      const isBrandPredefined = predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra";
-      const isEquipmentTypePredefined = maquinaTypeOptions.includes(maquina.equipmentType as any); 
+      setEditingMaquina(maquina);
+      const isBrandPredefined = maquina.brand ? (predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra") : false;
+      const isEquipmentTypePredefined = maquina.equipmentType ? maquinaTypeOptions.includes(maquina.equipmentType as any) : false;
 
-      form.reset({
+     form.reset({
         ...maquina,
         model: maquina.model || "",
         brand: isBrandPredefined ? maquina.brand : '_CUSTOM_',
@@ -248,7 +259,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     } else {
       setEditingMaquina(null); 
       form.reset({
-        brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
+        brand: "", model: "", chassisNumber: "", equipmentType: maquinaTypeOptions[0], // Default to the first option
         operationalStatus: "Disponível", customerId: null, 
         ownerReference: null, 
         manufactureYear: new Date().getFullYear(),
@@ -265,7 +276,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     setIsModalOpen(true);
   }, [form]); 
 
-  useEffect(() => {
+ useEffect(() => {
     if (maquinaIdFromUrl && !isLoadingMaquinas && maquinaList.length > 0 && !isModalOpen) { 
       const maquinaToEdit = maquinaList.find(eq => eq.id === maquinaIdFromUrl); 
       if (maquinaToEdit) {
@@ -276,10 +287,10 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       }
     }
   }, [maquinaIdFromUrl, maquinaList, isLoadingMaquinas, openModal, isModalOpen]); 
-
+  
   const prepareDataForFirestore = (
-    formData: z.infer<typeof MaquinaSchema>, 
-    newPartsCatalogUrl?: string | null,
+    formData: z.infer<typeof MaquinaSchema>,
+    newPartsCatalogUrl?: string | null, // Make these optional
     newErrorCodesUrl?: string | null
   ): Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType'> => { 
     const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, fleetNumber: formFleetNumber, ...restOfData } = formData;
@@ -357,8 +368,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     mutationFn: async (data: {
       id: string,
       formData: z.infer<typeof MaquinaSchema>, 
-      catalogFile: File | null,
-      codesFile: File | null,
+      catalogFile: File | null, // New file to upload
+      codesFile: File | null, // New file to upload
       currentMaquina: Maquina 
     }) => {
       if (!db || !storage) {
@@ -386,7 +397,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME] });
       toast({ title: "Máquina Atualizada", description: `${data.brand} ${data.model} atualizada.` });
       closeModal();
-    }, 
+    },
     onError: (err: Error, variables) => {
       let message = `Não foi possível atualizar ${variables.formData.brand} ${variables.formData.model}. Detalhe: ${err.message}`;
       if (err.message.includes("Um cliente deve ser selecionado")) {
@@ -497,7 +508,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   };
 
   const handleSelectChange = (field: 'brand' | 'equipmentType', value: string) => {
-    form.setValue(field, value);
+    form.setValue(field, value as any);
     setShowCustomFields(prev => ({ ...prev, [field]: value === '_CUSTOM_' }));
     if (value !== '_CUSTOM_') {
         form.setValue(field === 'brand' ? 'customBrand' : 'customEquipmentType', "");
@@ -527,7 +538,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   const isMutating = addMaquinaMutation.isPending || updateMaquinaMutation.isPending || deleteMaquinaMutation.isPending || removeFileMutation.isPending || isUploadingFiles || isSeeding;
 
   if (!db || !storage) {
-    return (
+    return ( // Display error if Firebase connection fails
       <div className="flex flex-col items-center justify-center h-full">
         <AlertIconLI className="h-16 w-16 text-destructive mb-4" />
         <PageHeader title="Erro de Conexão" />
@@ -562,7 +573,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
 
   return (
     <>
-      <PageHeader
+      <PageHeader // Page title and Add button
         title="Máquinas" 
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating}>
@@ -580,29 +591,35 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             className="w-full"
           />
         </div>
+
+        {/* Status Filter */}
         <div className="md:col-span-1">
-          
-          <Select onValueChange={setStatusFilter} value={statusFilter || ""}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Filtrar por Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Todos os Status</SelectItem>
-              {maquinaOperationalStatusOptions.map(status => (
-                <SelectItem key={status} value={status}>{status}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Select onValueChange={(value) => setStatusFilter(value)} value={statusFilter ?? ALL_STATUSES_FILTER_VALUE}>
+  <SelectTrigger className="w-full">
+    <SelectValue placeholder="Filtrar por Status" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value={ALL_STATUSES_FILTER_VALUE}>Todos os Status</SelectItem>
+    {maquinaOperationalStatusOptions.map(status => (
+      <SelectItem key={status} value={status}>{status}</SelectItem>
+    ))}
+  </SelectContent>
+</Select>
         </div>
+
+        {/* Customer Filter - Show only if there are customers */}
+        {!isLoadingCustomers && customers.length > 0 && (
         <div className="md:col-span-2 lg:col-span-2">
-          <Select onValueChange={setCustomerFilter} value={customerFilter || ""}>
+          <Select onValueChange={setCustomerFilter} value={customerFilter ?? ALL_CUSTOMERS_FILTER_VALUE}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Filtrar por Cliente"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os Clientes</SelectItem>
+              <SelectItem value={ALL_CUSTOMERS_FILTER_VALUE}>Todos os Clientes</SelectItem>
               <SelectItem value={NO_CUSTOMER_SELECT_ITEM_VALUE}>Sem Cliente Vinculado</SelectItem>
+
               {isLoadingCustomers ? (
+                // Display loading state if customers are still being fetched
                 <SelectItem value={LOADING_CUSTOMERS_SELECT_ITEM_VALUE} disabled>Carregando clientes...</SelectItem>
               ) : (
                 customers.map(cust => (
@@ -612,6 +629,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             </SelectContent>
           </Select>
         </div>
+        )}
       </div>
 
       {isLoadingMaquinas && (
@@ -620,7 +638,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
            <p className="ml-2">Carregando máquinas...</p>
          </div>
       )}
-
+      {/* Placeholder for no machines registered */}
       {!isLoadingMaquinas && maquinaList.length === 0 && searchTerm === "" && statusFilter === null && customerFilter === null && (
         <DataTablePlaceholder
           icon={Construction}
@@ -630,7 +648,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
           onButtonClick={() => openModal()}
         />
       )}
-
+       {/* Placeholder for no results with filters/search */}
       {!isLoadingMaquinas && filteredMaquinas.length === 0 && (searchTerm !== "" || statusFilter !== null || customerFilter !== null) && (
         <DataTablePlaceholder
           icon={Search}
@@ -644,6 +662,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
           }}
         />
       )}
+       {/* Display list of machines */}
 
       {!isLoadingMaquinas && filteredMaquinas.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -871,9 +890,12 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                           <>
                             <SelectItem value={NO_CUSTOMER_SELECT_ITEM_VALUE}>Nenhum</SelectItem>
                             {customers.map((cust) => (
-                              <SelectItem key={cust.id} value={cust.id}>
-                                {cust.name} ({cust.cnpj})
-                              </SelectItem>
+                              // Add check to ensure cust.id exists before rendering SelectItem
+                              cust.id && (
+                                <SelectItem key={cust.id} value={cust.id}>
+                                  {cust.name} ({cust.cnpj})
+                                </SelectItem>
+                              )
                             ))}
                           </>
                         )}
@@ -1026,7 +1048,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             </fieldset>
           </form>
         </Form>
-      </FormModal>
+ </FormModal>
     </>
   );
 }
