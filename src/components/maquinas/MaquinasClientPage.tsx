@@ -26,7 +26,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-// React is imported at the top
 
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; 
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
@@ -157,6 +156,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   const [partsCatalogFile, setPartsCatalogFile] = useState<File | null>(null);
   const [errorCodesFile, setErrorCodesFile] = useState<File | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
 
   const [showCustomFields, setShowCustomFields] = useState({
@@ -211,6 +211,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     setErrorCodesFile(null);
     if (maquina) {
       setEditingMaquina(maquina); 
+      setIsEditMode(false); // Start in view mode for existing items
       const isBrandPredefined = predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra";
       const isEquipmentTypePredefined = maquinaTypeOptions.includes(maquina.equipmentType as any); 
 
@@ -239,6 +240,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       setShowCustomFields({ brand: !isBrandPredefined, equipmentType: !isEquipmentTypePredefined });
     } else {
       setEditingMaquina(null); 
+      setIsEditMode(true); // Start in edit mode for new items
       form.reset({
         brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
         operationalStatus: "Disponível", customerId: null, 
@@ -253,7 +255,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       setShowCustomFields({ brand: false, equipmentType: false });
     }
     setIsModalOpen(true);
-  }, [form]);
+  }, [form, maquinaList]); // Dependency array reviewed
 
   useEffect(() => {
     if (maquinaIdFromUrl && !isLoadingMaquinas && maquinaList.length > 0 && !isModalOpen) { 
@@ -443,6 +445,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     setEditingMaquina(null); 
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
+    setIsEditMode(false); // Reset edit mode on close
     form.reset();
     setShowCustomFields({ brand: false, equipmentType: false });
   };
@@ -674,6 +677,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
         isSubmitting={isMutating}
         editingItem={editingMaquina} 
         onDeleteConfirm={handleModalDeleteConfirm}
+        isEditMode={isEditMode}
+        onEditModeToggle={() => setIsEditMode(true)}
         isDeleting={deleteMaquinaMutation.isPending} 
         deleteButtonLabel="Excluir Máquina" 
       >
@@ -681,234 +686,245 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
           <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> 
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="brand" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Marca</FormLabel>
-                  <Select onValueChange={(value) => handleSelectChange('brand', value)} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione ou digite" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {predefinedBrandOptionsList.map(option => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                      <SelectItem value="_CUSTOM_">Digitar Marca...</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {showCustomFields.brand && (
-                    <FormField control={form.control} name="customBrand" render={({ field: customField }) => (
-                      <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite a marca" {...customField} value={customField.value ?? ""} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <fieldset disabled={!!editingMaquina && !isEditMode}>
+                <FormField control={form.control} name="brand" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Marca</FormLabel>
+                    <Select onValueChange={(value) => handleSelectChange('brand', value)} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione ou digite" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {predefinedBrandOptionsList.map(option => (
+                          <SelectItem key={option} value={option}>{option}</SelectItem>
+                        ))}
+                        <SelectItem value="_CUSTOM_">Digitar Marca...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {showCustomFields.brand && (
+                      <FormField control={form.control} name="customBrand" render={({ field: customField }) => (
+                        <FormItem className="mt-2">
+                          <FormControl><Input placeholder="Digite a marca" {...customField} value={customField.value ?? ""} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-              <FormField control={form.control} name="model" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Modelo</FormLabel>
-                  <FormControl><Input placeholder="Ex: 8FGCU25, S25" {...field} value={field.value ?? ""} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+                <FormField control={form.control} name="model" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modelo</FormLabel>
+                    <FormControl><Input placeholder="Ex: 8FGCU25, S25" {...field} value={field.value ?? ""} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </fieldset>
             </div>
+            <fieldset disabled={!!editingMaquina && !isEditMode}>
+              <FormField control={form.control} name="chassisNumber" render={({ field }) => (
+                <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              
+              <FormField
+                control={form.control}
+                name="ownerReference"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Propriedade</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === NO_OWNER_REFERENCE_VALUE ? null : value as OwnerReferenceType)}
+                      value={field.value || NO_OWNER_REFERENCE_VALUE}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o proprietário" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_OWNER_REFERENCE_VALUE}>Não Especificado / Outro</SelectItem>
+                        {companyDisplayOptions.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={OWNER_REF_CUSTOMER}>Cliente Vinculado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {field.value === OWNER_REF_CUSTOMER && !form.getValues("customerId") && (
+                       <FormDescription className="text-destructive">Atenção: Vincule um cliente abaixo para esta opção.</FormDescription>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField control={form.control} name="chassisNumber" render={({ field }) => (
-              <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-            
-            <FormField
-              control={form.control}
-              name="ownerReference"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Propriedade</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === NO_OWNER_REFERENCE_VALUE ? null : value as OwnerReferenceType)}
-                    value={field.value || NO_OWNER_REFERENCE_VALUE}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o proprietário" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={NO_OWNER_REFERENCE_VALUE}>Não Especificado / Outro</SelectItem>
-                      {companyDisplayOptions.map((company) => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value={OWNER_REF_CUSTOMER}>Cliente Vinculado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {field.value === OWNER_REF_CUSTOMER && !form.getValues("customerId") && (
-                     <FormDescription className="text-destructive">Atenção: Vincule um cliente abaixo para esta opção.</FormDescription>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField control={form.control} name="customerId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cliente Associado (Serviço/Locação)</FormLabel>
+                    <Select
+                      onValueChange={(selectedValue) => field.onChange(selectedValue === NO_CUSTOMER_SELECT_ITEM_VALUE ? null : selectedValue)}
+                      value={field.value || NO_CUSTOMER_SELECT_ITEM_VALUE} 
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Selecione um cliente"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {isLoadingCustomers ? (
+                          <SelectItem value={LOADING_CUSTOMERS_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value={NO_CUSTOMER_SELECT_ITEM_VALUE}>Nenhum</SelectItem>
+                            {customers.map((cust) => (
+                              <SelectItem key={cust.id} value={cust.id}>
+                                {cust.name} ({cust.cnpj})
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-            <FormField control={form.control} name="customerId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cliente Associado (Serviço/Locação)</FormLabel>
-                  <Select
-                    onValueChange={(selectedValue) => field.onChange(selectedValue === NO_CUSTOMER_SELECT_ITEM_VALUE ? null : selectedValue)}
-                    value={field.value || NO_CUSTOMER_SELECT_ITEM_VALUE} 
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Selecione um cliente"} />
-                      </SelectTrigger>
-                    </FormControl>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="equipmentType" render={({ field }) => ( 
+                  <FormItem>
+                    <FormLabel>Tipo de Máquina</FormLabel> 
+                    <Select onValueChange={(value) => handleSelectChange('equipmentType', value)} value={field.value}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {maquinaTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)} 
+                        <SelectItem value="_CUSTOM_">Digitar Tipo...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {showCustomFields.equipmentType && (
+                      <FormField control={form.control} name="customEquipmentType" render={({ field: customField }) => (
+                       <FormItem className="mt-2">
+                          <FormControl><Input placeholder="Digite o tipo" {...customField} value={customField.value ?? ""} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="manufactureYear" render={({ field }) => (
+                  <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="Ex: 2022" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <FormField control={form.control} name="operationalStatus" render={({ field }) => (
+                <FormItem><FormLabel>Status Operacional</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      {isLoadingCustomers ? (
-                        <SelectItem value={LOADING_CUSTOMERS_SELECT_ITEM_VALUE} disabled>Carregando...</SelectItem>
-                      ) : (
-                        <>
-                          <SelectItem value={NO_CUSTOMER_SELECT_ITEM_VALUE}>Nenhum</SelectItem>
-                          {customers.map((cust) => (
-                            <SelectItem key={cust.id} value={cust.id}>
-                              {cust.name} ({cust.cnpj})
-                            </SelectItem>
-                          ))}
-                        </>
-                      )}
+                      {maquinaOperationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)} 
                     </SelectContent>
-                  </Select>
-                  <FormMessage />
+                  </Select><FormMessage />
                 </FormItem>
               )} />
-
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="equipmentType" render={({ field }) => ( 
-                <FormItem>
-                  <FormLabel>Tipo de Máquina</FormLabel> 
-                  <Select onValueChange={(value) => handleSelectChange('equipmentType', value)} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {maquinaTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)} 
-                      <SelectItem value="_CUSTOM_">Digitar Tipo...</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {showCustomFields.equipmentType && (
-                    <FormField control={form.control} name="customEquipmentType" render={({ field: customField }) => (
-                     <FormItem className="mt-2">
-                        <FormControl><Input placeholder="Digite o tipo" {...customField} value={customField.value ?? ""} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="manufactureYear" render={({ field }) => (
-                <FormItem><FormLabel>Ano de Fabricação</FormLabel><FormControl><Input type="number" placeholder="Ex: 2022" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
-            </div>
-            <FormField control={form.control} name="operationalStatus" render={({ field }) => (
-              <FormItem><FormLabel>Status Operacional</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {maquinaOperationalStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)} 
-                  </SelectContent>
-                </Select><FormMessage />
-              </FormItem>
-            )} />
-
+            </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <FormField control={form.control} name="towerOpenHeightMm" render={({ field }) => (
-                <FormItem><FormLabel>H3 - Torre Aberta (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="towerClosedHeightMm" render={({ field }) => (
-                <FormItem><FormLabel>H1 - Torre Fechada (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="nominalCapacityKg" render={({ field }) => (
-                <FormItem><FormLabel>Capacidade Nominal (kg)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-              )} />
-            </div>
+            <fieldset disabled={!!editingMaquina && !isEditMode}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <FormField control={form.control} name="towerOpenHeightMm" render={({ field }) => (
+                  <FormItem><FormLabel>H3 - Torre Aberta (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="towerClosedHeightMm" render={({ field }) => (
+                  <FormItem><FormLabel>H1 - Torre Fechada (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="nominalCapacityKg" render={({ field }) => (
+                  <FormItem><FormLabel>Capacidade Nominal (kg)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+            </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Dimensões Caixa de Bateria (Opcional)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => (
-                    <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="batteryBoxHeightMm" render={({ field }) => (
-                    <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="batteryBoxDepthMm" render={({ field }) => (
-                    <FormItem><FormLabel>Comprimento (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
-                )} />
-            </div>
+            <fieldset disabled={!!editingMaquina && !isEditMode}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => (
+                      <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="batteryBoxHeightMm" render={({ field }) => (
+                      <FormItem><FormLabel>Altura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="batteryBoxDepthMm" render={({ field }) => (
+                      <FormItem><FormLabel>Comprimento (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
+                  )} />
+              </div>
+            </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
             <FormItem>
               <FormLabel>Catálogo de Peças (PDF)</FormLabel>
-              {editingMaquina?.partsCatalogUrl && !partsCatalogFile && ( 
-                <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                  <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                    <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
-                  </a>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('partsCatalogUrl')} className="text-destructive hover:text-destructive">
-                    <XCircle className="h-4 w-4 mr-1"/> Remover
-                  </Button>
-                </div>
-              )}
-              <FormControl>
-                <Input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setPartsCatalogFile(e.target.files ? e.target.files[0] : null)}
-                  className="mt-1"
-                />
-              </FormControl>
-              {partsCatalogFile && <FormDescription>Novo arquivo selecionado: {partsCatalogFile.name}</FormDescription>}
+              <fieldset disabled={!!editingMaquina && !isEditMode}>
+                {editingMaquina?.partsCatalogUrl && !partsCatalogFile && (
+                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                    <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                      <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
+                    </a>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('partsCatalogUrl')} className="text-destructive hover:text-destructive">
+                      <XCircle className="h-4 w-4 mr-1"/> Remover
+                    </Button>
+                  </div>
+                )}
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setPartsCatalogFile(e.target.files ? e.target.files[0] : null)}
+                    className="mt-1"
+                  />
+                </FormControl>
+                {partsCatalogFile && <FormDescription>Novo arquivo selecionado: {partsCatalogFile.name}</FormDescription>}
+              </fieldset>
               <FormMessage />
             </FormItem>
 
             <FormItem>
               <FormLabel>Códigos de Erro (PDF)</FormLabel>
-               {editingMaquina?.errorCodesUrl && !errorCodesFile && ( 
-                <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                  <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                    <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
-                  </a>
-                   <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('errorCodesUrl')} className="text-destructive hover:text-destructive">
-                    <XCircle className="h-4 w-4 mr-1"/> Remover
-                  </Button>
-                </div>
-              )}
-              <FormControl>
-                <Input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setErrorCodesFile(e.target.files ? e.target.files[0] : null)}
-                  className="mt-1"
-                />
-              </FormControl>
-              {errorCodesFile && <FormDescription>Novo arquivo selecionado: {errorCodesFile.name}</FormDescription>}
+              <fieldset disabled={!!editingMaquina && !isEditMode}>
+                 {editingMaquina?.errorCodesUrl && !errorCodesFile && ( 
+                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                    <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                      <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
+                    </a>
+                     <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('errorCodesUrl')} className="text-destructive hover:text-destructive">
+                      <XCircle className="h-4 w-4 mr-1"/> Remover
+                    </Button>
+                  </div>
+                )}
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setErrorCodesFile(e.target.files ? e.target.files[0] : null)}
+                    className="mt-1"
+                  />
+                </FormControl>
+                {errorCodesFile && <FormDescription>Novo arquivo selecionado: {errorCodesFile.name}</FormDescription>}
+              </fieldset>
               <FormMessage />
             </FormItem>
 
-
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Informações Adicionais (Opcional)</h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <FormField control={form.control} name="hourMeter" render={({ field }) => (
-                    <FormItem><FormLabel>Horímetro Atual (h)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="monthlyRentalValue" render={({ field }) => (
-                    <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
-                )} />
-            </div>
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais, histórico, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
+            <fieldset disabled={!!editingMaquina && !isEditMode}>
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="hourMeter" render={({ field }) => (
+                      <FormItem><FormLabel>Horímetro Atual (h)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="monthlyRentalValue" render={({ field }) => (
+                      <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
+                  )} />
+              </div>
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais, histórico, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </fieldset>
           </form>
         </Form>
       </FormModal>
