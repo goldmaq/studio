@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
 import { PlusCircle, PackageSearch, Edit, Trash2, Tag, CheckCircle, Construction, Link as LinkIconLI, FileText, Package, ShieldAlert, Loader2, AlertTriangle, Box, BatteryCharging, Anchor } from "lucide-react";
-import type { LucideIcon } from "lucide-react"; 
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -15,19 +15,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { AuxiliaryEquipment, Maquina } from "@/types"; 
+import type { AuxiliaryEquipment, Maquina } from "@/types";
 import { AuxiliaryEquipmentSchema, auxiliaryEquipmentTypeOptions, auxiliaryEquipmentStatusOptions } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase"; 
+import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME = "equipamentosAuxiliares";
-const FIRESTORE_MAQUINAS_COLLECTION_NAME = "equipamentos"; 
+const FIRESTORE_MAQUINAS_COLLECTION_NAME = "equipamentos";
 
 const NO_LINKED_EQUIPMENT_VALUE = "_NO_LINKED_EQUIPMENT_";
 const LOADING_EQUIPMENT_VALUE = "_LOADING_EQUIPMENT_";
@@ -59,14 +59,14 @@ async function fetchAuxiliaryEquipment(): Promise<AuxiliaryEquipment[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuxiliaryEquipment));
 }
 
-async function fetchMaquinasPrincipais(): Promise<Maquina[]> { 
+async function fetchMaquinasPrincipais(): Promise<Maquina[]> {
   if (!db) {
     console.error("fetchMaquinasPrincipais: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
   const q = query(collection(db, FIRESTORE_MAQUINAS_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Maquina)); 
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Maquina));
 }
 
 export function AuxiliaryEquipmentClientPage() {
@@ -94,13 +94,13 @@ export function AuxiliaryEquipmentClientPage() {
   const { data: auxEquipmentList = [], isLoading: isLoadingAux, isError: isErrorAux, error: errorAux } = useQuery<AuxiliaryEquipment[], Error>({
     queryKey: [FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME],
     queryFn: fetchAuxiliaryEquipment,
-    enabled: !!db, 
+    enabled: !!db,
   });
 
-  const { data: maquinasPrincipaisList = [], isLoading: isLoadingMaquinasPrincipais } = useQuery<Maquina[], Error>({ 
+  const { data: maquinasPrincipaisList = [], isLoading: isLoadingMaquinasPrincipais } = useQuery<Maquina[], Error>({
     queryKey: [FIRESTORE_MAQUINAS_COLLECTION_NAME],
-    queryFn: fetchMaquinasPrincipais, 
-    enabled: !!db, 
+    queryFn: fetchMaquinasPrincipais,
+    enabled: !!db,
   });
 
   if (!db) {
@@ -236,14 +236,14 @@ export function AuxiliaryEquipmentClientPage() {
       form.setValue('customType', "");
     }
   };
-  
-  const getLinkedMaquinaName = (maquinaId?: string | null): string => { 
-    if (!maquinaId || !maquinasPrincipaisList) return "Nenhuma"; 
-    const maquina = maquinasPrincipaisList.find(eq => eq.id === maquinaId); 
+
+  const getLinkedMaquinaName = (maquinaId?: string | null): string => {
+    if (!maquinaId || !maquinasPrincipaisList) return "Nenhuma";
+    const maquina = maquinasPrincipaisList.find(eq => eq.id === maquinaId);
     return maquina ? `${maquina.brand} ${maquina.model} (${maquina.chassisNumber})` : "Não encontrada";
   };
 
-  const isLoadingPageData = isLoadingAux || isLoadingMaquinasPrincipais; 
+  const isLoadingPageData = isLoadingAux || isLoadingMaquinasPrincipais;
   const isMutating = addAuxEquipmentMutation.isPending || updateAuxEquipmentMutation.isPending || deleteAuxEquipmentMutation.isPending;
 
   if (isLoadingPageData && !isModalOpen) {
@@ -403,7 +403,7 @@ export function AuxiliaryEquipmentClientPage() {
 
               <FormField control={form.control} name="linkedEquipmentId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Vincular à Máquina Principal (Opcional)</FormLabel> 
+                  <FormLabel>Vincular à Máquina Principal (Opcional)</FormLabel>
                   <Select
                     onValueChange={(selectedValue) => field.onChange(selectedValue === NO_LINKED_EQUIPMENT_VALUE ? null : selectedValue)}
                     value={field.value ?? NO_LINKED_EQUIPMENT_VALUE}
@@ -417,7 +417,7 @@ export function AuxiliaryEquipmentClientPage() {
                       ) : (
                         <>
                           <SelectItem value={NO_LINKED_EQUIPMENT_VALUE}>Nenhuma</SelectItem>
-                          {maquinasPrincipaisList.map((eq) => ( 
+                          {maquinasPrincipaisList.map((eq) => (
                             <SelectItem key={eq.id} value={eq.id}>
                               {eq.brand} {eq.model} (Chassi: {eq.chassisNumber})
                             </SelectItem>
@@ -440,3 +440,5 @@ export function AuxiliaryEquipmentClientPage() {
     </>
   );
 }
+
+    
