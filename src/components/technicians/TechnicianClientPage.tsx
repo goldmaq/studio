@@ -79,10 +79,10 @@ async function fetchTechnicians(): Promise<Technician[]> {
 export function TechnicianClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [isEditMode, setIsEditMode] = useState(false);
-
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTechnician, setEditingTechnician] = useState<Technician | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const form = useForm<z.infer<typeof TechnicianSchema>>({
     resolver: zodResolver(TechnicianSchema),
@@ -165,26 +165,27 @@ export function TechnicianClientPage() {
         ...technician,
         phone: technician.phone ? formatPhoneNumberForInputDisplay(technician.phone) : "",
       });
-      setIsEditMode(false); // Start in view mode for existing items
+      setIsEditMode(false); 
     } else {
       setEditingTechnician(null);
       form.reset({ name: "", employeeId: "", specialization: "", phone: "" });
-      setIsEditMode(true); // Start in edit mode for new items
+      setIsEditMode(true); 
     }
-    setIsModalOpen(true); // Ensure modal is open
+    setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingTechnician(null);
     form.reset();
+    setIsEditMode(false);
   };
   
 
   const onSubmit = async (values: z.infer<typeof TechnicianSchema>) => {
     const dataToSave = {
       ...values,
-      phone: values.phone ? values.phone.replace(/\D/g, '') : undefined, // Salva apenas os dígitos
+      phone: values.phone ? values.phone.replace(/\D/g, '') : undefined, 
     };
     if (editingTechnician && editingTechnician.id) {
       updateTechnicianMutation.mutate({ ...dataToSave, id: editingTechnician.id });
@@ -318,9 +319,9 @@ export function TechnicianClientPage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="technician-form" className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome completo do técnico" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome completo do técnico" {...field} disabled={!!editingTechnician && !isEditMode} /></FormControl><FormMessage /></FormItem>
             )} />
-            <fieldset disabled={!!editingTechnician && !isEditMode} className="space-y-4"> {/* Wrap form fields in fieldset */}
+            <fieldset disabled={!!editingTechnician && !isEditMode} className="space-y-4">
               <FormField control={form.control} name="employeeId" render={({ field }) => (
                 <FormItem><FormLabel>Matrícula</FormLabel><FormControl><Input placeholder="Identificador único do funcionário" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
@@ -356,3 +357,4 @@ export function TechnicianClientPage() {
     </>
   );
 }
+
