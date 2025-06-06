@@ -452,8 +452,23 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   };
 
   const onSubmit = async (values: z.infer<typeof MaquinaSchema>) => {
+    const dataToSave = {
+      ...values,
+      brand: values.brand === '_CUSTOM_' ? values.customBrand?.toLowerCase() || "não especificado" : values.brand.toLowerCase(),
+      model: values.model.toLowerCase(),
+      equipmentType: values.equipmentType === '_CUSTOM_' ? values.customEquipmentType?.toLowerCase() || "não especificado" : values.equipmentType.toLowerCase(),
+      customBrand: values.customBrand?.toLowerCase() || "",
+      customEquipmentType: values.customEquipmentType?.toLowerCase() || "",
+      notes: values.notes?.toLowerCase() || null,
+      partsCatalogUrl: values.partsCatalogUrl, // URLs are not lowercased
+      errorCodesUrl: values.errorCodesUrl, // URLs are not lowercased
+      // Ensure numeric fields are parsed correctly here as well, though prepareDataForFirestore does this too
+      manufactureYear: parseNumericToNullOrNumber(values.manufactureYear),
+      hourMeter: parseNumericToNullOrNumber(values.hourMeter),
+      monthlyRentalValue: parseNumericToNullOrNumber(values.monthlyRentalValue),
+    };
     if (editingMaquina && editingMaquina.id) {
-      updateMaquinaMutation.mutate({
+      updateMaquinaMutation.mutate({ // Pass the lowercased data
         id: editingMaquina.id,
         formData: values,
         catalogFile: partsCatalogFile,

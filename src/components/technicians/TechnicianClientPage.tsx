@@ -184,10 +184,12 @@ export function TechnicianClientPage() {
 
   const onSubmit = async (values: z.infer<typeof TechnicianSchema>) => {
     const dataToSave = {
-      ...values,
-      phone: values.phone ? values.phone.replace(/\D/g, '') : undefined, 
+ ...values,
+      name: values.name.toLowerCase(),
+ specialization: values.specialization?.toLowerCase() ?? "",
+ phone: values.phone ? values.phone.replace(/\D/g, '') : undefined,
     };
-    if (editingTechnician && editingTechnician.id) {
+    if (editingTechnician?.id) {
       updateTechnicianMutation.mutate({ ...dataToSave, id: editingTechnician.id });
     } else {
       addTechnicianMutation.mutate(dataToSave);

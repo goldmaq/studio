@@ -331,9 +331,16 @@ export function CustomerClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof CustomerSchema>) => {
+    // Create a new object to avoid mutating the original values
     const dataToSave = {
         ...values,
         preferredTechnician: values.preferredTechnician || null,
+        name: values.name.toLowerCase(),
+        email: values.email.toLowerCase(),
+        contactName: values.contactName ? values.contactName.toLowerCase() : "",
+        street: values.street.toLowerCase(),
+        complement: values.complement ? values.complement.toLowerCase() : "",
+        neighborhood: values.neighborhood.toLowerCase(),
     };
     if (editingCustomer && editingCustomer.id) {
       updateCustomerMutation.mutate({ ...dataToSave, id: editingCustomer.id });

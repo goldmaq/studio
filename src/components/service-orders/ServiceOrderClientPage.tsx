@@ -382,7 +382,7 @@ export function ServiceOrderClientPage() {
     const validProcessedUrls = processedMediaUrls?.filter(url => typeof url === 'string') as string[] | undefined;
 
     return {
-      orderNumber: restOfData.orderNumber,
+ orderNumber: restOfData.orderNumber.toLowerCase(),
       customerId: restOfData.customerId,
       equipmentId: restOfData.equipmentId,
       requesterName: (restOfData.requesterName === undefined || restOfData.requesterName === null || restOfData.requesterName.trim() === "") ? null : restOfData.requesterName,
@@ -394,7 +394,7 @@ export function ServiceOrderClientPage() {
       vehicleId: restOfData.vehicleId || null,
       technicianId: restOfData.technicianId || null,
       mediaUrls: validProcessedUrls && validProcessedUrls.length > 0 ? validProcessedUrls : null,
-      technicalConclusion: restOfData.technicalConclusion || null,
+ technicalConclusion: restOfData.technicalConclusion ? restOfData.technicalConclusion.toLowerCase() : null,
       notes: (restOfData.notes === undefined || restOfData.notes === null || restOfData.notes.trim() === "") ? null : restOfData.notes,
     };
   };
@@ -568,6 +568,19 @@ export function ServiceOrderClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
+    // Convert specified fields to lowercase
+    const dataToSave = {
+      ...values,
+      serviceType: values.serviceType.toLowerCase(),
+      customServiceType: values.customServiceType?.toLowerCase() ?? '',
+      description: values.description.toLowerCase(),
+      notes: values.notes?.toLowerCase() ?? '',
+      mediaUrls: values.mediaUrls, // URLs don't need lowercase conversion
+      technicalConclusion: values.technicalConclusion?.toLowerCase() ?? null,
+      requesterName: values.requesterName?.toLowerCase() ?? null,
+    };
+
+
     const existingUrlsToKeep = form.getValues('mediaUrls') || [];
     const newFilesToUpload = mediaFiles;
     const originalMediaUrls = editingOrder?.mediaUrls || [];
@@ -576,7 +589,7 @@ export function ServiceOrderClientPage() {
         updateServiceOrderMutation.mutate({
           id: editingOrder.id,
           formData: values,
-          filesToUpload: newFilesToUpload,
+ filesToUpload: newFilesToUpload, // Keep this as original files
           existingUrlsToKeep,
           originalMediaUrls
         });
@@ -587,11 +600,11 @@ export function ServiceOrderClientPage() {
       updateServiceOrderMutation.mutate({
         id: editingOrder.id,
         formData: values,
-        filesToUpload: newFilesToUpload,
+ filesToUpload: newFilesToUpload, // Keep this as original files
         existingUrlsToKeep,
         originalMediaUrls
       });
-    } else {
+    } else { // Use dataToSave with lowercase fields for new orders
       addServiceOrderMutation.mutate({ formData: values, filesToUpload: newFilesToUpload });
     }
   };
