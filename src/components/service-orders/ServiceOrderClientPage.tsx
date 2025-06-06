@@ -383,7 +383,7 @@ export function ServiceOrderClientPage() {
       orderNumber: restOfData.orderNumber,
       customerId: restOfData.customerId,
       equipmentId: restOfData.equipmentId,
-      requesterName: restOfData.requesterName || undefined,
+      requesterName: (restOfData.requesterName === undefined || restOfData.requesterName === null || restOfData.requesterName.trim() === "") ? null : restOfData.requesterName,
       phase: restOfData.phase,
       description: restOfData.description,
       serviceType: finalServiceType,
@@ -393,7 +393,7 @@ export function ServiceOrderClientPage() {
       technicianId: restOfData.technicianId || null,
       mediaUrls: validProcessedUrls && validProcessedUrls.length > 0 ? validProcessedUrls : null,
       technicalConclusion: restOfData.technicalConclusion || null,
-      notes: restOfData.notes === null || restOfData.notes === "" ? undefined : restOfData.notes,
+      notes: (restOfData.notes === undefined || restOfData.notes === null || restOfData.notes.trim() === "") ? null : restOfData.notes,
     };
   };
 
@@ -432,9 +432,9 @@ export function ServiceOrderClientPage() {
       formData: z.infer<typeof ServiceOrderSchema>,
       filesToUpload: File[],
       existingUrlsToKeep: string[],
-      originalMediaUrls: string[]
+      originalMediaUrls: string[] // Pass originalMediaUrls here
     }) => {
-      if (!db || !storage) { // Added storage check
+      if (!db || !storage) {
         throw new Error("Firebase Firestore ou Storage connection not available.");
       }
       setIsUploadingFile(true);
@@ -450,6 +450,7 @@ export function ServiceOrderClientPage() {
         finalMediaUrls = [...finalMediaUrls, ...newUploadedUrls];
       }
 
+      // Use the passed originalMediaUrls for deletion logic
       const urlsToDelete = data.originalMediaUrls.filter(originalUrl => !data.existingUrlsToKeep.includes(originalUrl));
       for (const urlToDelete of urlsToDelete) {
         await deleteServiceOrderFileFromStorage(urlToDelete);
@@ -505,8 +506,8 @@ export function ServiceOrderClientPage() {
       if (orderToDelete.mediaUrls && orderToDelete.mediaUrls.length > 0) {
         await Promise.all(orderToDelete.mediaUrls.map(url => deleteServiceOrderFileFromStorage(url)));
       }
-      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderToDelete.id)); // Return was missing
-      return orderToDelete.id; // Ensure a value is returned for onSuccess if needed
+      await deleteDoc(doc(db, FIRESTORE_COLLECTION_NAME, orderToDelete.id));
+      return orderToDelete.id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [FIRESTORE_COLLECTION_NAME] });
@@ -614,7 +615,6 @@ export function ServiceOrderClientPage() {
     } else {
       setMediaFiles(files);
     }
-    // Clear the input value to allow re-selecting the same file if needed after an error or change
     if (event.target) {
         event.target.value = '';
     }
