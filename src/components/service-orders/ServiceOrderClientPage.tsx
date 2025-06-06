@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useWatch } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIconLI, XCircle, AlertTriangle, Save, Trash2 } from "lucide-react";
+import { PlusCircle, ClipboardList, User, Construction, HardHat, Settings2, Calendar, FileText, Play, Pause, Check, AlertTriangle as AlertIconLI, X, Loader2, CarFront as VehicleIcon, UploadCloud, Link as LinkIconLI, XCircle, AlertTriangle, Save, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -150,7 +150,7 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       orderNumber: data.orderNumber || "N/A",
       customerId: data.customerId || "N/A",
       equipmentId: data.equipmentId || "N/A",
-      requesterName: data.requesterName || undefined,
+      requesterName: data.requesterName || null,
       phase: (phaseOptions.includes(data.phase) ? data.phase : "Pendente") as ServiceOrder['phase'],
       technicianId: data.technicianId || null,
       serviceType: data.serviceType || "Não especificado",
@@ -158,7 +158,7 @@ async function fetchServiceOrders(): Promise<ServiceOrder[]> {
       startDate: data.startDate ? formatDateForInput(data.startDate) : undefined,
       endDate: data.endDate ? formatDateForInput(data.endDate) : undefined,
       description: data.description || "N/A",
-      notes: data.notes || undefined,
+      notes: data.notes || null,
       mediaUrls: Array.isArray(data.mediaUrls) ? data.mediaUrls.filter(url => typeof url === 'string') : [],
       technicalConclusion: data.technicalConclusion || null,
     };
@@ -262,11 +262,11 @@ export function ServiceOrderClientPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
   const [showCustomServiceType, setShowCustomServiceType] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isConclusionModalOpen, setIsConclusionModalOpen] = useState(false);
   const [technicalConclusionText, setTechnicalConclusionText] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
 
 
   const form = useForm<z.infer<typeof ServiceOrderSchema>>({
@@ -370,6 +370,7 @@ export function ServiceOrderClientPage() {
   const prepareDataForFirestore = (
     formData: z.infer<typeof ServiceOrderSchema>,
     processedMediaUrls?: (string | null)[] | null
+
   ): Omit<ServiceOrder, 'id' | 'customServiceType' | 'startDate' | 'endDate' | 'mediaUrls'> & { startDate: Timestamp | null; endDate: Timestamp | null; mediaUrls: string[] | null } => {
     const { customServiceType, mediaUrls: formMediaUrlsIgnored, ...restOfData } = formData;
 
@@ -433,7 +434,7 @@ export function ServiceOrderClientPage() {
       formData: z.infer<typeof ServiceOrderSchema>,
       filesToUpload: File[],
       existingUrlsToKeep: string[],
-      originalMediaUrls: string[] // Pass originalMediaUrls here
+      originalMediaUrls: string[] 
     }) => {
       if (!db || !storage) {
         throw new Error("Firebase Firestore ou Storage connection not available.");
@@ -451,7 +452,6 @@ export function ServiceOrderClientPage() {
         finalMediaUrls = [...finalMediaUrls, ...newUploadedUrls];
       }
 
-      // Use the passed originalMediaUrls for deletion logic
       const urlsToDelete = data.originalMediaUrls.filter(originalUrl => !data.existingUrlsToKeep.includes(originalUrl));
       for (const urlToDelete of urlsToDelete) {
         await deleteServiceOrderFileFromStorage(urlToDelete);
@@ -523,8 +523,8 @@ export function ServiceOrderClientPage() {
   const openModal = useCallback((order?: ServiceOrder) => {
     setMediaFiles([]);
     if (order) {
-      setIsEditMode(false); // Start in view mode for existing items
       setEditingOrder(order);
+      setIsEditMode(false); // Start in view mode for existing items
       const isServiceTypePredefined = serviceTypeOptionsList.includes(order.serviceType as any);
       form.reset({
         ...order,
@@ -541,8 +541,8 @@ export function ServiceOrderClientPage() {
       });
       setShowCustomServiceType(!isServiceTypePredefined);
     } else {
-      setIsEditMode(true); // Start in edit mode for new items
       setEditingOrder(null);
+      setIsEditMode(true); // Start in edit mode for new items
       const nextOrderNum = getNextOrderNumber(serviceOrders);
       form.reset({
         orderNumber: nextOrderNum,
@@ -561,10 +561,10 @@ export function ServiceOrderClientPage() {
     setEditingOrder(null);
     setMediaFiles([]);
     form.reset();
-    setIsEditMode(false); // Reset edit mode on close
     setShowCustomServiceType(false);
     setIsConclusionModalOpen(false);
     setTechnicalConclusionText("");
+    setIsEditMode(false);
   };
 
   const onSubmit = async (values: z.infer<typeof ServiceOrderSchema>) => {
@@ -660,7 +660,7 @@ export function ServiceOrderClientPage() {
       });
     }
   };
-
+  
   const isOrderConcludedOrCancelled = editingOrder?.phase === 'Concluída' || editingOrder?.phase === 'Cancelada';
   const isMutating = addServiceOrderMutation.isPending || updateServiceOrderMutation.isPending || isUploadingFile || concludeServiceOrderMutation.isPending || deleteServiceOrderMutation.isPending;
   const isLoadingPageData = isLoadingServiceOrders || isLoadingCustomers || isLoadingEquipment || isLoadingTechnicians || isLoadingVehicles;
@@ -805,13 +805,12 @@ export function ServiceOrderClientPage() {
         isDeleting={deleteServiceOrderMutation.isPending}
         deleteButtonLabel="Excluir OS"
         submitButtonLabel={editingOrder ? "Salvar Alterações" : "Criar OS"}
-        disableSubmit={editingOrder?.phase === 'Concluída'}
         isEditMode={isEditMode}
         onEditModeToggle={() => setIsEditMode(true)}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
-            <fieldset disabled={editingOrder?.phase === 'Concluída' || editingOrder?.phase === 'Cancelada'}>
+            <fieldset disabled={(!!editingOrder && !isEditMode) || isOrderConcludedOrCancelled}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="orderNumber" render={({ field }) => (
                   <FormItem>
@@ -827,7 +826,7 @@ export function ServiceOrderClientPage() {
                 <FormField control={form.control} name="customerId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Cliente</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""} disabled={isOrderConcludedOrCancelled}>
+                    <Select onValueChange={field.onChange} value={field.value || ""} >
                       <FormControl><SelectTrigger>
                         <SelectValue placeholder={isLoadingCustomers ? "Carregando..." : "Selecione o Cliente"} />
                       </SelectTrigger></FormControl>
@@ -848,7 +847,7 @@ export function ServiceOrderClientPage() {
                     <Select
                       onValueChange={field.onChange}
                       value={field.value || NO_EQUIPMENT_SELECTED_VALUE}
-                      disabled={isOrderConcludedOrCancelled}
+                      
                     >
                       <FormControl><SelectTrigger>
                         <SelectValue placeholder={isLoadingEquipment ? "Carregando..." : (filteredEquipmentList.length === 0 && !selectedCustomerId ? "Nenhum equipamento da frota disponível" : "Selecione o Equipamento")} />
@@ -889,7 +888,7 @@ export function ServiceOrderClientPage() {
                     <Select
                       onValueChange={(selectedValue) => field.onChange(selectedValue === NO_TECHNICIAN_SELECTED_VALUE ? null : selectedValue)}
                       value={field.value ?? NO_TECHNICIAN_SELECTED_VALUE}
-                      disabled={isOrderConcludedOrCancelled}
+                      
                     >
                       <FormControl><SelectTrigger>
                         <SelectValue placeholder={isLoadingTechnicians ? "Carregando..." : "Atribuir Técnico (Opcional)"} />
@@ -914,7 +913,7 @@ export function ServiceOrderClientPage() {
                 <FormField control={form.control} name="serviceType" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de Serviço</FormLabel>
-                    <Select onValueChange={handleServiceTypeChange} value={field.value} disabled={isOrderConcludedOrCancelled}>
+                    <Select onValueChange={handleServiceTypeChange} value={field.value} >
                       <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
                       <SelectContent>
                         {serviceTypeOptionsList.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
@@ -924,7 +923,7 @@ export function ServiceOrderClientPage() {
                     {showCustomServiceType && (
                       <FormField control={form.control} name="customServiceType" render={({ field: customField }) => (
                        <FormItem className="mt-2">
-                          <FormControl><Input placeholder="Digite o tipo de serviço" {...customField} value={customField.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl>
+                          <FormControl><Input placeholder="Digite o tipo de serviço" {...customField} value={customField.value ?? ""}  /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
@@ -940,7 +939,7 @@ export function ServiceOrderClientPage() {
                     <Select
                       onValueChange={(selectedValue) => field.onChange(selectedValue === NO_VEHICLE_SELECTED_VALUE ? null : selectedValue)}
                       value={field.value ?? NO_VEHICLE_SELECTED_VALUE}
-                      disabled={isOrderConcludedOrCancelled}
+                      
                     >
                       <FormControl><SelectTrigger>
                         <SelectValue placeholder={isLoadingVehicles ? "Carregando..." : "Selecione o Veículo"} />
@@ -963,28 +962,28 @@ export function ServiceOrderClientPage() {
                 )} />
 
                 <FormField control={form.control} name="startDate" render={({ field }) => (
-                  <FormItem><FormLabel>Data de Início</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Data de Início</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""}  /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="endDate" render={({ field }) => (
-                  <FormItem><FormLabel>Data de Conclusão (Prevista)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Data de Conclusão (Prevista)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ""}  /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
 
               <FormField control={form.control} name="requesterName" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nome do Solicitante (Opcional)</FormLabel>
-                  <FormControl><Input placeholder="Nome da pessoa que solicitou o serviço" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl>
+                  <FormControl><Input placeholder="Nome da pessoa que solicitou o serviço" {...field} value={field.value ?? ""}  /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
 
               <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem><FormLabel>Problema Relatado</FormLabel><FormControl><Textarea placeholder="Descreva o problema relatado pelo cliente ou identificado" {...field} value={field.value ?? ""} disabled={isOrderConcludedOrCancelled} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Problema Relatado</FormLabel><FormControl><Textarea placeholder="Descreva o problema relatado pelo cliente ou identificado" {...field} value={field.value ?? ""}  /></FormControl><FormMessage /></FormItem>
               )} />
             </fieldset>
 
             <FormItem>
-              <FormLabel>Anexos (Foto/Vídeo/PDF - Opcional){isEditMode ? ` - Máx ${MAX_FILES_ALLOWED} arquivos.` : ''}</FormLabel>
+              <FormLabel>Anexos (Foto/Vídeo/PDF - Opcional){(isEditMode || !editingOrder) ? ` - Máx ${MAX_FILES_ALLOWED} arquivos.` : ''}</FormLabel>
               {editingOrder && formMediaUrls && formMediaUrls.length > 0 && (
                 <div className="mb-2">
                   <p className="text-sm font-medium mb-1">Anexos Existentes ({formMediaUrls.length}):</p>
@@ -999,15 +998,15 @@ export function ServiceOrderClientPage() {
                       )
                     ))}
                   </ul>
-                  {!isOrderConcludedOrCancelled && (
-                    <Button variant="link" size="sm" className="text-red-500 mt-1 p-0 h-auto" onClick={handleRemoveAllExistingAttachments} disabled={isMutating || isOrderConcludedOrCancelled}>
+                  {isEditMode && !isOrderConcludedOrCancelled && (
+                    <Button variant="link" size="sm" className="text-red-500 mt-1 p-0 h-auto" onClick={handleRemoveAllExistingAttachments} disabled={isMutating}>
                         Remover Todos os Anexos Existentes
                     </Button>
                   )}
                 </div>
               )}
 
-              {!isOrderConcludedOrCancelled && isEditMode && ( // Only show file input in edit mode
+              {isEditMode && !isOrderConcludedOrCancelled && (
                 <FormControl>
                   <Input
                     type="file"
@@ -1017,24 +1016,24 @@ export function ServiceOrderClientPage() {
                       "border-red-500": (formMediaUrls?.length || 0) + mediaFiles.length > MAX_FILES_ALLOWED,
                     })}
                     multiple
-                    disabled={isOrderConcludedOrCancelled || (formMediaUrls?.length || 0) >= MAX_FILES_ALLOWED || isUploadingFile || isMutating}
+                    disabled={isMutating || isUploadingFile || (formMediaUrls?.length || 0) >= MAX_FILES_ALLOWED}
                   />
                 </FormControl>
               )}
 
-              {mediaFiles.length > 0 && !isOrderConcludedOrCancelled && isEditMode && ( // Only show file selection info in edit mode
+              {isEditMode && !isOrderConcludedOrCancelled && mediaFiles.length > 0 && (
                 <FormDescription className="mt-2 text-sm text-muted-foreground">
                   Novos arquivos selecionados ({mediaFiles.length}): {mediaFiles.map(file => file.name).join(', ')}. <br />
                   Total de anexos após salvar: {(formMediaUrls?.length || 0) + mediaFiles.length} / {MAX_FILES_ALLOWED}.
                 </FormDescription>
               )}
-              {((formMediaUrls?.length || 0) + mediaFiles.length) > MAX_FILES_ALLOWED && !isOrderConcludedOrCancelled && isEditMode && ( // Only show limit warning in edit mode
+              {isEditMode && !isOrderConcludedOrCancelled && ((formMediaUrls?.length || 0) + mediaFiles.length) > MAX_FILES_ALLOWED && (
                 <p className="text-sm font-medium text-destructive mt-1">Limite de {MAX_FILES_ALLOWED} arquivos excedido.</p>
               )}
               <FormMessage />
             </FormItem>
 
-            {editingOrder && !isOrderConcludedOrCancelled && editingOrder.phase !== 'Cancelada' && (
+            {editingOrder && !isOrderConcludedOrCancelled && editingOrder.phase !== 'Cancelada' && isEditMode && (
               <div className="pt-4">
                 <Button type="button" variant="outline" onClick={handleOpenConclusionModal} disabled={isMutating} className="w-full sm:w-auto">
                   <Check className="mr-2 h-4 w-4" /> Concluir OS
@@ -1042,7 +1041,7 @@ export function ServiceOrderClientPage() {
               </div>
             )}
 
-            {editingOrder && (editingOrder.phase === 'Concluída' || editingOrder.phase === 'Cancelada') && (
+            {editingOrder && (isOrderConcludedOrCancelled || (editingOrder.phase === 'Concluída' && !isEditMode)) && (
               <FormField control={form.control} name="technicalConclusion" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Conclusão Técnica</FormLabel>
@@ -1059,10 +1058,12 @@ export function ServiceOrderClientPage() {
                 </FormItem>
               )} />
             )}
-
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais, peças utilizadas, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
+            
+            <fieldset disabled={(!!editingOrder && !isEditMode) || isOrderConcludedOrCancelled}>
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Observações adicionais, peças utilizadas, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </fieldset>
 
           </form>
         </Form>
