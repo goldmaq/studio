@@ -15,19 +15,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { AuxiliaryEquipment, Maquina } from "@/types"; // Changed Equipment to Maquina
+import type { AuxiliaryEquipment, Maquina } from "@/types"; 
 import { AuxiliaryEquipmentSchema, auxiliaryEquipmentTypeOptions, auxiliaryEquipmentStatusOptions } from "@/types";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
 import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase"; // Import db
+import { db } from "@/lib/firebase"; 
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME = "equipamentosAuxiliares";
-const FIRESTORE_MAQUINAS_COLLECTION_NAME = "equipamentos"; // Firestore collection name remains "equipamentos"
+const FIRESTORE_MAQUINAS_COLLECTION_NAME = "equipamentos"; 
 
 const NO_LINKED_EQUIPMENT_VALUE = "_NO_LINKED_EQUIPMENT_";
 const LOADING_EQUIPMENT_VALUE = "_LOADING_EQUIPMENT_";
@@ -59,14 +59,14 @@ async function fetchAuxiliaryEquipment(): Promise<AuxiliaryEquipment[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as AuxiliaryEquipment));
 }
 
-async function fetchMaquinasPrincipais(): Promise<Maquina[]> { // Renamed function, changed return type
+async function fetchMaquinasPrincipais(): Promise<Maquina[]> { 
   if (!db) {
     console.error("fetchMaquinasPrincipais: Firebase DB is not available.");
     throw new Error("Firebase DB is not available");
   }
   const q = query(collection(db, FIRESTORE_MAQUINAS_COLLECTION_NAME), orderBy("brand", "asc"), orderBy("model", "asc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Maquina)); // Changed to Maquina
+  return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Maquina)); 
 }
 
 export function AuxiliaryEquipmentClientPage() {
@@ -76,6 +76,7 @@ export function AuxiliaryEquipmentClientPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AuxiliaryEquipment | null>(null);
   const [showCustomTypeField, setShowCustomTypeField] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const form = useForm<z.infer<typeof AuxiliaryEquipmentSchema>>({
     resolver: zodResolver(AuxiliaryEquipmentSchema),
@@ -96,9 +97,9 @@ export function AuxiliaryEquipmentClientPage() {
     enabled: !!db, 
   });
 
-  const { data: maquinasPrincipaisList = [], isLoading: isLoadingMaquinasPrincipais } = useQuery<Maquina[], Error>({ // Renamed variable, changed type
+  const { data: maquinasPrincipaisList = [], isLoading: isLoadingMaquinasPrincipais } = useQuery<Maquina[], Error>({ 
     queryKey: [FIRESTORE_MAQUINAS_COLLECTION_NAME],
-    queryFn: fetchMaquinasPrincipais, // Renamed function
+    queryFn: fetchMaquinasPrincipais, 
     enabled: !!db, 
   });
 
@@ -191,6 +192,7 @@ export function AuxiliaryEquipmentClientPage() {
         linkedEquipmentId: item.linkedEquipmentId || null,
       });
       setShowCustomTypeField(!isTypePredefined);
+      setIsEditMode(false); // Start in view mode for existing items
     } else {
       setEditingItem(null);
       form.reset({
@@ -198,6 +200,7 @@ export function AuxiliaryEquipmentClientPage() {
         status: "Disponível", linkedEquipmentId: null, notes: "",
       });
       setShowCustomTypeField(false);
+      setIsEditMode(true); // Start in edit mode for new items
     }
     setIsModalOpen(true);
   };
@@ -207,6 +210,7 @@ export function AuxiliaryEquipmentClientPage() {
     setEditingItem(null);
     form.reset();
     setShowCustomTypeField(false);
+    setIsEditMode(false); // Reset edit mode
   };
 
   const onSubmit = async (values: z.infer<typeof AuxiliaryEquipmentSchema>) => {
@@ -233,13 +237,13 @@ export function AuxiliaryEquipmentClientPage() {
     }
   };
   
-  const getLinkedMaquinaName = (maquinaId?: string | null): string => { // Renamed function
-    if (!maquinaId || !maquinasPrincipaisList) return "Nenhuma"; // Renamed variable
-    const maquina = maquinasPrincipaisList.find(eq => eq.id === maquinaId); // Renamed variable
+  const getLinkedMaquinaName = (maquinaId?: string | null): string => { 
+    if (!maquinaId || !maquinasPrincipaisList) return "Nenhuma"; 
+    const maquina = maquinasPrincipaisList.find(eq => eq.id === maquinaId); 
     return maquina ? `${maquina.brand} ${maquina.model} (${maquina.chassisNumber})` : "Não encontrada";
   };
 
-  const isLoadingPageData = isLoadingAux || isLoadingMaquinasPrincipais; // Renamed variable
+  const isLoadingPageData = isLoadingAux || isLoadingMaquinasPrincipais; 
   const isMutating = addAuxEquipmentMutation.isPending || updateAuxEquipmentMutation.isPending || deleteAuxEquipmentMutation.isPending;
 
   if (isLoadingPageData && !isModalOpen) {
@@ -350,87 +354,89 @@ export function AuxiliaryEquipmentClientPage() {
         onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteAuxEquipmentMutation.isPending}
         deleteButtonLabel="Excluir Equip. Auxiliar"
+        isEditMode={isEditMode}
+        onEditModeToggle={() => setIsEditMode(true)}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="aux-equipment-form" className="space-y-4">
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Nome do Equipamento</FormLabel><FormControl><Input placeholder="Ex: Bateria Tracionária 80V" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
+            <fieldset disabled={!!editingItem && !isEditMode} className="space-y-4">
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem><FormLabel>Nome do Equipamento</FormLabel><FormControl><Input placeholder="Ex: Bateria Tracionária 80V" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
 
-            <FormField control={form.control} name="type" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo</FormLabel>
-                <Select onValueChange={handleTypeChange} value={field.value}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {auxiliaryEquipmentTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                    <SelectItem value={CUSTOM_AUXILIARY_TYPE_VALUE}>Outro (Especificar)</SelectItem>
-                  </SelectContent>
-                </Select>
-                {showCustomTypeField && (
-                  <FormField control={form.control} name="customType" render={({ field: customField }) => (
-                    <FormItem className="mt-2">
-                      <FormControl><Input placeholder="Digite o tipo" {...customField} value={customField.value ?? ""} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                )}
-                <FormMessage />
-              </FormItem>
-            )} />
+              <FormField control={form.control} name="type" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo</FormLabel>
+                  <Select onValueChange={handleTypeChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {auxiliaryEquipmentTypeOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      <SelectItem value={CUSTOM_AUXILIARY_TYPE_VALUE}>Outro (Especificar)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {showCustomTypeField && (
+                    <FormField control={form.control} name="customType" render={({ field: customField }) => (
+                      <FormItem className="mt-2">
+                        <FormControl><Input placeholder="Digite o tipo" {...customField} value={customField.value ?? ""} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-            <FormField control={form.control} name="serialNumber" render={({ field }) => (
-              <FormItem><FormLabel>Número de Série (Opcional)</FormLabel><FormControl><Input placeholder="Nº de série único, se houver" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
+              <FormField control={form.control} name="serialNumber" render={({ field }) => (
+                <FormItem><FormLabel>Número de Série (Opcional)</FormLabel><FormControl><Input placeholder="Nº de série único, se houver" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
 
-            <FormField control={form.control} name="status" render={({ field }) => (
-              <FormItem><FormLabel>Status</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {auxiliaryEquipmentStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                  </SelectContent>
-                </Select><FormMessage />
-              </FormItem>
-            )} />
+              <FormField control={form.control} name="status" render={({ field }) => (
+                <FormItem><FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione o status" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {auxiliaryEquipmentStatusOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                    </SelectContent>
+                  </Select><FormMessage />
+                </FormItem>
+              )} />
 
-            <FormField control={form.control} name="linkedEquipmentId" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Vincular à Máquina Principal (Opcional)</FormLabel> 
-                <Select
-                  onValueChange={(selectedValue) => field.onChange(selectedValue === NO_LINKED_EQUIPMENT_VALUE ? null : selectedValue)}
-                  value={field.value ?? NO_LINKED_EQUIPMENT_VALUE}
-                >
-                  <FormControl><SelectTrigger>
-                    <SelectValue placeholder={isLoadingMaquinasPrincipais ? "Carregando..." : "Selecione para vincular"} />
-                  </SelectTrigger></FormControl>
-                  <SelectContent>
-                    {isLoadingMaquinasPrincipais ? (
-                      <SelectItem value={LOADING_EQUIPMENT_VALUE} disabled>Carregando...</SelectItem>
-                    ) : (
-                      <>
-                        <SelectItem value={NO_LINKED_EQUIPMENT_VALUE}>Nenhuma</SelectItem>
-                        {maquinasPrincipaisList.map((eq) => ( // Renamed variable
-                          <SelectItem key={eq.id} value={eq.id}>
-                            {eq.brand} {eq.model} (Chassi: {eq.chassisNumber})
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
+              <FormField control={form.control} name="linkedEquipmentId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Vincular à Máquina Principal (Opcional)</FormLabel> 
+                  <Select
+                    onValueChange={(selectedValue) => field.onChange(selectedValue === NO_LINKED_EQUIPMENT_VALUE ? null : selectedValue)}
+                    value={field.value ?? NO_LINKED_EQUIPMENT_VALUE}
+                  >
+                    <FormControl><SelectTrigger>
+                      <SelectValue placeholder={isLoadingMaquinasPrincipais ? "Carregando..." : "Selecione para vincular"} />
+                    </SelectTrigger></FormControl>
+                    <SelectContent>
+                      {isLoadingMaquinasPrincipais ? (
+                        <SelectItem value={LOADING_EQUIPMENT_VALUE} disabled>Carregando...</SelectItem>
+                      ) : (
+                        <>
+                          <SelectItem value={NO_LINKED_EQUIPMENT_VALUE}>Nenhuma</SelectItem>
+                          {maquinasPrincipaisList.map((eq) => ( 
+                            <SelectItem key={eq.id} value={eq.id}>
+                              {eq.brand} {eq.model} (Chassi: {eq.chassisNumber})
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais sobre o equipamento" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem><FormLabel>Observações (Opcional)</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais sobre o equipamento" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </fieldset>
           </form>
         </Form>
       </FormModal>
     </>
   );
 }
-
-    
