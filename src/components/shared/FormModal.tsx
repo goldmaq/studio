@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
-import { Trash2, Loader2, Save } from "lucide-react"; // Added Save icon
+import { Trash2, Loader2, Save, Pencil } from "lucide-react"; // Added Pencil icon
 
 interface FormModalProps<T> {
   isOpen: boolean;
@@ -25,8 +25,10 @@ interface FormModalProps<T> {
   onDeleteConfirm?: () => void;
   isDeleting?: boolean;
   deleteButtonLabel?: string;
-  submitButtonLabel?: string; // New prop for submit button text
-  disableSubmit?: boolean; // New prop to disable submit button
+  submitButtonLabel?: string;
+  disableSubmit?: boolean;
+  isEditMode: boolean; 
+  onEditModeToggle?: () => void; 
 }
 
 export function FormModal<T>({
@@ -41,8 +43,10 @@ export function FormModal<T>({
   onDeleteConfirm,
   isDeleting,
   deleteButtonLabel,
-  submitButtonLabel, // Use new prop
-  disableSubmit, // Use new prop
+  submitButtonLabel,
+  disableSubmit,
+  isEditMode,
+  onEditModeToggle,
 }: FormModalProps<T>) {
   const disableActions = isSubmitting || isDeleting;
 
@@ -54,13 +58,13 @@ export function FormModal<T>({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         
-        <div className="py-4 max-h-[70vh] overflow-y-auto pr-2"> {/* Increased max-h */}
+        <div className="py-4 max-h-[70vh] overflow-y-auto pr-2">
           {children}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between pt-4 border-t mt-4"> {/* Added border-t and mt-4 */}
+        <DialogFooter className="gap-2 sm:justify-between pt-4 border-t mt-4">
           <div className="flex-grow-0">
-            {editingItem && onDeleteConfirm && (
+            {editingItem && onDeleteConfirm && isEditMode && ( // Delete button only in edit mode
               <Button
                 type="button"
                 variant="outline"
@@ -80,25 +84,41 @@ export function FormModal<T>({
           </div>
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={onClose} disabled={disableActions}>
-              Cancelar
+              {isEditMode && editingItem ? "Cancelar Edição" : "Fechar"}
             </Button>
-            <Button 
-              type="submit" 
-              form={formId} 
-              disabled={disableActions || disableSubmit} // Use disableSubmit here
-              className="bg-primary hover:bg-primary/90"
-            >
-              {isSubmitting ? (
-                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                 <Save className="mr-2 h-4 w-4" /> 
-              )}
-              {isSubmitting ? (isDeleting ? "Processando..." : "Salvando...") : (submitButtonLabel || (editingItem ? "Salvar Alterações" : "Criar"))}
-            </Button>
+            
+            {/* Show Edit button in view mode for existing item */}
+            {!!editingItem && !isEditMode && onEditModeToggle && (
+              <Button
+                type="button"
+                onClick={onEditModeToggle}
+                disabled={disableActions}
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Editar
+              </Button>
+            )}
+            
+            {/* Show Submit button in edit mode or for new item */}
+            {isEditMode && (
+              <Button 
+                type="submit"
+                form={formId} 
+                disabled={disableActions || disableSubmit}
+                className="bg-primary hover:bg-primary/90"
+              >
+                {isSubmitting ? (
+                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                   <Save className="mr-2 h-4 w-4" /> 
+                )}
+                {isSubmitting ? (isDeleting ? "Processando..." : "Salvando...") : (submitButtonLabel || (editingItem ? "Salvar Alterações" : "Criar"))}
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

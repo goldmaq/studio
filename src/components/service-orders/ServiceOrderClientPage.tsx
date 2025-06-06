@@ -262,6 +262,7 @@ export function ServiceOrderClientPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ServiceOrder | null>(null);
   const [showCustomServiceType, setShowCustomServiceType] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isConclusionModalOpen, setIsConclusionModalOpen] = useState(false);
@@ -522,6 +523,7 @@ export function ServiceOrderClientPage() {
   const openModal = useCallback((order?: ServiceOrder) => {
     setMediaFiles([]);
     if (order) {
+      setIsEditMode(false); // Start in view mode for existing items
       setEditingOrder(order);
       const isServiceTypePredefined = serviceTypeOptionsList.includes(order.serviceType as any);
       form.reset({
@@ -539,6 +541,7 @@ export function ServiceOrderClientPage() {
       });
       setShowCustomServiceType(!isServiceTypePredefined);
     } else {
+      setIsEditMode(true); // Start in edit mode for new items
       setEditingOrder(null);
       const nextOrderNum = getNextOrderNumber(serviceOrders);
       form.reset({
@@ -558,6 +561,7 @@ export function ServiceOrderClientPage() {
     setEditingOrder(null);
     setMediaFiles([]);
     form.reset();
+    setIsEditMode(false); // Reset edit mode on close
     setShowCustomServiceType(false);
     setIsConclusionModalOpen(false);
     setTechnicalConclusionText("");
@@ -802,6 +806,8 @@ export function ServiceOrderClientPage() {
         deleteButtonLabel="Excluir OS"
         submitButtonLabel={editingOrder ? "Salvar Alterações" : "Criar OS"}
         disableSubmit={editingOrder?.phase === 'Concluída'}
+        isEditMode={isEditMode}
+        onEditModeToggle={() => setIsEditMode(true)}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="service-order-form" className="space-y-4">
@@ -978,7 +984,7 @@ export function ServiceOrderClientPage() {
             </fieldset>
 
             <FormItem>
-              <FormLabel>Anexos (Foto/Vídeo/PDF - Opcional) - Máx {MAX_FILES_ALLOWED} arquivos.</FormLabel>
+              <FormLabel>Anexos (Foto/Vídeo/PDF - Opcional){isEditMode ? ` - Máx ${MAX_FILES_ALLOWED} arquivos.` : ''}</FormLabel>
               {editingOrder && formMediaUrls && formMediaUrls.length > 0 && (
                 <div className="mb-2">
                   <p className="text-sm font-medium mb-1">Anexos Existentes ({formMediaUrls.length}):</p>
@@ -1001,7 +1007,7 @@ export function ServiceOrderClientPage() {
                 </div>
               )}
 
-              {!isOrderConcludedOrCancelled && (
+              {!isOrderConcludedOrCancelled && isEditMode && ( // Only show file input in edit mode
                 <FormControl>
                   <Input
                     type="file"
@@ -1016,13 +1022,13 @@ export function ServiceOrderClientPage() {
                 </FormControl>
               )}
 
-              {mediaFiles.length > 0 && !isOrderConcludedOrCancelled && (
+              {mediaFiles.length > 0 && !isOrderConcludedOrCancelled && isEditMode && ( // Only show file selection info in edit mode
                 <FormDescription className="mt-2 text-sm text-muted-foreground">
                   Novos arquivos selecionados ({mediaFiles.length}): {mediaFiles.map(file => file.name).join(', ')}. <br />
                   Total de anexos após salvar: {(formMediaUrls?.length || 0) + mediaFiles.length} / {MAX_FILES_ALLOWED}.
                 </FormDescription>
               )}
-              {((formMediaUrls?.length || 0) + mediaFiles.length) > MAX_FILES_ALLOWED && !isOrderConcludedOrCancelled && (
+              {((formMediaUrls?.length || 0) + mediaFiles.length) > MAX_FILES_ALLOWED && !isOrderConcludedOrCancelled && isEditMode && ( // Only show limit warning in edit mode
                 <p className="text-sm font-medium text-destructive mt-1">Limite de {MAX_FILES_ALLOWED} arquivos excedido.</p>
               )}
               <FormMessage />

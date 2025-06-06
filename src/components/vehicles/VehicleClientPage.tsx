@@ -71,6 +71,7 @@ export function VehicleClientPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const form = useForm<z.infer<typeof VehicleSchema>>({
     resolver: zodResolver(VehicleSchema),
@@ -164,6 +165,7 @@ export function VehicleClientPage() {
       setEditingVehicle(null); 
       form.reset({ model: "", licensePlate: "", kind: "", currentMileage: 0, fuelConsumption: 0, costPerKilometer: 0, fipeValue: null, registrationInfo: "", status: "Disponível" });
     }
+    setIsEditMode(!!vehicle); // Set to false if editing, true if creating
     setIsModalOpen(true);
   };
 
@@ -171,6 +173,7 @@ export function VehicleClientPage() {
     setIsModalOpen(false);
     setEditingVehicle(null);
     form.reset();
+    setIsEditMode(false); // Reset edit mode on close
   };
 
   const onSubmit = async (values: z.infer<typeof VehicleSchema>) => {

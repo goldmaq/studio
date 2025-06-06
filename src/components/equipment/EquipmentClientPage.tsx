@@ -157,6 +157,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   const [partsCatalogFile, setPartsCatalogFile] = useState<File | null>(null);
   const [errorCodesFile, setErrorCodesFile] = useState<File | null>(null);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
 
   const [showCustomFields, setShowCustomFields] = useState({
@@ -207,6 +208,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
   }
 
   const openModal = useCallback((maquina?: Maquina) => {
+ setIsEditMode(!!maquina); // Set edit mode to true for new, false for existing initially
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
     if (maquina) {
@@ -252,6 +254,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
       });
       setShowCustomFields({ brand: false, equipmentType: false });
     }
+
     setIsModalOpen(true);
   }, [form]);
 
@@ -442,6 +445,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
     setIsModalOpen(false);
     setEditingMaquina(null);
     setPartsCatalogFile(null);
+ setIsEditMode(false); // Reset edit mode on close
     setErrorCodesFile(null);
     form.reset();
     setShowCustomFields({ brand: false, equipmentType: false });
@@ -674,6 +678,8 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
         isSubmitting={isMutating}
         editingItem={editingMaquina}
         onDeleteConfirm={handleModalDeleteConfirm}
+ isEditMode={isEditMode}
+ onEditModeToggle={() => setIsEditMode(true)}
         isDeleting={deleteMaquinaMutation.isPending}
         deleteButtonLabel="Excluir Máquina"
       >
@@ -681,6 +687,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
           <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> {/* Updated id */}
             <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+ <fieldset disabled={!!editingMaquina && !isEditMode}>
               <FormField control={form.control} name="brand" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Marca</FormLabel>
@@ -712,6 +719,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                   <FormMessage />
                 </FormItem>
               )} />
+ </fieldset>
             </div>
 
             <FormField control={form.control} name="chassisNumber" render={({ field }) => (
@@ -823,6 +831,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+ <fieldset disabled={!!editingMaquina && !isEditMode}>
               <FormField control={form.control} name="towerOpenHeightMm" render={({ field }) => (
                 <FormItem><FormLabel>Altura Torre Aberta (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
               )} />
@@ -834,9 +843,11 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
               )} />
             </div>
 
+ </fieldset>
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Dimensões Caixa de Bateria (Opcional)</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => (
+ <fieldset disabled={!!editingMaquina && !isEditMode}>
                     <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="batteryBoxHeightMm" render={({ field }) => (
@@ -846,12 +857,14 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                     <FormItem><FormLabel>Profundidade (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
+ </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
             <FormItem>
               <FormLabel>Catálogo de Peças (PDF)</FormLabel>
               {editingMaquina?.partsCatalogUrl && !partsCatalogFile && (
                 <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+ <fieldset disabled={!!editingMaquina && !isEditMode}>
                   <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
                     <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
                   </a>
@@ -859,6 +872,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                     <XCircle className="h-4 w-4 mr-1"/> Remover
                   </Button>
                 </div>
+ </fieldset>
               )}
               <FormControl>
                 <Input
@@ -875,6 +889,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
             <FormItem>
               <FormLabel>Códigos de Erro (PDF)</FormLabel>
                {editingMaquina?.errorCodesUrl && !errorCodesFile && (
+ <fieldset disabled={!!editingMaquina && !isEditMode}>
                 <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
                   <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
                     <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
@@ -883,6 +898,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                     <XCircle className="h-4 w-4 mr-1"/> Remover
                   </Button>
                 </div>
+ </fieldset>
               )}
               <FormControl>
                 <Input
@@ -899,6 +915,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Informações Adicionais (Opcional)</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+ <fieldset disabled={!!editingMaquina && !isEditMode}>
                 <FormField control={form.control} name="hourMeter" render={({ field }) => (
                     <FormItem><FormLabel>Horímetro Atual (h)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -906,6 +923,7 @@ export function EquipmentClientPage({ equipmentIdFromUrl }: EquipmentClientPageP
                     <FormItem><FormLabel>Valor Aluguel Mensal (R$)</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
+ </fieldset>
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais, histórico, etc." {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
             )} />

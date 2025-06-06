@@ -79,6 +79,7 @@ async function fetchTechnicians(): Promise<Technician[]> {
 export function TechnicianClientPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTechnician, setEditingTechnician] = useState<Technician | null>(null);
@@ -164,11 +165,13 @@ export function TechnicianClientPage() {
         ...technician,
         phone: technician.phone ? formatPhoneNumberForInputDisplay(technician.phone) : "",
       });
+      setIsEditMode(false); // Start in view mode for existing items
     } else {
       setEditingTechnician(null);
       form.reset({ name: "", employeeId: "", specialization: "", phone: "" });
+      setIsEditMode(true); // Start in edit mode for new items
     }
-    setIsModalOpen(true);
+    setIsModalOpen(true); // Ensure modal is open
   };
 
   const closeModal = () => {
@@ -176,6 +179,7 @@ export function TechnicianClientPage() {
     setEditingTechnician(null);
     form.reset();
   };
+  
 
   const onSubmit = async (values: z.infer<typeof TechnicianSchema>) => {
     const dataToSave = {
@@ -307,6 +311,8 @@ export function TechnicianClientPage() {
         editingItem={editingTechnician}
         onDeleteConfirm={handleModalDeleteConfirm}
         isDeleting={deleteTechnicianMutation.isPending}
+        isEditMode={isEditMode}
+        onEditModeToggle={() => setIsEditMode(true)}
         deleteButtonLabel="Excluir Técnico"
       >
         <Form {...form}>
@@ -314,34 +320,36 @@ export function TechnicianClientPage() {
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome completo do técnico" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
-            <FormField control={form.control} name="employeeId" render={({ field }) => (
-              <FormItem><FormLabel>Matrícula</FormLabel><FormControl><Input placeholder="Identificador único do funcionário" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="specialization" render={({ field }) => (
-              <FormItem><FormLabel>Especialização (Opcional)</FormLabel><FormControl><Input placeholder="ex: Hidráulica, Elétrica" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="phone" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Telefone/WhatsApp (Opcional)</FormLabel>
-                <FormControl>
-                  <Input 
-                    placeholder="(00) 00000-0000" 
-                    {...field} 
-                    value={field.value ?? ""}
-                    onChange={(e) => {
-                      const rawValue = e.target.value.replace(/\D/g, "");
-                      if (rawValue.length <= 11) { 
-                        field.onChange(formatPhoneNumberForInputDisplay(e.target.value));
-                      } else {
-                        field.onChange(formatPhoneNumberForInputDisplay(rawValue.substring(0,11)));
-                      }
-                    }}
-                    maxLength={15} 
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <fieldset disabled={!!editingTechnician && !isEditMode} className="space-y-4"> {/* Wrap form fields in fieldset */}
+              <FormField control={form.control} name="employeeId" render={({ field }) => (
+                <FormItem><FormLabel>Matrícula</FormLabel><FormControl><Input placeholder="Identificador único do funcionário" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="specialization" render={({ field }) => (
+                <FormItem><FormLabel>Especialização (Opcional)</FormLabel><FormControl><Input placeholder="ex: Hidráulica, Elétrica" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="phone" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Telefone/WhatsApp (Opcional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="(00) 00000-0000"
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/\D/g, "");
+                        if (rawValue.length <= 11) {
+                          field.onChange(formatPhoneNumberForInputDisplay(e.target.value));
+                        } else {
+                          field.onChange(formatPhoneNumberForInputDisplay(rawValue.substring(0, 11)));
+                        }
+                      }}
+                      maxLength={15}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </fieldset>
           </form>
         </Form>
       </FormModal>

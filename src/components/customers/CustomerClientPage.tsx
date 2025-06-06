@@ -20,7 +20,7 @@ import { FormModal } from "@/components/shared/FormModal";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "firebase/firestore";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueryState } from "@tanstack/react-query";
 import { Textarea } from "../ui/textarea";
 
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
@@ -159,6 +159,7 @@ export function CustomerClientPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isCepLoading, setIsCepLoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const form = useForm<z.infer<typeof CustomerSchema>>({
     resolver: zodResolver(CustomerSchema),
@@ -309,6 +310,7 @@ export function CustomerClientPage() {
         preferredTechnician: customer.preferredTechnician || null,
         cep: customer.cep || null,
       });
+      setIsEditMode(false);
     } else {
       setEditingCustomer(null);
       form.reset({
@@ -317,11 +319,13 @@ export function CustomerClientPage() {
         preferredTechnician: null, notes: ""
       });
     }
+    setIsEditMode(true);
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setIsEditMode(false);
     setEditingCustomer(null);
     form.reset();
   };
@@ -557,6 +561,8 @@ export function CustomerClientPage() {
         editingItem={editingCustomer}
         onDeleteConfirm={editingCustomer ? handleModalDeleteConfirm : undefined}
         isDeleting={deleteCustomerMutation.isPending}
+ isEditMode={isEditMode}
+        onEditModeToggle={() => setIsEditMode(true)}
         deleteButtonLabel="Excluir Cliente"
       >
         <Form {...form}>
