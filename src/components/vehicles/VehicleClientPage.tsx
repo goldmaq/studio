@@ -178,10 +178,16 @@ export function VehicleClientPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof VehicleSchema>) => {
+    const dataToSave = {
+ ...values,
+ model: values.model.toLowerCase(),
+      kind: values.kind.toLowerCase(),
+      registrationInfo: values.registrationInfo?.toLowerCase() || "",
+    };
     if (editingVehicle && editingVehicle.id && !editingVehicle.id.startsWith("mock")) {
-      updateVehicleMutation.mutate({ ...values, id: editingVehicle.id });
+ updateVehicleMutation.mutate({ ...dataToSave, id: editingVehicle.id });
     } else {
-      addVehicleMutation.mutate(values);
+ addVehicleMutation.mutate(dataToSave);
     }
   };
 

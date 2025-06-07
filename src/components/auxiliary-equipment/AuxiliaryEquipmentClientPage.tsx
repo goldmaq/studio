@@ -26,6 +26,14 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
+// Helper function to convert string to Title Case
+const toTitleCase = (str: string): string => {
+  if (!str) return "";
+  return str.toLowerCase().split(' ').map(word => {
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+};
+
 const FIRESTORE_AUX_EQUIPMENT_COLLECTION_NAME = "equipamentosAuxiliares";
 const FIRESTORE_MAQUINAS_COLLECTION_NAME = "equipamentos";
 
@@ -122,8 +130,9 @@ export function AuxiliaryEquipmentClientPage() {
       if (!db) throw new Error("Conexão com Firebase não disponível para adicionar equipamento auxiliar.");
       const { customType, ...dataToSave } = newItemData;
       const finalData = {
-        ...dataToSave,
-        type: dataToSave.type === CUSTOM_AUXILIARY_TYPE_VALUE ? customType || "Outro" : dataToSave.type,
+        name: toTitleCase(dataToSave.name),
+        type: dataToSave.type === CUSTOM_AUXILIARY_TYPE_VALUE ? toTitleCase(customType || "Outro") : toTitleCase(dataToSave.type),
+        customType: customType ? toTitleCase(customType) : "",
         serialNumber: dataToSave.serialNumber || null,
         linkedEquipmentId: dataToSave.linkedEquipmentId || null,
         notes: dataToSave.notes || null,
@@ -147,7 +156,9 @@ export function AuxiliaryEquipmentClientPage() {
       if (!id) throw new Error("ID do item é necessário para atualização.");
       const finalData = {
         ...dataToUpdate,
-        type: dataToUpdate.type === CUSTOM_AUXILIARY_TYPE_VALUE ? customType || "Outro" : dataToUpdate.type,
+        name: toTitleCase(dataToUpdate.name),
+        type: dataToUpdate.type === CUSTOM_AUXILIARY_TYPE_VALUE ? toTitleCase(customType || "Outro") : toTitleCase(dataToUpdate.type),
+        customType: customType ? toTitleCase(customType) : "",
         serialNumber: dataToUpdate.serialNumber || null,
         linkedEquipmentId: dataToUpdate.linkedEquipmentId || null,
         notes: dataToUpdate.notes || null,

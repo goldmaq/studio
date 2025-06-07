@@ -1,26 +1,27 @@
 
 "use client";
 
-import React from 'react'; // Explicitly import React
-import { useState, useEffect, useCallback } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
+import React from 'react';
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from "react-hook-form";
 import type * as z from "zod";
-import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer } from "lucide-react";
+import { PlusCircle, Construction, Tag, Layers, CalendarDays, CheckCircle, User, Loader2, Users, FileText, Coins, Package, ShieldAlert, Trash2, AlertTriangle as AlertIconLI, UploadCloud, BookOpen, AlertCircle, Link as LinkIcon, XCircle, Building, UserCog, ArrowUpFromLine, ArrowDownToLine, Timer, Search, Database } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import type { Maquina, Customer, CompanyId, OwnerReferenceType } from "@/types"; 
+import type { Maquina, Customer, CompanyId, OwnerReferenceType } from "@/types";
 import { MaquinaSchema, maquinaTypeOptions, maquinaOperationalStatusOptions, companyDisplayOptions, OWNER_REF_CUSTOMER, companyIds } from "@/types"; 
 import { PageHeader } from "@/components/shared/PageHeader";
-import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder";
+import { DataTablePlaceholder } from "@/components/shared/DataTablePlaceholder"; 
 import { FormModal } from "@/components/shared/FormModal";
+import { ClipboardSignature } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { db, storage } from "@/lib/firebase";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc } from "firebase/firestore";
+import { db, storage } from '@/lib/firebase';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, where } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,10 +31,13 @@ import type { LucideIcon } from "lucide-react";
 const FIRESTORE_EQUIPMENT_COLLECTION_NAME = "equipamentos"; 
 const FIRESTORE_CUSTOMER_COLLECTION_NAME = "clientes";
 
+const ALL_CUSTOMERS_FILTER_VALUE = "_ALL_CUSTOMERS_";
 const NO_CUSTOMER_SELECT_ITEM_VALUE = "_NO_CUSTOMER_SELECTED_";
 const LOADING_CUSTOMERS_SELECT_ITEM_VALUE = "_LOADING_CUSTOMERS_";
-const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
 
+const ALL_STATUSES_FILTER_VALUE = "_ALL_STATUSES_";
+
+const NO_OWNER_REFERENCE_VALUE = "_NOT_SPECIFIED_";
 
 const operationalStatusIcons: Record<typeof maquinaOperationalStatusOptions[number], JSX.Element> = {
   Disponível: <CheckCircle className="h-4 w-4 text-green-500" />,
@@ -68,6 +72,7 @@ const getFileNameFromUrl = (url: string): string => {
     return "arquivo";
   }
 };
+
 
 async function uploadFile(
   file: File,
@@ -129,10 +134,11 @@ async function fetchMaquinas(): Promise<Maquina[]> {
       hourMeter: parseNumericToNullOrNumber(data.hourMeter),
       notes: data.notes || null,
       partsCatalogUrl: data.partsCatalogUrl || null,
+      fleetNumber: data.fleetNumber || null,
       errorCodesUrl: data.errorCodesUrl || null,
     } as Maquina;
   });
-}
+};
 
 async function fetchCustomers(): Promise<Customer[]> {
   if (!db) {
@@ -143,11 +149,11 @@ async function fetchCustomers(): Promise<Customer[]> {
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Customer));
 }
 
-interface MaquinasClientPageProps { 
-  maquinaIdFromUrl?: string | null; 
+interface MaquinasClientPageProps {
+ maquinaIdFromUrl?: string | null;
 }
 
-export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps) { 
+export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -155,19 +161,21 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   const [editingMaquina, setEditingMaquina] = useState<Maquina | null>(null); 
   const [partsCatalogFile, setPartsCatalogFile] = useState<File | null>(null);
   const [errorCodesFile, setErrorCodesFile] = useState<File | null>(null);
-  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [customerFilter, setCustomerFilter] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const [showCustomFields, setShowCustomFields] = useState({
     brand: false,
     equipmentType: false,
   });
-
-  const form = useForm<z.infer<typeof MaquinaSchema>>({ 
-    resolver: zodResolver(MaquinaSchema), 
+  const form = useForm<z.infer<typeof MaquinaSchema>>({
+    resolver: zodResolver(MaquinaSchema),
     defaultValues: {
-      brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
+      brand: "", model: "", chassisNumber: "", equipmentType: maquinaTypeOptions[0],
       operationalStatus: "Disponível", customerId: null, 
       ownerReference: null, 
       manufactureYear: new Date().getFullYear(),
@@ -175,12 +183,12 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       towerOpenHeightMm: undefined, towerClosedHeightMm: undefined,
       nominalCapacityKg: undefined,
       batteryBoxWidthMm: undefined, batteryBoxHeightMm: undefined, batteryBoxDepthMm: undefined,
-      notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
+      notes: "", monthlyRentalValue: undefined, hourMeter: undefined, fleetNumber: null,
       partsCatalogUrl: null, errorCodesUrl: null,
     },
   });
 
-  const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({ 
+  const { data: maquinaList = [], isLoading: isLoadingMaquinas, isError: isErrorMaquinas, error: errorMaquinas } = useQuery<Maquina[], Error>({
     queryKey: [FIRESTORE_EQUIPMENT_COLLECTION_NAME], 
     queryFn: fetchMaquinas, 
     enabled: !!db,
@@ -192,30 +200,38 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     enabled: !!db,
   });
   
-  if (!db || !storage) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <AlertIconLI className="h-16 w-16 text-destructive mb-4" />
-        <PageHeader title="Erro de Conexão" />
-        <p className="text-lg text-center text-muted-foreground">
-          Não foi possível conectar aos serviços do Firebase.
-          <br />
-          Verifique a configuração e sua conexão com a internet.
-        </p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    // Set default filters after initial load
+    if (!isLoadingMaquinas && maquinaList.length > 0 && statusFilter === null && customerFilter === null) {
+      setStatusFilter(ALL_STATUSES_FILTER_VALUE);
+      setCustomerFilter(ALL_CUSTOMERS_FILTER_VALUE);
+    }
+  }, [isLoadingMaquinas, maquinaList, statusFilter, customerFilter]);
+
+  const filteredMaquinas = useMemo(() => {
+    return maquinaList?.filter(maquina => {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      const matchesSearch =
+        (maquina.brand?.toLowerCase() ?? '').includes(lowerCaseSearchTerm) ||
+        (maquina.fleetNumber?.toLowerCase() ?? '').includes(lowerCaseSearchTerm);
+
+        const matchesStatus = statusFilter && statusFilter !== ALL_STATUSES_FILTER_VALUE
+        ? maquina.operationalStatus === statusFilter
+        : true;
+            const matchesCustomer = customerFilter && customerFilter !== ALL_CUSTOMERS_FILTER_VALUE ? maquina.customerId === customerFilter : true;
+      return matchesSearch && matchesStatus && matchesCustomer;
+    });
+  }, [maquinaList, searchTerm, statusFilter, customerFilter]);
 
   const openModal = useCallback((maquina?: Maquina) => { 
-    setPartsCatalogFile(null);
+    setPartsCatalogFile(null); // Clear file inputs on opening
     setErrorCodesFile(null);
     if (maquina) {
-      setEditingMaquina(maquina); 
-      setIsEditMode(false); // Start in view mode for existing items
-      const isBrandPredefined = predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra";
-      const isEquipmentTypePredefined = maquinaTypeOptions.includes(maquina.equipmentType as any); 
+      setEditingMaquina(maquina);
+      const isBrandPredefined = maquina.brand ? (predefinedBrandOptionsList.includes(maquina.brand) && maquina.brand !== "Outra") : false;
+      const isEquipmentTypePredefined = maquina.equipmentType ? maquinaTypeOptions.includes(maquina.equipmentType as any) : false;
 
-      form.reset({
+     form.reset({
         ...maquina,
         model: maquina.model || "",
         brand: isBrandPredefined ? maquina.brand : '_CUSTOM_',
@@ -234,15 +250,16 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
         monthlyRentalValue: maquina.monthlyRentalValue ?? undefined,
         hourMeter: maquina.hourMeter ?? undefined,
         notes: maquina.notes || "",
+        fleetNumber: maquina.fleetNumber ?? null,
         partsCatalogUrl: maquina.partsCatalogUrl || null,
         errorCodesUrl: maquina.errorCodesUrl || null,
       });
       setShowCustomFields({ brand: !isBrandPredefined, equipmentType: !isEquipmentTypePredefined });
+      setIsEditMode(false);
     } else {
       setEditingMaquina(null); 
-      setIsEditMode(true); // Start in edit mode for new items
       form.reset({
-        brand: "", model: "", chassisNumber: "", equipmentType: "Empilhadeira Contrabalançada GLP",
+        brand: "", model: "", chassisNumber: "", equipmentType: maquinaTypeOptions[0], // Default to the first option
         operationalStatus: "Disponível", customerId: null, 
         ownerReference: null, 
         manufactureYear: new Date().getFullYear(),
@@ -250,14 +267,16 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
         towerOpenHeightMm: undefined, towerClosedHeightMm: undefined, nominalCapacityKg: undefined,
         batteryBoxWidthMm: undefined, batteryBoxHeightMm: undefined, batteryBoxDepthMm: undefined,
         notes: "", monthlyRentalValue: undefined, hourMeter: undefined,
+        fleetNumber: null,
         partsCatalogUrl: null, errorCodesUrl: null,
       });
       setShowCustomFields({ brand: false, equipmentType: false });
+      setIsEditMode(true);
     }
     setIsModalOpen(true);
-  }, [form, maquinaList]); // Dependency array reviewed
+  }, [form]); 
 
-  useEffect(() => {
+ useEffect(() => {
     if (maquinaIdFromUrl && !isLoadingMaquinas && maquinaList.length > 0 && !isModalOpen) { 
       const maquinaToEdit = maquinaList.find(eq => eq.id === maquinaIdFromUrl); 
       if (maquinaToEdit) {
@@ -268,13 +287,13 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       }
     }
   }, [maquinaIdFromUrl, maquinaList, isLoadingMaquinas, openModal, isModalOpen]); 
-
+  
   const prepareDataForFirestore = (
-    formData: z.infer<typeof MaquinaSchema>, 
-    newPartsCatalogUrl?: string | null,
+    formData: z.infer<typeof MaquinaSchema>,
+    newPartsCatalogUrl?: string | null, // Make these optional
     newErrorCodesUrl?: string | null
   ): Omit<Maquina, 'id' | 'customBrand' | 'customEquipmentType'> => { 
-    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, ...restOfData } = formData;
+    const { customBrand, customEquipmentType, customerId: formCustomerId, ownerReference: formOwnerReferenceFromForm, fleetNumber: formFleetNumber, ...restOfData } = formData;
     const parsedData = {
       ...restOfData,
       manufactureYear: parseNumericToNullOrNumber(restOfData.manufactureYear),
@@ -287,11 +306,13 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
       monthlyRentalValue: parseNumericToNullOrNumber(restOfData.monthlyRentalValue),
       hourMeter: parseNumericToNullOrNumber(restOfData.hourMeter),
     };
-
+    
     const finalOwnerReference: OwnerReferenceType | null = formOwnerReferenceFromForm ?? null;
+    const finalFleetNumber: string | null = formFleetNumber || null;
 
     return {
       ...parsedData,
+      fleetNumber: finalFleetNumber,
       brand: parsedData.brand === '_CUSTOM_' ? customBrand || "Não especificado" : parsedData.brand,
       model: parsedData.model,
       equipmentType: parsedData.equipmentType === '_CUSTOM_' ? customEquipmentType || "Não especificado" : parsedData.equipmentType,
@@ -347,8 +368,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     mutationFn: async (data: {
       id: string,
       formData: z.infer<typeof MaquinaSchema>, 
-      catalogFile: File | null,
-      codesFile: File | null,
+      catalogFile: File | null, // New file to upload
+      codesFile: File | null, // New file to upload
       currentMaquina: Maquina 
     }) => {
       if (!db || !storage) {
@@ -439,15 +460,14 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     },
   });
 
-
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingMaquina(null); 
     setPartsCatalogFile(null);
     setErrorCodesFile(null);
-    setIsEditMode(false); // Reset edit mode on close
     form.reset();
     setShowCustomFields({ brand: false, equipmentType: false });
+    setIsEditMode(false);
   };
 
   const onSubmit = async (values: z.infer<typeof MaquinaSchema>) => { 
@@ -476,7 +496,6 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     }
   };
 
-
   const handleFileRemove = (fileType: 'partsCatalogUrl' | 'errorCodesUrl') => {
     if (editingMaquina && editingMaquina.id) { 
       const fileUrlToRemove = editingMaquina[fileType];
@@ -488,9 +507,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
     }
   };
 
-
   const handleSelectChange = (field: 'brand' | 'equipmentType', value: string) => {
-    form.setValue(field, value);
+    form.setValue(field, value as any);
     setShowCustomFields(prev => ({ ...prev, [field]: value === '_CUSTOM_' }));
     if (value !== '_CUSTOM_') {
         form.setValue(field === 'brand' ? 'customBrand' : 'customEquipmentType', "");
@@ -512,11 +530,26 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   const getOwnerIcon = (ownerRef?: OwnerReferenceType | null): LucideIcon => {
     if (ownerRef === OWNER_REF_CUSTOMER) return UserCog;
     if (companyIds.includes(ownerRef as CompanyId)) return Building;
+    
     return Construction;
   };
 
   const isLoadingPage = isLoadingMaquinas || isLoadingCustomers;
-  const isMutating = addMaquinaMutation.isPending || updateMaquinaMutation.isPending || deleteMaquinaMutation.isPending || removeFileMutation.isPending || isUploadingFiles;
+  const isMutating = addMaquinaMutation.isPending || updateMaquinaMutation.isPending || deleteMaquinaMutation.isPending || removeFileMutation.isPending || isUploadingFiles || isSeeding;
+
+  if (!db || !storage) {
+    return ( // Display error if Firebase connection fails
+      <div className="flex flex-col items-center justify-center h-full">
+        <AlertIconLI className="h-16 w-16 text-destructive mb-4" />
+        <PageHeader title="Erro de Conexão" />
+        <p className="text-lg text-center text-muted-foreground">
+          Não foi possível conectar aos serviços do Firebase.
+          <br />
+          Verifique a configuração e sua conexão com a internet.
+        </p>
+      </div>
+    );
+  }
 
   if (isLoadingPage && !isModalOpen) {
     return (
@@ -539,27 +572,101 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
   }
 
   return (
-    <React.Fragment>
-      <PageHeader
+    <>
+      <PageHeader // Page title and Add button
         title="Máquinas" 
         actions={
           <Button onClick={() => openModal()} className="bg-primary hover:bg-primary/90" disabled={isMutating}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Máquina
+              <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Máquina
           </Button>
         }
       />
 
-      {maquinaList.length === 0 && !isLoadingMaquinas ? ( 
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="md:col-span-1 flex items-center">
+          <Input
+            placeholder="Pesquisar máquina..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
+
+        {/* Status Filter */}
+        <div className="md:col-span-1">
+        <Select onValueChange={(value) => setStatusFilter(value)} value={statusFilter ?? ALL_STATUSES_FILTER_VALUE}>
+  <SelectTrigger className="w-full">
+    <SelectValue placeholder="Filtrar por Status" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value={ALL_STATUSES_FILTER_VALUE}>Todos os Status</SelectItem>
+    {maquinaOperationalStatusOptions.map(status => (
+      <SelectItem key={status} value={status}>{status}</SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+        </div>
+
+        {/* Customer Filter - Show only if there are customers */}
+        {!isLoadingCustomers && customers.length > 0 && (
+        <div className="md:col-span-2 lg:col-span-2">
+          <Select onValueChange={setCustomerFilter} value={customerFilter ?? ALL_CUSTOMERS_FILTER_VALUE}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Filtrar por Cliente"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_CUSTOMERS_FILTER_VALUE}>Todos os Clientes</SelectItem>
+              <SelectItem value={NO_CUSTOMER_SELECT_ITEM_VALUE}>Sem Cliente Vinculado</SelectItem>
+
+              {isLoadingCustomers ? (
+                // Display loading state if customers are still being fetched
+                <SelectItem value={LOADING_CUSTOMERS_SELECT_ITEM_VALUE} disabled>Carregando clientes...</SelectItem>
+              ) : (
+                customers.map(cust => (
+                  <SelectItem key={cust.id} value={cust.id}>{cust.name} ({cust.cnpj})</SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        )}
+      </div>
+
+      {isLoadingMaquinas && (
+         <div className="flex justify-center items-center h-64">
+           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+           <p className="ml-2">Carregando máquinas...</p>
+         </div>
+      )}
+      {/* Placeholder for no machines registered */}
+      {!isLoadingMaquinas && maquinaList.length === 0 && searchTerm === "" && statusFilter === null && customerFilter === null && (
         <DataTablePlaceholder
           icon={Construction}
-          title="Nenhuma Máquina Registrada" 
-          description="Adicione sua primeira máquina para começar a rastrear." 
+          title="Nenhuma Máquina Registrada"
+          description="Comece adicionando a primeira máquina ao seu inventário."
           buttonLabel="Adicionar Máquina" 
           onButtonClick={() => openModal()}
         />
-      ) : (
+      )}
+       {/* Placeholder for no results with filters/search */}
+      {!isLoadingMaquinas && filteredMaquinas.length === 0 && (searchTerm !== "" || statusFilter !== null || customerFilter !== null) && (
+        <DataTablePlaceholder
+          icon={Search}
+          title="Nenhuma Máquina Encontrada"
+          description={`Nenhum resultado para os filtros aplicados ou pesquisa "${searchTerm}".`}
+          buttonLabel="Limpar Filtros/Pesquisa"
+          onButtonClick={() => {
+            setSearchTerm("");
+            setStatusFilter(null);
+            setCustomerFilter(null);
+          }}
+        />
+      )}
+       {/* Display list of machines */}
+
+      {!isLoadingMaquinas && filteredMaquinas.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {maquinaList.map((maq) => { 
+          {filteredMaquinas.map((maq) => {
             const customer = maq.customerId ? customers.find(c => c.id === maq.customerId) : null;
             const ownerDisplay = getOwnerDisplayString(maq.ownerReference, maq.customerId, customers);
             const OwnerIconComponent = getOwnerIcon(maq.ownerReference);
@@ -578,6 +685,13 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     <span className="font-medium text-muted-foreground mr-1">Chassi:</span>
                     <span>{maq.chassisNumber}</span>
                   </p>
+                 {maq.fleetNumber && (
+                  <p className="flex items-center text-sm">
+                    <ClipboardSignature className="mr-2 h-4 w-4 text-primary flex-shrink-0" />
+                    <span className="font-medium text-muted-foreground mr-1">Frota:</span>
+                    <span>{maq.fleetNumber}</span>
+                  </p>
+                 )}
                 <p className="flex items-center text-sm"><Layers className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Tipo:</span> {maq.equipmentType}</p>
                 {maq.manufactureYear && <p className="flex items-center text-sm"><CalendarDays className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Ano:</span> {maq.manufactureYear}</p>}
                 <p className="flex items-center text-sm">
@@ -618,7 +732,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                   <p className="flex items-center text-sm"><ArrowDownToLine className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">H1 - Torre Fechada:</span> {maq.towerClosedHeightMm} mm</p>
                 )}
                  {maq.hourMeter !== null && maq.hourMeter !== undefined && <p className="flex items-center text-sm"><Timer className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Horímetro:</span> {maq.hourMeter}h</p>}
-                 {maq.monthlyRentalValue !== null && maq.monthlyRentalValue !== undefined && <p className="flex items-center text-sm"><Coins className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Aluguel Mensal:</span> R$ {maq.monthlyRentalValue.toFixed(2)}</p>}
+                 {maq.monthlyRentalValue !== null && maq.monthlyRentalValue !== undefined && <p className="flex items-center text-sm"><Coins className="mr-2 h-4 w-4 text-primary" /> <span className="font-medium text-muted-foreground mr-1">Aluguel Mensal:</span> R$ {Number(maq.monthlyRentalValue).toFixed(2)}</p>}
 
                  {maq.partsCatalogUrl && (
                     <p className="flex items-center text-sm">
@@ -670,23 +784,23 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
 
       <FormModal
         isOpen={isModalOpen}
-        onClose={closeModal}
+        onClose={closeModal} 
         title={editingMaquina ? "Editar Máquina" : "Adicionar Nova Máquina"} 
         description="Forneça os detalhes da máquina, incluindo arquivos PDF se necessário." 
         formId="maquina-form" 
         isSubmitting={isMutating}
         editingItem={editingMaquina} 
-        onDeleteConfirm={handleModalDeleteConfirm}
-        isEditMode={isEditMode}
-        onEditModeToggle={() => setIsEditMode(true)}
+        onDeleteConfirm={handleModalDeleteConfirm} 
+        onEditModeToggle={() => setIsEditMode(true)} 
         isDeleting={deleteMaquinaMutation.isPending} 
+        isEditMode={isEditMode}
         deleteButtonLabel="Excluir Máquina" 
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} id="maquina-form" className="space-y-4"> 
-            <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
+              <h3 className="text-md font-semibold pt-2 border-b pb-1 font-headline">Informações Básicas</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField control={form.control} name="brand" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Marca</FormLabel>
@@ -718,9 +832,8 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     <FormMessage />
                   </FormItem>
                 )} />
-              </fieldset>
-            </div>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+              </div>
+
               <FormField control={form.control} name="chassisNumber" render={({ field }) => (
                 <FormItem><FormLabel>Número do Chassi</FormLabel><FormControl><Input placeholder="Número único do chassi" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
@@ -736,7 +849,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                       value={field.value || NO_OWNER_REFERENCE_VALUE}
                     >
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue placeholder="Selecione o proprietário" />
                         </SelectTrigger>
                       </FormControl>
@@ -767,7 +880,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Selecione um cliente"} />
+                          <SelectValue placeholder={isLoadingCustomers ? "Carregando clientes..." : "Selecione um cliente (Opcional)"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -777,9 +890,12 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                           <>
                             <SelectItem value={NO_CUSTOMER_SELECT_ITEM_VALUE}>Nenhum</SelectItem>
                             {customers.map((cust) => (
-                              <SelectItem key={cust.id} value={cust.id}>
-                                {cust.name} ({cust.cnpj})
-                              </SelectItem>
+                              // Add check to ensure cust.id exists before rendering SelectItem
+                              cust.id && (
+                                <SelectItem key={cust.id} value={cust.id}>
+                                  {cust.name} ({cust.cnpj})
+                                </SelectItem>
+                              )
                             ))}
                           </>
                         )}
@@ -826,10 +942,18 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                   </Select><FormMessage />
                 </FormItem>
               )} />
+
+              <FormField
+                control={form.control}
+                name="fleetNumber"
+                render={({ field }) => (
+                <FormItem><FormLabel>Número da Frota</FormLabel><FormControl><Input placeholder="Ex: F-001, FROTA123" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+                )}
+              />
             </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Especificações Técnicas (Opcional)</h3>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <FormField control={form.control} name="towerOpenHeightMm" render={({ field }) => (
                   <FormItem><FormLabel>H3 - Torre Aberta (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
@@ -844,7 +968,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Dimensões Caixa de Bateria (Opcional)</h3>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField control={form.control} name="batteryBoxWidthMm" render={({ field }) => (
                       <FormItem><FormLabel>Largura (mm)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseInt(e.target.value,10))} /></FormControl><FormMessage /></FormItem>
@@ -857,62 +981,59 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
                   )} />
               </div>
             </fieldset>
-
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Arquivos (PDF)</h3>
-            <FormItem>
-              <FormLabel>Catálogo de Peças (PDF)</FormLabel>
-              <fieldset disabled={!!editingMaquina && !isEditMode}>
-                {editingMaquina?.partsCatalogUrl && !partsCatalogFile && (
-                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                    <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                      <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
-                    </a>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('partsCatalogUrl')} className="text-destructive hover:text-destructive">
-                      <XCircle className="h-4 w-4 mr-1"/> Remover
-                    </Button>
-                  </div>
-                )}
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setPartsCatalogFile(e.target.files ? e.target.files[0] : null)}
-                    className="mt-1"
-                  />
-                </FormControl>
-                {partsCatalogFile && <FormDescription>Novo arquivo selecionado: {partsCatalogFile.name}</FormDescription>}
-              </fieldset>
-              <FormMessage />
-            </FormItem>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
+              <FormItem>
+                <FormLabel>Catálogo de Peças (PDF)</FormLabel>
+                  {editingMaquina?.partsCatalogUrl && !partsCatalogFile && (
+                    <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                      <a href={editingMaquina.partsCatalogUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                        <LinkIcon className="h-3 w-3"/> Ver Catálogo: {getFileNameFromUrl(editingMaquina.partsCatalogUrl)}
+                      </a>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('partsCatalogUrl')} className="text-destructive hover:text-destructive">
+                        <XCircle className="h-4 w-4 mr-1"/> Remover
+                      </Button>
+                    </div>
+                  )}
+                  <FormControl>
+                    <Input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setPartsCatalogFile(e.target.files ? e.target.files[0] : null)}
+                      className="mt-1"
+                    />
+                  </FormControl>
+                  {partsCatalogFile && <FormDescription>Novo arquivo selecionado: {partsCatalogFile.name}</FormDescription>}
+                <FormMessage />
+              </FormItem>
 
-            <FormItem>
-              <FormLabel>Códigos de Erro (PDF)</FormLabel>
-              <fieldset disabled={!!editingMaquina && !isEditMode}>
-                 {editingMaquina?.errorCodesUrl && !errorCodesFile && ( 
-                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                    <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
-                      <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
-                    </a>
-                     <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('errorCodesUrl')} className="text-destructive hover:text-destructive">
-                      <XCircle className="h-4 w-4 mr-1"/> Remover
-                    </Button>
-                  </div>
-                )}
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setErrorCodesFile(e.target.files ? e.target.files[0] : null)}
-                    className="mt-1"
-                  />
-                </FormControl>
-                {errorCodesFile && <FormDescription>Novo arquivo selecionado: {errorCodesFile.name}</FormDescription>}
-              </fieldset>
-              <FormMessage />
-            </FormItem>
+              <FormItem>
+                <FormLabel>Códigos de Erro (PDF)</FormLabel>
+                   {editingMaquina?.errorCodesUrl && !errorCodesFile && ( 
+                    <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                      <a href={editingMaquina.errorCodesUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                        <LinkIcon className="h-3 w-3"/> Ver Códigos: {getFileNameFromUrl(editingMaquina.errorCodesUrl)}
+                      </a>
+                       <Button type="button" variant="ghost" size="sm" onClick={() => handleFileRemove('errorCodesUrl')} className="text-destructive hover:text-destructive">
+                        <XCircle className="h-4 w-4 mr-1"/> Remover
+                      </Button>
+                    </div>
+                  )}
+                  <FormControl>
+                    <Input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setErrorCodesFile(e.target.files ? e.target.files[0] : null)}
+                      className="mt-1"
+                    />
+                  </FormControl>
+                  {errorCodesFile && <FormDescription>Novo arquivo selecionado: {errorCodesFile.name}</FormDescription>}
+                <FormMessage />
+              </FormItem>
+            </fieldset>
 
             <h3 className="text-md font-semibold pt-4 border-b pb-1 font-headline">Informações Adicionais (Opcional)</h3>
-            <fieldset disabled={!!editingMaquina && !isEditMode}>
+            <fieldset disabled={isMutating || (!!editingMaquina && !isEditMode)}>
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormField control={form.control} name="hourMeter" render={({ field }) => (
                       <FormItem><FormLabel>Horímetro Atual (h)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value === '' ? null : parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>
@@ -927,7 +1048,7 @@ export function MaquinasClientPage({ maquinaIdFromUrl }: MaquinasClientPageProps
             </fieldset>
           </form>
         </Form>
-      </FormModal>
-    </React.Fragment>
+ </FormModal>
+    </>
   );
 }
